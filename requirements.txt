@@ -1,0 +1,8 @@
+# Évaluation (léger, suffit pour evaluer.py et les tests)
+jiwer>=3.0
+pytest>=8.0
+
+# Transcription (lourd : torch + transformers ; déjà présents sur Colab)
+transformers>=4.40
+torch
+librosa

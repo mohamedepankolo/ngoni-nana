@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.ipynb_checkpoints/
+
+# Enregistrements : voix des participantes -> stockés hors dépôt (Drive), jamais sur GitHub
+asr_test/audio/*
+!asr_test/audio/.gitkeep
