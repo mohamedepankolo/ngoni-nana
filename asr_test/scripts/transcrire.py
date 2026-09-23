@@ -91,8 +91,8 @@ def charger_pipeline_transformers(modele: str, device: str | None, max_new_token
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    asr = pipeline(
-        "automatic-speech-recognition",
+    kwargs = dict(
+        task="automatic-speech-recognition",
         model=modele,
         token=os.environ.get("HF_TOKEN"),
         device=device,
@@ -104,6 +104,36 @@ def charger_pipeline_transformers(modele: str, device: str | None, max_new_token
         # apparent). 256 tokens ≈ largement de quoi transcrire une phrase.
         generate_kwargs={"max_new_tokens": max_new_tokens},
     )
+    try:
+        asr = pipeline(**kwargs)
+    except OSError as e:
+        # Un modèle "gated" déjà téléchargé une fois peut échouer à se
+        # recharger sans HF_TOKEN dans l'environnement : transformers essaie
+        # quand même de vérifier certains fichiers optionnels en ligne (ex.
+        # tokenizer.json, absent de ce dépôt) et l'accès refusé casse tout
+        # au lieu de retomber sur le cache local. `pipeline(local_files_only=
+        # True)` ne suffit pas à corriger ça (le paramètre n'est pas propagé
+        # jusqu'à ce chargement précis) : on reconstruit le pipeline à la
+        # main à partir des composants (modèle + processeur), qui eux
+        # respectent bien local_files_only. Suppose un modèle seq2seq de la
+        # famille Whisper (vrai pour tous ceux utilisés ici) ; à adapter si
+        # un jour un autre type d'architecture emprunte ce chemin.
+        if "gated repo" not in str(e).lower():
+            raise
+        print("Accès en ligne refusé (modèle protégé, pas de token ici) : "
+              "nouvelle tentative en mode hors-ligne avec le cache local...", file=sys.stderr)
+        from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+
+        modele_local = AutoModelForSpeechSeq2Seq.from_pretrained(modele, local_files_only=True)
+        processor = AutoProcessor.from_pretrained(modele, local_files_only=True)
+        kwargs.pop("model")
+        kwargs.pop("token", None)
+        asr = pipeline(
+            model=modele_local,
+            tokenizer=processor.tokenizer,
+            feature_extractor=processor.feature_extractor,
+            **kwargs,
+        )
     return lambda chemin: asr(chemin)["text"]
 
 
