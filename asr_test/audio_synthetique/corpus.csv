@@ -1,0 +1,3 @@
+id,categorie,sens_fr,texte_bambara,montant_fcfa,unite,fichier_audio,locuteur,environnement
+P01,dette_client,Mariam me doit 2500 francs,Mariam ka jɛnɛ ye 2500 francs,2500,fcfa,maliba_p01.wav,maliba_tts,calme
+P02,vente,La vente de 3 moutons vous apporte 250000 - êtes-vous d'accord ?,"Saga dourou fereli be bin wa bi dourou ma, i son na wah",250000,dorome,maliba_p02.wav,maliba_tts,calme
