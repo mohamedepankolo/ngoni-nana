@@ -1,5 +1,16 @@
 # Comparaison de modèles ASR bambara (23/09/2026)
 
+**Mise à jour** : RobotsMali/soloni-114m-tdt-ctc-v3 est maintenant intégré
+au pipeline officiel — `transcrire.py --modele RobotsMali/soloni-114m-tdt-ctc-v3`
+suffit (le backend NeMo est auto-détecté au préfixe `RobotsMali/`, sinon
+`--backend nemo` explicite). Les deux bugs de compatibilité NeMo notés plus
+bas sont maintenant corrigés automatiquement au runtime par `transcrire.py`,
+plus besoin de patcher site-packages à la main. `montants.py` a aussi été
+corrigé (dictionnaire élargi + tolérance aux mots collés) : le montant P02
+est maintenant retrouvé avec RobotsMali (1/2 au lieu de 0/2, voir détail
+plus bas — inchangé pour P01, qui reste un problème de synthèse TTS, pas
+du parseur).
+
 Le modèle prévu dans Réponses_Amina (`FarmRadioInternational/bambara-whisper-asr`)
 n'est **pas benchmarké** sur le [leaderboard communautaire](https://huggingface.co/spaces/MALIBA-AI/bambara-asr-leaderboard)
 qui compare une quarantaine de modèles bambara. Avant d'aller plus loin, on a
@@ -41,9 +52,13 @@ qu'un vrai échec de compréhension :
   problème vient peut-être de la synthèse MALIBA-AI TTS elle-même, pas de
   l'ASR. Voir `audio_synthetique/README.md`).
 
-→ Action à faire : élargir le dictionnaire de numéraux dans `montants.py`
-  et le rendre tolérant aux mots collés, avant même d'avoir du vrai audio
-  terrain (déjà noté dans `audio_synthetique/README.md`).
+→ Fait : dictionnaire de numéraux élargi (variante « dou ») et parseur
+  rendu tolérant aux mots collés dans `montants.py`. Corrige le cas
+  RobotsMali (P02 ✅) et le cas FarmRadioInternational (« biwa » → 50 000
+  retrouvé aussi, vérifié manuellement). Le cas P01 (MALIBA-AI et les deux
+  autres modèles) reste non résolu : aucun des trois n'entend le moindre
+  chiffre, ce qui pointe vers la synthèse TTS plutôt que vers l'ASR ou le
+  parseur (voir `audio_synthetique/README.md`).
 
 ### Problème de fiabilité trouvé sur MALIBA-AI/bambara-asr-v3
 
@@ -71,6 +86,9 @@ creuser en priorité :
 **Inconvénient à peser** : il tourne sur le toolkit **NVIDIA NeMo**, pas sur
 `transformers` comme le reste du pipeline — une dépendance nettement plus
 lourde à faire fonctionner sur le GAIC Sandbox. À vérifier avec Isaak/CFA.
+Le pipeline de test (`transcrire.py`) gère déjà les deux backends de façon
+transparente, mais ça ne dit rien de la faisabilité d'un déploiement NeMo
+sur le sandbox lui-même.
 
 **MALIBA-AI/bambara-asr-v3** ne semble pas adapté à ce projet : plus lent
 que le modèle actuel sur CPU, licence non commerciale, et le risque
@@ -84,14 +102,12 @@ qualité des modèles eux-mêmes :
 
 1. **NeMo + Python 3.11 sous Windows** : `nemo.utils.tar_utils.safe_extract`
    appelle `TarFile.extract(..., filter="data")`, un paramètre qui n'existe
-   qu'à partir de Python 3.12. Contournement : ne passer `filter` que si
-   `sys.version_info >= (3, 12)`. Un deuxième bug de compatibilité de
-   version touche `BoostingTreeModelConfig.is_empty()` (accès à un champ de
-   config absent d'un checkpoint plus ancien) : contourné en remplaçant les
-   accès directs par `getattr(cfg, ..., None)`. Ces deux correctifs ont été
-   appliqués localement dans l'environnement de test (site-packages), pas
-   dans ce dépôt — à refaire si NeMo est réinstallé ailleurs, ou à
-   supprimer si une version corrigée de NeMo est publiée.
+   qu'à partir de Python 3.12. Un deuxième bug de compatibilité de version
+   touche `BoostingTreeModelConfig.is_empty()` (accès à un champ de config
+   absent d'un checkpoint plus ancien). **Désormais corrigé automatiquement**
+   par `transcrire.py` (`_patch_compat_nemo()`, appliqué au runtime avant
+   de charger un modèle NeMo — sans effet si NeMo a corrigé ces bugs
+   entre-temps).
 2. **MALIBA-AI/bambara-asr-v3 en fp16 sur CPU** : le pipeline `transformers`
    charge le modèle dans le dtype natif du checkpoint (fp16), ce qui l'a
    fait tourner plus d'une heure sans produire le moindre résultat sur un

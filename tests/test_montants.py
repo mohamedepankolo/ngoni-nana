@@ -41,5 +41,18 @@ def test_mots_courants_ne_sont_pas_des_nombres():
     assert extraire_nombres("a ba ye") == []
 
 
+def test_variante_dou():
+    # "dou" : troncature de dourou/duuru observée en sortie ASR (RobotsMali)
+    assert extraire_nombres("wa bi dou") == [50000]
+
+
+def test_mots_colles():
+    # Sans pause audible, l'ASR peut fusionner deux mots numéraux en un seul
+    # token (observé : FarmRadioInternational/bambara-whisper-asr a
+    # transcrit "wa bi" en "biwa" dans "wa bi dourou").
+    assert extraire_nombres("biwa bi duuru") == [50000]
+    assert extraire_nombres("kemebi saba") == [3000]  # "kɛmɛ" + "bi saba" collés
+
+
 def test_normaliser():
     assert normaliser("Kɛmɛ DUURU, ɲɔgɔn!") == "keme duuru nyogon"

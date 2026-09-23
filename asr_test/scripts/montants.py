@@ -30,7 +30,11 @@ import unicodedata
 # Graphies normalisées (sans caractères spéciaux) -> valeur.
 UNITES = {
     "kelen": 1, "fila": 2, "saba": 3, "naani": 4, "nani": 4,
-    "duuru": 5, "duru": 5, "dourou": 5, "wooro": 6, "woro": 6,
+    # "dou" : troncature de dourou/duuru observée en sortie ASR (RobotsMali/
+    # soloni-114m-tdt-ctc-v3 sur "wa bi dourou") — à valider avec un·e
+    # linguiste comme le reste de ces règles, mais sans ce variant le
+    # montant n'est simplement jamais retrouvé.
+    "duuru": 5, "duru": 5, "dourou": 5, "dou": 5, "wooro": 6, "woro": 6,
     "wolonwula": 7, "wolonfila": 7, "seegin": 8, "segin": 8, "seguin": 8,
     "kononton": 9,
 }
@@ -113,6 +117,31 @@ def _nombre(tokens, i):
     return total, j
 
 
+def _decouper_mot_colle(mot: str, profondeur_max: int = 4) -> list[str] | None:
+    """Décompose un mot collé (ex. "biwa") en mots numéraux connus mis
+    bout à bout, sans reste, ou None si impossible.
+
+    Sans pause audible entre deux mots, l'ASR peut les fusionner en un seul
+    token (observé : "wa bi dourou" transcrit avec "wa"+"bi" fusionnés en
+    "biwa"), ce qui casse le découpage par espaces dont dépend le parseur.
+    Cherche à chaque étape le préfixe connu le plus long, pour préférer les
+    mots les plus spécifiques (éviter par ex. de lire "duuru" comme deux
+    mots plus courts qui n'existent pas dans NUMERAUX).
+    """
+    if not mot or profondeur_max == 0:
+        return None
+    if mot in NUMERAUX:
+        return [mot]
+    plus_long = max((len(m) for m in NUMERAUX), default=0)
+    for taille in range(min(len(mot) - 1, plus_long), 1, -1):
+        prefixe, reste = mot[:taille], mot[taille:]
+        if prefixe in NUMERAUX:
+            suite = _decouper_mot_colle(reste, profondeur_max - 1)
+            if suite is not None:
+                return [prefixe] + suite
+    return None
+
+
 def extraire_nombres(texte: str) -> list[int]:
     """Tous les nombres prononcés (chiffres ou toutes lettres), sans conversion d'unité."""
     tokens = normaliser(texte).split()
@@ -123,6 +152,10 @@ def extraire_nombres(texte: str) -> list[int]:
             nombres.append(int(tokens[i]))
             i += 1
             continue
+        if tokens[i] not in NUMERAUX:
+            morceaux = _decouper_mot_colle(tokens[i])
+            if morceaux and len(morceaux) > 1:
+                tokens[i:i + 1] = morceaux
         if tokens[i] in NUMERAUX:
             valeur, j = _nombre(tokens, i)
             if valeur is not None:

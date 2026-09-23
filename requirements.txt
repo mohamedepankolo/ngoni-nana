@@ -2,7 +2,12 @@
 jiwer>=3.0
 pytest>=8.0
 
-# Transcription (lourd : torch + transformers ; déjà présents sur Colab)
+# Transcription, backend "transformers" (lourd ; déjà présents sur Colab)
 transformers>=4.40
 torch
 librosa
+
+# Transcription, backend "nemo" (RobotsMali/soloni-114m-tdt-ctc-v3 et
+# consorts, voir COMPARAISON_MODELES.md) — optionnel, seulement si vous
+# utilisez --backend nemo :
+#   pip install nemo-toolkit[asr]
