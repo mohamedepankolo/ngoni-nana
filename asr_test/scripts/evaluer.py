@@ -127,6 +127,11 @@ def rapport(lignes: list[dict], modele: str) -> str:
 
 
 def main():
+    # Windows attache souvent stdout à cp1252 : les caractères bambara (ɛ, ɔ...)
+    # y provoquent une UnicodeEncodeError.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--corpus", type=Path, default=RACINE / "corpus" / "phrases.csv")
     p.add_argument("--transcriptions", type=Path, default=RACINE / "results" / "transcriptions.csv")

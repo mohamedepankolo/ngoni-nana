@@ -36,6 +36,11 @@ def charger_pipeline(modele: str, device: str | None):
 
 
 def main():
+    # Windows attache souvent stdout à cp1252 : les caractères bambara (ɛ, ɔ...)
+    # y provoquent une UnicodeEncodeError et coupent la boucle de transcription.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--modele", default=MODELE_DEFAUT)
     p.add_argument("--corpus", type=Path, default=RACINE / "corpus" / "phrases.csv")
