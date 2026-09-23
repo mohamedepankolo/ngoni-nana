@@ -20,7 +20,10 @@ RACINE = Path(__file__).resolve().parents[1]
 MODELE_DEFAUT = "FarmRadioInternational/bambara-whisper-asr"
 
 
-def charger_pipeline(modele: str, device: str | None):
+MAX_NEW_TOKENS_DEFAUT = 256
+
+
+def charger_pipeline(modele: str, device: str | None, max_new_tokens: int):
     import torch
     from transformers import pipeline
 
@@ -32,6 +35,12 @@ def charger_pipeline(modele: str, device: str | None):
         token=os.environ.get("HF_TOKEN"),
         device=device,
         chunk_length_s=30,
+        # Filet de sécurité : sans limite, un modèle Whisper peut partir en
+        # boucle de répétition sur un audio court et tourner indéfiniment
+        # sans jamais rendre la main (observé avec MALIBA-AI/bambara-asr-v3 :
+        # >1h sans sortie sur un clip de 2 s, CPU à fond, aucun blocage
+        # apparent). 256 tokens ≈ largement de quoi transcrire une phrase.
+        generate_kwargs={"max_new_tokens": max_new_tokens},
     )
 
 
@@ -47,6 +56,8 @@ def main():
     p.add_argument("--audio", type=Path, default=RACINE / "audio")
     p.add_argument("--sortie", type=Path, default=RACINE / "results" / "transcriptions.csv")
     p.add_argument("--device", default=None, help="cpu, cuda:0... (auto par défaut)")
+    p.add_argument("--max-new-tokens", type=int, default=MAX_NEW_TOKENS_DEFAUT,
+                    help="limite de tokens générés par phrase, pour éviter une boucle infinie (défaut 256)")
     args = p.parse_args()
 
     with open(args.corpus, newline="", encoding="utf-8") as f:
@@ -58,7 +69,7 @@ def main():
     if not lignes:
         sys.exit("Aucun enregistrement à transcrire.")
 
-    asr = charger_pipeline(args.modele, args.device)
+    asr = charger_pipeline(args.modele, args.device, args.max_new_tokens)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     with open(args.sortie, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
