@@ -1,0 +1,61 @@
+id,categorie,sens_fr,texte_bambara,montant_fcfa,unite,fichier_audio,locuteur,environnement,confiance_brouillon
+P01,dette_client,Mariam me doit 2500 francs,n kɛmɛ duuru bɛ Mariam na,2500,dorome,P01_L01_calme.wav,L01,calme,moyenne
+P02,vente,La vente de 3 moutons vous apporte 250000 - êtes-vous d'accord ?,n ye saga saba feere wa bi duuru,250000,dorome,P02_L01_calme.wav,L01,calme,haute
+P03,vente,J'ai vendu 2 sacs d'arachides à 15000 francs,n ye tiga bɔrɛ fila feere wa [?],15000,dorome,P03_L01_calme.wav,L01,calme,basse — prix probablement coupé
+P04,vente,J'ai vendu du savon pour 500 francs,n ye safunɛ feere kɛmɛ,500,fcfa,P04_L01_calme.wav,L01,calme,moyenne — montant jamais confirmé
+P05,vente,J'ai vendu 10 tas de gombo à 2500 francs,n ye [gaban] tan feere [?],2500,dorome,P05_L01_calme.wav,L01,calme,basse — prix non confirmé
+P06,vente,J'ai vendu un pagne à 7500 francs,n ye fini kelen feere wa kelen ni kɛmɛ duuru,7500,dorome,P06_L01_calme.wav,L01,calme,haute
+P07,achat,J'ai acheté un sac de mil à 25000 francs,n ye bɔrɛ kelen san wa duuru,25000,dorome,P07_L01_calme.wav,L01,calme,haute
+P08,achat,J'ai acheté du beurre de karité pour 1250 francs,n ye si tulu san kɛmɛ fila ni bi duuru,1250,dorome,P08_L01_calme.wav,L01,calme,haute
+P09,achat,J'ai acheté 5 poulets à 12500 francs,n ye sɛ duuru san waa fila ni kɛmɛ duuru,12500,dorome,P09_L01_calme.wav,L01,calme,haute
+P10,depense,J'ai payé le transport 750 francs,n ye n ka paser sara kɛmɛ ni bi duuru,750,dorome,P10_L01_calme.wav,L01,calme,haute
+P11,depense,J'ai payé la place au marché 100 francs,n ye n ka sugu sigiyɔrɔ sara dɔrɔmɛ mugan,100,dorome,P11_L01_calme.wav,L01,calme,haute
+P12,depense,J'ai dépensé 5000 francs pour les emballages,n ye waa kelen kɛ ka mana foroko san,5000,dorome,P12_L01_calme.wav,L01,calme,moyenne
+P13,dette_client,Awa me doit 10000 francs,n ka waa fila juru bɛ Awa la,10000,dorome,P13_L01_calme.wav,L01,calme,haute
+P14,dette_client,Fanta m'a remboursé 3500 francs,"n ka kɛmɛ wolonwula jurumu bɛ Fanta la, a y'o sara",3500,dorome,P14_L01_calme.wav,L01,calme,haute
+P15,capital,Mon capital de départ est de 50000 francs,n ka jagokun ye waa tan ye,50000,dorome,P15_L01_calme.wav,L01,calme,haute
+P16,capital,J'ajoute 20000 francs à mon capital,n ye wa naani fara n ka jagokun kan,20000,dorome,P16_L01_calme.wav,L01,calme,haute
+P17,consultation,Combien ai-je vendu ce mois-ci ?,n ye joli feere nin kalo in na,,,P17_L01_calme.wav,L01,calme,haute
+P18,consultation,Qui me doit de l'argent ?,n ka juru bɛ mɔgɔ jɔn na,,,P18_L01_calme.wav,L01,calme,haute
+P19,stock,Il me reste 4 sacs de mil,sanɲɔgɔn bɔrɔ naani de bɛ ne bolo,,,P19_L01_calme.wav,L01,calme,haute
+P20,vente,J'ai vendu 3 moutons à 125000 francs,n ye saga saba feere wa mugan ni duuru,125000,dorome,P20_L01_calme.wav,L01,calme,haute
+P01b,dette_client,Mariam me doit 2500 francs,n ka kɛmɛ duuru bɛ Mariam min na,2500,dorome,P01b_L02_calme.wav,L02,calme,haute
+P02b,vente,La vente de 3 moutons vous apporte 250000 - êtes-vous d'accord ?,n ye saga saba feere waa bi duuru,250000,dorome,P02b_L02_calme.wav,L02,calme,haute
+P03b,vente,J'ai vendu 2 sacs d'arachides à 15000 francs,n ye tiga bɔrɛ fila feere waa saba,15000,dorome,P03b_L02_calme.wav,L02,calme,haute
+P04b,vente,J'ai vendu du savon pour 500 francs,n ye safunɛ feere [?],500,fcfa,P04b_L02_calme.wav,L02,calme,basse — montant jamais confirmé
+P05b,vente,J'ai vendu 10 tas de gombo à 2500 francs,n ye [gaban] feere kɛmɛ duuru,2500,dorome,P05b_L02_calme.wav,L02,calme,moyenne
+P06b,vente,J'ai vendu un pagne à 7500 francs,n ye fini feere wa kelen ni kɛmɛ duuru,7500,dorome,P06b_L02_calme.wav,L02,calme,haute
+P07b,achat,J'ai acheté un sac de mil à 25000 francs,n ye bɔrɛ san waa duuru,25000,dorome,P07b_L02_calme.wav,L02,calme,haute
+P08b,achat,J'ai acheté du beurre de karité pour 1250 francs,n ye si tulu feere kɛmɛ fila bi duuru,1250,dorome,P08b_L02_calme.wav,L02,calme,haute
+P09b,achat,J'ai acheté 5 poulets à 12500 francs,n ye sɛfuru feere waa fila ni kɛmɛ duuru,12500,dorome,P09b_L02_calme.wav,L02,calme,haute
+P10b,depense,J'ai payé le transport 750 francs,n ye pase sara kɛmɛ ni bi duuru,750,dorome,P10b_L02_calme.wav,L02,calme,haute
+P11b,depense,J'ai payé la place au marché 100 francs,n ye n ka sugu sigiyɔrɔ sara mugan,100,dorome,P11b_L02_calme.wav,L02,calme,haute
+P12b,depense,J'ai dépensé 5000 francs pour les emballages,[?] mana foroko ni bɔrɛw san,5000,dorome,P12b_L02_calme.wav,L02,calme,basse — montant non identifié
+P13b,dette_client,Awa me doit 10000 francs,n ka wa fila juru bɛ Awa la,10000,dorome,P13b_L02_calme.wav,L02,calme,haute
+P14b,dette_client,Fanta m'a remboursé 3500 francs,"Fanta ye kɛmɛ wolonwula sara, n ka juru la",3500,dorome,P14b_L02_calme.wav,L02,calme,haute
+P15b,capital,Mon capital de départ est de 50000 francs,n ka jagokun bɛɛ ye waa tan,50000,dorome,P15b_L02_calme.wav,L02,calme,haute
+P16b,capital,J'ajoute 20000 francs à mon capital,n ye wa naani fara n ka jagokun kan,20000,dorome,P16b_L02_calme.wav,L02,calme,haute
+P17b,consultation,Combien ai-je vendu ce mois-ci ?,n yɛrɛ ka minɛn tɔ tora joli nin kalo in na,,,P17b_L02_calme.wav,L02,calme,haute
+P18b,consultation,Qui me doit de l'argent ?,mɔgɔ jɔn ni jɔn de ka n ka juru b'olu la,,,P18b_L02_calme.wav,L02,calme,haute
+P19b,stock,Il me reste 4 sacs de mil,ɲɔ bɔrɛ naani de tora an bolo,,,P19b_L02_calme.wav,L02,calme,haute
+P20b,vente,J'ai vendu 3 moutons à 125000 francs,n ye saga saba feere waa mugan ni duuru,125000,dorome,P20b_L02_calme.wav,L02,calme,haute
+P01c,dette_client,Mariam me doit 2500 francs,n ka kɛmɛ duuru bɛ Mariama fɛ,2500,dorome,P01c_L03_calme.wav,L03,calme,haute
+P02c,vente,La vente de 3 moutons vous apporte 250000 - êtes-vous d'accord ?,"saga saba feerelen bɛ na waa bi duuru ma, i sɔnna",250000,dorome,P02c_L03_calme.wav,L03,calme,haute
+P03c,vente,J'ai vendu 2 sacs d'arachides à 15000 francs,n ye tiga bɔrɔ feere wa[a saba],15000,dorome,P03c_L03_calme.wav,L03,calme,moyenne — prix probablement coupé
+P04c,vente,J'ai vendu du savon pour 500 francs,n ye safunɛ san [?],500,fcfa,P04c_L03_calme.wav,L03,calme,basse — montant jamais confirmé
+P05c,vente,J'ai vendu 10 tas de gombo à 2500 francs,"n ye [gaban] sara tan, kɛmɛ duuru",2500,dorome,P05c_L03_calme.wav,L03,calme,haute
+P06c,vente,J'ai vendu un pagne à 7500 francs,n ye fini san waa kelen ni kɛmɛ duuru,7500,dorome,P06c_L03_calme.wav,L03,calme,haute
+P07c,achat,J'ai acheté un sac de mil à 25000 francs,n ye ɲɔ bɔrɛ kelen san waa duuru,25000,dorome,P07c_L03_calme.wav,L03,calme,haute
+P08c,achat,J'ai acheté du beurre de karité pour 1250 francs,n ye si tulu san kɛmɛ fila ni bi duuru la,1250,dorome,P08c_L03_calme.wav,L03,calme,haute
+P09c,achat,J'ai acheté 5 poulets à 12500 francs,n ye sɛ san waa fila ni kɛmɛ duuru,12500,dorome,P09c_L03_calme.wav,L03,calme,haute
+P10c,depense,J'ai payé le transport 750 francs,n ye pase sara kɛmɛ ni bi duuru,750,dorome,P10c_L03_calme.wav,L03,calme,haute
+P11c,depense,J'ai payé la place au marché 100 francs,n ye n sigiyɔrɔ sara dɔrɔmɛ mugan,100,dorome,P11c_L03_calme.wav,L03,calme,haute
+P12c,depense,J'ai dépensé 5000 francs pour les emballages,n ye waa kelen don bɔrɛw la,5000,dorome,P12c_L03_calme.wav,L03,calme,haute
+P13c,dette_client,Awa me doit 10000 francs,n ka waa fila de bɛ Awa la,10000,dorome,P13c_L03_calme.wav,L03,calme,haute
+P14c,dette_client,Fanta m'a remboursé 3500 francs,Fanta ye n ka kɛmɛ wolonwula sara,3500,dorome,P14c_L03_calme.wav,L03,calme,haute
+P15c,capital,Mon capital de départ est de 50000 francs,n ka jagokun tun ye waa tan ye,50000,dorome,P15c_L03_calme.wav,L03,calme,haute
+P16c,capital,J'ajoute 20000 francs à mon capital,n ye wa naani fara'o kan,20000,dorome,P16c_L03_calme.wav,L03,calme,haute
+P17c,consultation,Combien ai-je vendu ce mois-ci ?,n ye joli feere nin kalo in na,,,P17c_L03_calme.wav,L03,calme,haute
+P18c,consultation,Qui me doit de l'argent ?,n ka wari bɛ jɔn na,,,P18c_L03_calme.wav,L03,calme,haute
+P19c,stock,Il me reste 4 sacs de mil,n ka ɲɔ tun ye bɔrɔ naani ye,,,P19c_L03_calme.wav,L03,calme,haute
+P20c,vente,J'ai vendu 3 moutons à 125000 francs,n ye saga saba feere wa mugan ni duuru,125000,dorome,P20c_L03_calme.wav,L03,calme,haute
