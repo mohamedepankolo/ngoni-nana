@@ -1,5 +1,41 @@
 # Comparaison de modèles ASR bambara (23/09/2026)
 
+## Résultat définitif (27/09/2026) — vrai corpus terrain, référence vérifiée
+
+Premier test sur de vraies personnes : 3 locutrices (L01, L02, L03),
+20 phrases chacune (60 au total), voir `corpus/phrases_reelles.csv`.
+Référence `texte_bambara` écoutée et vérifiée à l'oreille (voir
+`corpus/a_corriger.xlsx`) — ce résultat n'est plus une estimation, c'est
+la comparaison qui compte pour trancher.
+
+| | FarmRadioInternational<br>(modèle actuel) | RobotsMali/<br>soloni-114m-tdt-ctc-v3 |
+|---|---|---|
+| WER | 52 % | **30 %** |
+| CER | 23 % | **16 %** |
+| Montants exacts | 47 % (24/51) | **69 % (35/51)** |
+| Montants — locutrice L03 | 18 % | **76 %** |
+| Latence | 25,2 s | **0,3 s** |
+
+**RobotsMali gagne nettement sur les trois critères du cahier des
+charges** (mots, montants, robustesse/latence), y compris sur la
+locutrice la plus difficile (L03), où FarmRadio s'effondre (18 %) alors
+que RobotsMali tient (76 %). Aucun des deux n'atteint encore les 80 %
+visés sur les montants, mais RobotsMali s'en approche nettement plus.
+Rapports complets : `results/reelles_farmradio_rapport.md`,
+`results/reelles_robotsmali_rapport.md`.
+
+**Recommandation à ce stade** : basculer le test/développement sur
+RobotsMali/soloni-114m-tdt-ctc-v3 comme modèle de référence, sous réserve
+de la faisabilité du déploiement NeMo sur le GAIC Sandbox (à vérifier
+avec Isaak/CFA — voir plus bas).
+
+---
+
+## Résultat préliminaire (23/09/2026) — échantillon synthétique, superseded
+
+*Section conservée pour historique ; le résultat ci-dessus (27/09) sur
+données réelles fait foi.*
+
 **Mise à jour** : RobotsMali/soloni-114m-tdt-ctc-v3 est maintenant intégré
 au pipeline officiel — `transcrire.py --modele RobotsMali/soloni-114m-tdt-ctc-v3`
 suffit (le backend NeMo est auto-détecté au préfixe `RobotsMali/`, sinon
