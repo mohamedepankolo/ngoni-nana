@@ -102,6 +102,12 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
         champs["article"] = " ".join(mots)
     if intention == "client" and mots:
         champs["client"] = mots[0]
+        # "juru" seul = l'utilisatrice déclare une nouvelle dette (P13 : "Awa
+        # me doit 10000 francs"). "juru" + "sara" (payer) = un paiement reçu
+        # qui RÉDUIT la dette (P14 : "Fanta m'a remboursé..., a y'o sara").
+        # Signal tiré des 60 phrases vérifiées, voir tests/test_moteur_decision.py.
+        tokens_bruts = normaliser(texte).split()
+        champs["est_un_paiement"] = any(t.startswith("sara") for t in tokens_bruts)
 
     return champs
 

@@ -74,6 +74,26 @@ def reconnaitre_intention(texte: str) -> str | None:
     return None
 
 
+# Confirmation oui/non (demandée après chaque montant, cas 8 du parcours).
+# "owo"/"ayi" : formes bambara courantes, non encore vues dans un corpus de ce
+# projet (aucune phrase de confirmation n'y figure) — à valider en priorité
+# par une personne bambaraphone, comme le reste de ce fichier. Les formes
+# françaises sont gardées en repli, les documents du projet n'étant pas tous
+# cohérents sur ce point.
+MOTS_OUI = ["owo", "awo", "oui"]
+MOTS_NON = ["ayi", "non"]
+
+
+def reconnaitre_confirmation(texte: str) -> bool | None:
+    """True = oui, False = non, None = ni l'un ni l'autre (pas une réponse de confirmation)."""
+    tokens = normaliser(texte).split()
+    if any(_mot_present(m, tokens) for m in MOTS_OUI):
+        return True
+    if any(_mot_present(m, tokens) for m in MOTS_NON):
+        return False
+    return None
+
+
 def _ressemble_a_une_dette(texte: str) -> bool:
     """Repli pour le cas 'client' sans le mot "juru" (ex. "X bɛ Mariam na" = Mariam doit X).
 

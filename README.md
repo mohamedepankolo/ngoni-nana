@@ -9,10 +9,14 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 | Brique | Dossier | État |
 |---|---|---|
 | Test du modèle ASR bambara | `asr_test/` | **en cours** |
-| Moteur de décision GERME Comptabilité | `moteur/` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
-| TTS bambara (MALIBA-AI, licence à valider) | — | bloqué : licence |
-| Téléphonie (remplaçant de Retell AI) | — | à choisir |
-| API et tableau de bord ABIC | — | à venir |
+| Moteur de décision GERME Comptabilité | `moteur/moteur_decision.py` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
+| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | code prêt, pas encore exécuté en bout en bout (dépendance NeMo lourde, non installée ici) |
+| Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | code prêt ; licence CC-BY-NC toujours non confirmée pour la production (R4) |
+| Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **en cours**, testé de bout en bout en texte (SQLite local) |
+| API Gateway | `moteur/api.py` | **en cours**, testé de bout en bout (voir plus bas) |
+| Téléphonie (remplaçant de Retell AI) | — | à choisir (R2) |
+| Hébergement réel (API, base de données) | — | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
+| Tableau de bord ABIC | — | maquette Figma faite, code à venir |
 
 ## Test ASR : `asr_test/`
 
@@ -63,26 +67,57 @@ Le modèle de reconnaissance vocale ne peut retranscrire que le nombre **prononc
 
 La lecture des nombres en toutes lettres (`montants.py`) suit les règles de numération décrites dans le fichier. **Un·e linguiste bambara doit les valider.**
 
-## Moteur de décision : `moteur/`
+## MVP : `moteur/`
 
-Premier jet du moteur de décision GERME Comptabilité (étape 5.1 du workplan), en 4 couches comme défini dans `Architecture_Technique_NGONI_NANA.docx` (section 3.3) :
+Tous les composants applicatifs du MVP (Architecture_Technique_NGONI_NANA.docx, section 3), sauf la téléphonie (R2) et l'hébergement réel (R1), toujours ouverts :
 
 ```
 moteur/
   dictionnaire_mots_cles.py   couche 1 : reconnaissance d'intention par mots-clés bambara (R9)
   moteur_decision.py          couches 2 à 4 : entités, nombres (réutilise montants.py), machine à états de session
+  base_donnees.py             schéma SQLAlchemy (section 3.7) ; SQLite par défaut, Postgres/Neon via DATABASE_URL
+  agent_vocal.py              orchestrateur (section 3.5) : relie moteur + base de données, gère la confirmation oui/non
+  asr_robotsmali.py           intégration ASR (RobotsMali/soloni-114m-tdt-ctc-v3, backend NeMo)
+  tts_maliba.py                intégration TTS (MALIBA-AI/MalianTTS, licence CC-BY-NC à confirmer pour la prod, R4)
+  api.py                      API Gateway (section 3.6) : /health, /session, /call, /modules, /sms
 ```
 
-Jamais de LLM génératif ici : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne comprend le bambara de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
+Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne le fait de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
 
 - reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase) — pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
 - montant FCFA reconstruit exactement : **96 %** (49/51).
 
-Le dictionnaire de mots-clés et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
+Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
+
+### Pas encore fait, à savoir avant de tester
+
+- `asr_robotsmali.py` et `tts_maliba.py` sont du code réel, pas des maquettes, mais **pas exécutés de bout en bout dans ce dépôt** : NeMo (ASR) est une dépendance lourde non installée par défaut, et le TTS a besoin d'un `HF_TOKEN` + d'un accès réseau à Hugging Face. `/call` prend donc du texte déjà transcrit, pas un fichier audio, pour l'instant.
+- La hiérarchie de rôles complète (section 4 : animatrice, gestionnaire de coopérative, administratrice) n'existe pas encore : l'API n'a qu'un seul jeton statique (`API_TOKEN`), pas de vrais comptes.
+- Les seuils de vraisemblance des montants (R5), la politique de rétention audio (R7) et le mécanisme d'escalade humaine réel (R6) restent à définir avec Fadima/CFA ; l'escalade ici se limite à un message, rien n'est câblé vers une vraie animatrice.
+
+### Lancer l'API en local
+
+```bash
+pip install -r requirements.txt
+export API_TOKEN=demo
+export DATABASE_URL=sqlite:///ngoni_nana.db   # omis = même défaut
+python -m uvicorn moteur.api:app --reload
+```
+
+Puis, par exemple :
+
+```bash
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/session -H "Authorization: Bearer demo" \
+  -H "Content-Type: application/json" -d '{"utilisatrice_id": 1}'
+curl -X POST http://127.0.0.1:8000/call -H "Authorization: Bearer demo" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": 1, "utilisatrice_id": 1, "texte": "n ye saga saba feere wa bi duuru"}'
+```
 
 ### Tests
 
 ```bash
-pip install jiwer pytest
+pip install -r requirements.txt
 pytest
 ```

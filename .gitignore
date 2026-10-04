@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .env
 .ipynb_checkpoints/
+*.db
 
 # Enregistrements : voix des participantes -> stockés hors dépôt (Drive), jamais sur GitHub
 asr_test/audio/*

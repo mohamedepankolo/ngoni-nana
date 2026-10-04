@@ -2,6 +2,14 @@
 jiwer>=3.0
 pytest>=8.0
 
+# Moteur de décision, API Gateway, base de données (moteur/) : légers, aucun
+# modèle à télécharger.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+httpx>=0.27
+sqlalchemy>=2.0
+gradio_client>=1.0  # TTS (moteur/tts_maliba.py), nécessite HF_TOKEN à l'exécution
+
 # Transcription, backend "transformers" (lourd ; déjà présents sur Colab)
 transformers>=4.40
 torch
