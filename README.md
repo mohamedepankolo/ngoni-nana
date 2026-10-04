@@ -9,7 +9,7 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 | Brique | Dossier | État |
 |---|---|---|
 | Test du modèle ASR bambara | `asr_test/` | **en cours** |
-| Moteur de décision GERME Comptabilité | — | à venir |
+| Moteur de décision GERME Comptabilité | `moteur/` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
 | TTS bambara (MALIBA-AI, licence à valider) | — | bloqué : licence |
 | Téléphonie (remplaçant de Retell AI) | — | à choisir |
 | API et tableau de bord ABIC | — | à venir |
@@ -62,6 +62,23 @@ Beaucoup de prix se disent en **dɔrɔmɛ** (1 dɔrɔmɛ = 5 FCFA), souvent sans
 Le modèle de reconnaissance vocale ne peut retranscrire que le nombre **prononcé**. C'est donc ce nombre que l'évaluation compare, déduit de `montant_fcfa` et de la colonne `unite` (`fcfa` ou `dorome`). La conversion en FCFA revient au moteur de décision. Il devra confirmer le montant à l'utilisatrice, ou lui faire taper le montant au clavier, comme Isaak Kamau l'a suggéré.
 
 La lecture des nombres en toutes lettres (`montants.py`) suit les règles de numération décrites dans le fichier. **Un·e linguiste bambara doit les valider.**
+
+## Moteur de décision : `moteur/`
+
+Premier jet du moteur de décision GERME Comptabilité (étape 5.1 du workplan), en 4 couches comme défini dans `Architecture_Technique_NGONI_NANA.docx` (section 3.3) :
+
+```
+moteur/
+  dictionnaire_mots_cles.py   couche 1 : reconnaissance d'intention par mots-clés bambara (R9)
+  moteur_decision.py          couches 2 à 4 : entités, nombres (réutilise montants.py), machine à états de session
+```
+
+Jamais de LLM génératif ici : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne comprend le bambara de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
+
+- reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase) — pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
+- montant FCFA reconstruit exactement : **96 %** (49/51).
+
+Le dictionnaire de mots-clés et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
 
 ### Tests
 
