@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>N'GONI NANA — test vocal</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 16px;
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    background: #faf7f2; color: #2a2a2a;
+    display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+  }
+  h1 { font-size: 18px; margin: 4px 0 0; }
+  .sousTitre { font-size: 13px; color: #777; margin: 0 0 8px; }
+
+  .ligne { display: flex; gap: 8px; align-items: center; }
+  input[type=text] {
+    flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;
+  }
+  button.petit {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid #ccc; background: #fff;
+    font-size: 14px;
+  }
+
+  #statut { font-size: 13px; color: #555; min-height: 18px; }
+  #statut.erreur { color: #b3261e; font-weight: 600; }
+
+  #zoneBouton { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 0; }
+  #parler {
+    width: 180px; height: 180px; border-radius: 50%; border: none;
+    background: #b5541c; color: #fff; font-size: 17px; font-weight: 600;
+    box-shadow: 0 4px 16px rgba(181,84,28,0.35);
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #parler.enregistre { background: #d6351f; box-shadow: 0 0 0 12px rgba(214,53,31,0.18); }
+  #parler:disabled { background: #ccc; box-shadow: none; }
+
+  #journal { display: flex; flex-direction: column; gap: 10px; max-height: 42vh; overflow-y: auto; }
+  .tour { padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
+  .tour.utilisatrice { background: #eee; align-self: flex-end; }
+  .tour.systeme { background: #fde9da; }
+  .tour .etiquette { font-size: 11px; color: #888; margin-bottom: 2px; }
+
+  #badgeSession { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #eee; }
+  #badgeSession.complete { background: #d9f2d9; color: #1f6b1f; }
+  #badgeSession.incomplete { background: #fde9da; color: #9a5214; }
+</style>
+</head>
+<body>
+
+<h1>N'GONI NANA — test vocal</h1>
+<p class="sousTitre">Outil de développement : maintenir le bouton pour parler, relâcher pour envoyer. Pas l'interface finale (le vrai canal sera la téléphonie).</p>
+
+<div class="ligne">
+  <input type="text" id="jeton" placeholder="Jeton API (API_TOKEN du serveur)">
+  <button class="petit" id="sauverJeton">OK</button>
+</div>
+<div class="ligne">
+  <span>Session : <span id="badgeSession">—</span></span>
+  <button class="petit" id="nouvelleSession" style="margin-left:auto">Nouvelle session</button>
+</div>
+<div id="statut">Chargement…</div>
+
+<div id="journal"></div>
+
+<div id="zoneBouton">
+  <button id="parler" disabled>Maintenir pour parler</button>
+</div>
+
+<audio id="lecteur" hidden></audio>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let jeton = localStorage.getItem("ngoni_jeton") || "";
+$("jeton").value = jeton;
+
+let utilisatriceId = null;
+let sessionId = null;
+let media = null, morceaux = [], enregistreur = null;
+
+function statut(texte, estErreur = false) {
+  $("statut").textContent = texte;
+  $("statut").classList.toggle("erreur", estErreur);
+}
+
+function ajouterAuJournal(role, texte) {
+  const div = document.createElement("div");
+  div.className = "tour " + role;
+  const etiquette = role === "utilisatrice" ? "Vous (reconnu)" : "N'GONI NANA";
+  div.innerHTML = `<div class="etiquette">${etiquette}</div>${texte}`;
+  $("journal").appendChild(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+async function appelApi(chemin, options = {}) {
+  const entetes = options.entetes || {};
+  if (!(options.corps instanceof FormData)) entetes["Content-Type"] = "application/json";
+  entetes["Authorization"] = "Bearer " + jeton;
+  const reponse = await fetch(chemin, {
+    method: options.methode || "GET",
+    headers: entetes,
+    body: options.corps instanceof FormData ? options.corps
+          : options.corps ? JSON.stringify(options.corps) : undefined,
+  });
+  if (!reponse.ok) {
+    const detail = await reponse.text();
+    throw new Error(`${reponse.status} : ${detail}`);
+  }
+  return reponse.json();
+}
+
+function majBadgeSession(statutSession) {
+  const badge = $("badgeSession");
+  badge.textContent = statutSession;
+  badge.className = statutSession === "complete" ? "complete" : "incomplete";
+}
+
+async function demarrerSession() {
+  statut("Connexion au serveur…");
+  try {
+    const bootstrap = await appelApi("/demo/bootstrap", { methode: "POST", corps: {} });
+    utilisatriceId = bootstrap.utilisatrice_id;
+    const s = await appelApi("/session", { methode: "POST", corps: { utilisatrice_id: utilisatriceId } });
+    sessionId = s.session_id;
+    majBadgeSession("incomplete");
+    statut("Prêt. Maintenez le bouton pour parler.");
+    $("parler").disabled = false;
+  } catch (e) {
+    statut("Erreur de connexion : " + e.message, true);
+  }
+}
+
+$("sauverJeton").onclick = () => {
+  jeton = $("jeton").value.trim();
+  localStorage.setItem("ngoni_jeton", jeton);
+  demarrerSession();
+};
+
+$("nouvelleSession").onclick = demarrerSession;
+
+async function commencerEnregistrement() {
+  if (!media) {
+    media = await navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+  morceaux = [];
+  enregistreur = new MediaRecorder(media);
+  enregistreur.ondataavailable = (e) => morceaux.push(e.data);
+  enregistreur.start();
+  $("parler").classList.add("enregistre");
+  $("parler").textContent = "Parlez…";
+  statut("Enregistrement en cours…");
+}
+
+function arreterEnregistrement() {
+  return new Promise((resoudre) => {
+    if (!enregistreur || enregistreur.state === "inactive") return resoudre(null);
+    enregistreur.onstop = () => resoudre(new Blob(morceaux, { type: "audio/webm" }));
+    enregistreur.stop();
+  });
+}
+
+async function envoyerTour(blobAudio) {
+  statut("Envoi… (reconnaissance vocale puis synthèse, peut prendre quelques secondes)");
+  $("parler").disabled = true;
+  try {
+    const donnees = new FormData();
+    donnees.append("session_id", sessionId);
+    donnees.append("utilisatrice_id", utilisatriceId);
+    donnees.append("fichier", blobAudio, "tour.webm");
+
+    const resultat = await appelApi("/call_audio", { methode: "POST", corps: donnees });
+
+    ajouterAuJournal("utilisatrice", resultat.texte_reconnu || "(rien compris)");
+    ajouterAuJournal("systeme", resultat.message);
+
+    if (resultat.audio_base64) {
+      const lecteur = $("lecteur");
+      lecteur.src = `data:audio/${resultat.type_audio};base64,${resultat.audio_base64}`;
+      lecteur.hidden = false;
+      await lecteur.play().catch(() => {});
+    }
+
+    const etatSession = await appelApi(`/session/${sessionId}`, { methode: "GET" });
+    majBadgeSession(etatSession.statut);
+    statut(etatSession.statut === "complete"
+      ? "Terminé. Maintenez le bouton pour une nouvelle action, ou 'Nouvelle session'."
+      : "Prêt. Maintenez le bouton pour répondre.");
+  } catch (e) {
+    statut("Erreur : " + e.message, true);
+  } finally {
+    $("parler").disabled = false;
+    $("parler").classList.remove("enregistre");
+    $("parler").textContent = "Maintenir pour parler";
+  }
+}
+
+const boutonParler = $("parler");
+boutonParler.addEventListener("pointerdown", (e) => { e.preventDefault(); commencerEnregistrement(); });
+["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
+  boutonParler.addEventListener(evt, async () => {
+    if (!enregistreur || enregistreur.state !== "recording") return;
+    const blob = await arreterEnregistrement();
+    if (blob && blob.size > 0) envoyerTour(blob);
+  })
+);
+
+if (jeton) demarrerSession();
+else statut("Entrez le jeton API du serveur ci-dessus, puis OK.");
+</script>
+</body>
+</html>

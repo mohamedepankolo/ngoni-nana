@@ -15,6 +15,10 @@ HF_TOKEN) : jamais codé en dur ici.
 import os
 from typing import Callable
 
+from dotenv import load_dotenv
+
+load_dotenv()  # lit HF_TOKEN depuis .env si ce module est utilisé hors de api.py
+
 ESPACE_PAR_DEFAUT = "MALIBA-AI/MalianTTS"
 
 

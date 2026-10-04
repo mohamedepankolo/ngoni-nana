@@ -1,5 +1,7 @@
+import io
 import os
 import sys
+import wave
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
@@ -21,6 +23,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{DB_TEST}"
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from moteur import api as moteur_api  # noqa: E402
 from moteur import base_donnees as db  # noqa: E402
 from moteur.api import _agent, _SessionLocal, app  # noqa: E402
 
@@ -42,6 +45,8 @@ def base_propre():
     # mot-clé AUTOINCREMENT ici) : purge aussi l'état en mémoire de l'agent
     # pour qu'un session_id réutilisé ne retrouve pas l'état d'un test précédent.
     _agent._etats.clear()
+    moteur_api._transcrire = None
+    moteur_api._syntheser = None
 
 
 def test_health_ne_demande_aucune_authentification():
@@ -97,3 +102,53 @@ def test_parcours_complet_session_puis_call():
 
     r = client.get(f"/session/{session_id}", headers=ENTETES)
     assert r.json()["statut"] == "complete"
+
+
+def _wav_silence(duree_s: float = 0.3) -> bytes:
+    tampon = io.BytesIO()
+    with wave.open(tampon, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"\x00\x00" * int(16000 * duree_s))
+    return tampon.getvalue()
+
+
+def test_call_audio_bout_en_bout_avec_asr_et_tts_factices(monkeypatch):
+    """N'exerce pas les vrais modèles (ASR/TTS réels : voir README) : vérifie que
+    /call_audio convertit bien l'audio (ffmpeg), appelle l'agent avec le texte
+    transcrit, et renvoie une réponse audio encodée en base64.
+    """
+    monkeypatch.setattr(moteur_api, "_obtenir_transcrire",
+                         lambda: (lambda chemin_wav: "n ye saga saba feere wa bi duuru"))
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser",
+                         lambda: (lambda texte: _ecrire_wav_temporaire()))
+
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    session_id = client.post("/session", json={"utilisatrice_id": u.id}, headers=ENTETES).json()["session_id"]
+
+    r = client.post(
+        "/call_audio", headers=ENTETES,
+        data={"session_id": session_id, "utilisatrice_id": u.id},
+        files={"fichier": ("tour.webm", _wav_silence(), "audio/wav")},
+    )
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["texte_reconnu"] == "n ye saga saba feere wa bi duuru"
+    assert corps["intention"] == "vente"
+    assert corps["audio_base64"]
+
+
+def _ecrire_wav_temporaire() -> str:
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        f.write(_wav_silence(0.2))
+        return f.name

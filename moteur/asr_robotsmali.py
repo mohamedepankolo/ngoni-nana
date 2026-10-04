@@ -11,6 +11,7 @@ pas dans requirements.txt par défaut (voir ce fichier). Rien dans ce module
 ne l'importe tant que `obtenir_transcripteur()` n'est pas appelé, pour que le
 reste du moteur (agent_vocal, api) reste testable sans cette installation.
 """
+import subprocess
 import sys
 from pathlib import Path
 from typing import Callable
@@ -20,6 +21,18 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 MODELE_PAR_DEFAUT = "RobotsMali/soloni-114m-tdt-ctc-v3"
+
+
+def convertir_en_wav(chemin_entree: str, chemin_sortie: str) -> str:
+    """Convertit n'importe quel format audio (ex. webm/opus d'un enregistrement
+    navigateur) en WAV 16 kHz mono, le format attendu par le modèle. Nécessite
+    ffmpeg sur le PATH.
+    """
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", chemin_entree, "-ar", "16000", "-ac", "1", chemin_sortie],
+        check=True, capture_output=True,
+    )
+    return chemin_sortie
 
 
 def obtenir_transcripteur(modele: str = MODELE_PAR_DEFAUT) -> Callable[[str], str]:

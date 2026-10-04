@@ -10,10 +10,10 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 |---|---|---|
 | Test du modèle ASR bambara | `asr_test/` | **en cours** |
 | Moteur de décision GERME Comptabilité | `moteur/moteur_decision.py` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
-| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | code prêt, pas encore exécuté en bout en bout (dépendance NeMo lourde, non installée ici) |
+| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | code prêt ; test en direct en cours (installation de NeMo) |
 | Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | code prêt ; licence CC-BY-NC toujours non confirmée pour la production (R4) |
 | Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **en cours**, testé de bout en bout en texte (SQLite local) |
-| API Gateway | `moteur/api.py` | **en cours**, testé de bout en bout (voir plus bas) |
+| API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **en cours**, testé de bout en bout (voir plus bas) |
 | Téléphonie (remplaçant de Retell AI) | — | à choisir (R2) |
 | Hébergement réel (API, base de données) | — | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
 | Tableau de bord ABIC | — | maquette Figma faite, code à venir |
@@ -77,9 +77,10 @@ moteur/
   moteur_decision.py          couches 2 à 4 : entités, nombres (réutilise montants.py), machine à états de session
   base_donnees.py             schéma SQLAlchemy (section 3.7) ; SQLite par défaut, Postgres/Neon via DATABASE_URL
   agent_vocal.py              orchestrateur (section 3.5) : relie moteur + base de données, gère la confirmation oui/non
-  asr_robotsmali.py           intégration ASR (RobotsMali/soloni-114m-tdt-ctc-v3, backend NeMo)
+  asr_robotsmali.py           intégration ASR (RobotsMali/soloni-114m-tdt-ctc-v3, backend NeMo) + conversion audio (ffmpeg)
   tts_maliba.py                intégration TTS (MALIBA-AI/MalianTTS, licence CC-BY-NC à confirmer pour la prod, R4)
-  api.py                      API Gateway (section 3.6) : /health, /session, /call, /modules, /sms
+  api.py                      API Gateway (section 3.6) : /health, /session, /call, /call_audio, /modules, /sms
+  web/index.html              page de test "maintenir pour parler" (navigateur, y compris mobile), servie sur /web
 ```
 
 Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne le fait de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
@@ -91,26 +92,31 @@ Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction
 
 ### Pas encore fait, à savoir avant de tester
 
-- `asr_robotsmali.py` et `tts_maliba.py` sont du code réel, pas des maquettes, mais **pas exécutés de bout en bout dans ce dépôt** : NeMo (ASR) est une dépendance lourde non installée par défaut, et le TTS a besoin d'un `HF_TOKEN` + d'un accès réseau à Hugging Face. `/call` prend donc du texte déjà transcrit, pas un fichier audio, pour l'instant.
 - La hiérarchie de rôles complète (section 4 : animatrice, gestionnaire de coopérative, administratrice) n'existe pas encore : l'API n'a qu'un seul jeton statique (`API_TOKEN`), pas de vrais comptes.
 - Les seuils de vraisemblance des montants (R5), la politique de rétention audio (R7) et le mécanisme d'escalade humaine réel (R6) restent à définir avec Fadima/CFA ; l'escalade ici se limite à un message, rien n'est câblé vers une vraie animatrice.
+- Pas de vraie téléphonie (R2) ni d'hébergement tranché (R1) : la page `/web` et `/call_audio` simulent un appel à partir d'un enregistrement navigateur, pas d'un vrai réseau téléphonique.
 
-### Lancer l'API en local
+### Lancer l'API en local (avec ASR + TTS réels)
 
 ```bash
-pip install -r requirements.txt
-export API_TOKEN=demo
-export DATABASE_URL=sqlite:///ngoni_nana.db   # omis = même défaut
+pip install -r requirements.txt   # inclut nemo-toolkit[asr] (lourd, voir ci-dessous) si décommenté
+cp .env.example .env
+# éditer .env : mettre un API_TOKEN et un HF_TOKEN valides (voir ce fichier pour le détail)
 python -m uvicorn moteur.api:app --reload
 ```
 
-Puis, par exemple :
+`ffmpeg` doit être installé et sur le PATH (conversion de l'audio navigateur avant l'ASR). `nemo-toolkit[asr]` n'est pas dans `requirements.txt` par défaut (dépendance lourde) : `pip install "nemo-toolkit[asr]"` séparément avant de tester `/call_audio` pour de vrai.
+
+**Page de test "maintenir pour parler"** : ouvrir `http://127.0.0.1:8000/` (ou l'IP de la machine depuis un téléphone sur le même réseau, ex. `http://192.168.x.x:8000/`), entrer l'`API_TOKEN` du `.env`, puis maintenir le bouton pour parler et relâcher pour envoyer. L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+
+**En ligne de commande, en texte** (sans ASR/TTS, juste moteur + base de données) :
 
 ```bash
 curl http://127.0.0.1:8000/health
-curl -X POST http://127.0.0.1:8000/session -H "Authorization: Bearer demo" \
+curl -X POST http://127.0.0.1:8000/demo/bootstrap -H "Authorization: Bearer $API_TOKEN"
+curl -X POST http://127.0.0.1:8000/session -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" -d '{"utilisatrice_id": 1}'
-curl -X POST http://127.0.0.1:8000/call -H "Authorization: Bearer demo" \
+curl -X POST http://127.0.0.1:8000/call -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"session_id": 1, "utilisatrice_id": 1, "texte": "n ye saga saba feere wa bi duuru"}'
 ```
