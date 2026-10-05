@@ -198,6 +198,17 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
 
     try:
         convertir_en_wav(chemin_brut, chemin_wav)
+        if os.environ.get("NGONI_DEBUG_AUDIO"):
+            # Diagnostic temporaire (désactivé par défaut) : garde une copie du
+            # brut et du WAV converti pour inspecter pourquoi une transcription
+            # reviendrait vide depuis un enregistrement navigateur.
+            import shutil
+            import time
+            debug_dir = Path("debug_audio")
+            debug_dir.mkdir(exist_ok=True)
+            horodatage = int(time.time())
+            shutil.copy(chemin_brut, debug_dir / f"{horodatage}{suffixe_entree}")
+            shutil.copy(chemin_wav, debug_dir / f"{horodatage}.wav")
         texte_reconnu = _obtenir_transcrire()(chemin_wav)
     finally:
         os.unlink(chemin_brut)

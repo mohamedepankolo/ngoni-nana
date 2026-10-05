@@ -197,13 +197,25 @@ async function envoyerTour(blobAudio) {
   }
 }
 
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  statut("Microphone indisponible : le navigateur bloque l'accès au micro en dehors d'une connexion sécurisée (https) ou de localhost. Ouvrez cette page en https.", true);
+  $("parler").disabled = true;
+}
+
 const boutonParler = $("parler");
-boutonParler.addEventListener("pointerdown", (e) => { e.preventDefault(); commencerEnregistrement(); });
+boutonParler.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  commencerEnregistrement().catch((err) => statut("Micro refusé ou indisponible : " + err.message, true));
+});
 ["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
   boutonParler.addEventListener(evt, async () => {
     if (!enregistreur || enregistreur.state !== "recording") return;
-    const blob = await arreterEnregistrement();
-    if (blob && blob.size > 0) envoyerTour(blob);
+    try {
+      const blob = await arreterEnregistrement();
+      if (blob && blob.size > 0) envoyerTour(blob);
+    } catch (err) {
+      statut("Erreur : " + err.message, true);
+    }
   })
 );
 

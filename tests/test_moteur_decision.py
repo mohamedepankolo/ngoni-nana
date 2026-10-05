@@ -8,7 +8,7 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "asr_test" / "scripts"))
 
-from moteur.dictionnaire_mots_cles import reconnaitre_intention  # noqa: E402
+from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention  # noqa: E402
 from moteur.moteur_decision import Session, analyser  # noqa: E402
 
 # categorie (phrases_reelles.csv) -> intention du moteur. Le parcours
@@ -90,6 +90,17 @@ def test_montant_reconstruit_exactement_sur_corpus_reel():
 ])
 def test_reconnaitre_intention_cas_simples(texte, intention_attendue):
     assert reconnaitre_intention(texte) == intention_attendue
+
+
+@pytest.mark.parametrize("texte, attendu", [
+    ("owo", True), ("awo", True), ("aawo", True), ("oui", True),
+    ("ayi", False), ("non", False),
+    ("n ye saga saba feere", None),
+])
+def test_reconnaitre_confirmation(texte, attendu):
+    # "aawo" : graphie observée en test réel (ASR RobotsMali, 2026-10-05) pour
+    # le "oui" bambara — a fait planter une vraie session avant d'être ajoutée.
+    assert reconnaitre_confirmation(texte) == attendu
 
 
 def test_session_rien_enregistre_avant_confirmation_finale():

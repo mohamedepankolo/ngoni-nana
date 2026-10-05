@@ -4,6 +4,9 @@ __pycache__/
 .env
 .ipynb_checkpoints/
 *.db
+.certs/
+debug_audio/
+serveur.log
 
 # Enregistrements : voix des participantes -> stockés hors dépôt (Drive), jamais sur GitHub
 asr_test/audio/*

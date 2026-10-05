@@ -10,10 +10,10 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 |---|---|---|
 | Test du modèle ASR bambara | `asr_test/` | **en cours** |
 | Moteur de décision GERME Comptabilité | `moteur/moteur_decision.py` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
-| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | code prêt ; test en direct en cours (installation de NeMo) |
-| Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | code prêt ; licence CC-BY-NC toujours non confirmée pour la production (R4) |
-| Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **en cours**, testé de bout en bout en texte (SQLite local) |
-| API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **en cours**, testé de bout en bout (voir plus bas) |
+| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | **validé en réel** sur téléphone (2026-10-05), transcription correcte, ~0,3 s |
+| Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | **validé en réel** sur téléphone (2026-10-05) ; licence CC-BY-NC toujours non confirmée pour la production (R4) ; lit du texte français pour l'instant (voir plus bas) |
+| Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **validé en réel** : vente complète enregistrée via vraie voix, capital mis à jour |
+| API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS |
 | Téléphonie (remplaçant de Retell AI) | — | à choisir (R2) |
 | Hébergement réel (API, base de données) | — | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
 | Tableau de bord ABIC | — | maquette Figma faite, code à venir |
@@ -95,19 +95,36 @@ Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction
 - La hiérarchie de rôles complète (section 4 : animatrice, gestionnaire de coopérative, administratrice) n'existe pas encore : l'API n'a qu'un seul jeton statique (`API_TOKEN`), pas de vrais comptes.
 - Les seuils de vraisemblance des montants (R5), la politique de rétention audio (R7) et le mécanisme d'escalade humaine réel (R6) restent à définir avec Fadima/CFA ; l'escalade ici se limite à un message, rien n'est câblé vers une vraie animatrice.
 - Pas de vraie téléphonie (R2) ni d'hébergement tranché (R1) : la page `/web` et `/call_audio` simulent un appel à partir d'un enregistrement navigateur, pas d'un vrai réseau téléphonique.
+- Les messages du système (`agent_vocal.py`) sont des gabarits **en français** ("J'ai compris : 3 saga, 250000 francs. C'est bien ça ?") : le TTS (configuré en bambara) les lit donc avec un accent bambara sur du texte français, pas en bambara. Les formuler en bambara demande une vraie traduction/construction de phrase validée par une personne bambaraphone, pas une simple substitution de mots.
 
 ### Lancer l'API en local (avec ASR + TTS réels)
 
+**Python 3.11, pas une version plus récente.** NeMo (ASR) tire des dépendances (numpy, onnx, protobuf, ml_dtypes...) qui, en pratique, ne sont pas encore stables sur Python 3.14 : la combinaison a produit en test une chaîne d'incompatibilités (`numpy`/longdouble, `onnx`/`protobuf`, `onnx`/`ml_dtypes`), chacune corrigeable une à une mais sans fin propre. Un environnement virtuel dédié en 3.11 évite tout ça d'un coup — testé de bout en bout (ASR + TTS réels) le 2026-10-05 dans cette configuration.
+
 ```bash
-pip install -r requirements.txt   # inclut nemo-toolkit[asr] (lourd, voir ci-dessous) si décommenté
+py -3.11 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r requirements.txt
+./.venv/Scripts/python.exe -m pip install "nemo-toolkit[asr]"   # lourd (plusieurs Go), à part : voir ci-dessus
 cp .env.example .env
 # éditer .env : mettre un API_TOKEN et un HF_TOKEN valides (voir ce fichier pour le détail)
-python -m uvicorn moteur.api:app --reload
 ```
 
-`ffmpeg` doit être installé et sur le PATH (conversion de l'audio navigateur avant l'ASR). `nemo-toolkit[asr]` n'est pas dans `requirements.txt` par défaut (dépendance lourde) : `pip install "nemo-toolkit[asr]"` séparément avant de tester `/call_audio` pour de vrai.
+`ffmpeg` doit être installé et sur le PATH (conversion de l'audio navigateur avant l'ASR).
 
-**Page de test "maintenir pour parler"** : ouvrir `http://127.0.0.1:8000/` (ou l'IP de la machine depuis un téléphone sur le même réseau, ex. `http://192.168.x.x:8000/`), entrer l'`API_TOKEN` du `.env`, puis maintenir le bouton pour parler et relâcher pour envoyer. L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+**Pour tester depuis un téléphone, servir en HTTPS** : les navigateurs mobiles bloquent l'accès au micro (`getUserMedia`) hors HTTPS ou localhost — sans ça, le bouton de la page de test ne fait rien, sans message d'erreur. Un certificat auto-signé suffit (le navigateur affichera un avertissement à accepter une fois) :
+
+```bash
+mkdir .certs
+MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout .certs/key.pem -out .certs/cert.pem -days 365 -nodes \
+  -subj "/CN=ngoni-nana-test" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:VOTRE_IP_LOCALE"
+
+./.venv/Scripts/python.exe -m uvicorn moteur.api:app --host 0.0.0.0 --port 8099 \
+  --ssl-keyfile .certs/key.pem --ssl-certfile .certs/cert.pem
+```
+
+**Page de test "maintenir pour parler"** : ouvrir `https://VOTRE_IP_LOCALE:8099/` depuis un téléphone sur le même réseau Wi-Fi, accepter l'avertissement de certificat, entrer l'`API_TOKEN` du `.env`, puis maintenir le bouton pour parler et relâcher pour envoyer. L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+
+Diagnostic : `NGONI_DEBUG_AUDIO=1` (variable d'environnement) conserve une copie de chaque enregistrement reçu dans `debug_audio/` (brut + converti en WAV), utile si une transcription revient vide sans erreur.
 
 **En ligne de commande, en texte** (sans ASR/TTS, juste moteur + base de données) :
 

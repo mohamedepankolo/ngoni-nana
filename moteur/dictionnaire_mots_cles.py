@@ -77,10 +77,11 @@ def reconnaitre_intention(texte: str) -> str | None:
 # Confirmation oui/non (demandée après chaque montant, cas 8 du parcours).
 # "owo"/"ayi" : formes bambara courantes, non encore vues dans un corpus de ce
 # projet (aucune phrase de confirmation n'y figure) — à valider en priorité
-# par une personne bambaraphone, comme le reste de ce fichier. Les formes
-# françaises sont gardées en repli, les documents du projet n'étant pas tous
-# cohérents sur ce point.
-MOTS_OUI = ["owo", "awo", "oui"]
+# par une personne bambaraphone, comme le reste de ce fichier. "aawo" :
+# graphie observée en test réel (ASR RobotsMali sur une vraie locutrice,
+# 2026-10-05) pour le même mot. Les formes françaises sont gardées en repli,
+# les documents du projet n'étant pas tous cohérents sur ce point.
+MOTS_OUI = ["owo", "awo", "aawo", "oui"]
 MOTS_NON = ["ayi", "non"]
 
 
