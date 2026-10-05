@@ -9,7 +9,7 @@ sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "asr_test" / "scripts"))
 
 from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention  # noqa: E402
-from moteur.moteur_decision import Session, analyser  # noqa: E402
+from moteur.moteur_decision import Session, analyser, extraire_entites  # noqa: E402
 
 # categorie (phrases_reelles.csv) -> intention du moteur. Le parcours
 # utilisateur ne propose que 5 actions au menu (vente, depense, capital,
@@ -90,6 +90,14 @@ def test_montant_reconstruit_exactement_sur_corpus_reel():
 ])
 def test_reconnaitre_intention_cas_simples(texte, intention_attendue):
     assert reconnaitre_intention(texte) == intention_attendue
+
+
+def test_variante_ne_pour_n_ne_pollue_pas_larticle():
+    # ASR RobotsMali, test réel 2026-10-05 : "ne" (variante de "n") a été
+    # transcrit à la place de "n" et s'est retrouvé dans l'article extrait
+    # ("ne saga" au lieu de "saga") avant d'être ajouté à MOTS_GRAMMATICAUX.
+    champs = extraire_entites("ne ye saga saba feere wa bi duuru", "vente")
+    assert champs["article"] == "saga"
 
 
 @pytest.mark.parametrize("texte, attendu", [

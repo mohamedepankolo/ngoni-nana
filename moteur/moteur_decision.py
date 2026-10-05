@@ -46,11 +46,13 @@ CHAMPS_ATTENDUS: dict[str, list[str]] = {
 
 # Mots grammaticaux bambara à ignorer lors de l'extraction de l'article ou du
 # nom propre (ce qui reste une fois les nombres et les mots-clés retirés).
-# Construit par balayage des 60 phrases de phrases_reelles.csv ; à valider et
-# compléter par une personne bambaraphone (R9), au même titre que le reste de
-# ce dictionnaire.
+# Construit par balayage des 60 phrases de phrases_reelles.csv, complété par
+# des variantes observées en test réel ("ne" pour "n" : ASR RobotsMali,
+# 2026-10-05, faisait fuir "ne" dans l'article extrait : "ne saga" au lieu de
+# "saga") ; à valider et compléter par une personne bambaraphone (R9), au
+# même titre que le reste de ce dictionnaire.
 MOTS_GRAMMATICAUX = {
-    "n", "ka", "ye", "y", "ni", "be", "la", "na", "min", "fe", "de", "o",
+    "n", "ne", "ka", "ye", "y", "ni", "be", "la", "na", "min", "fe", "de", "o",
     "a", "i", "in", "tun", "ke", "don", "son", "sonna", "olu", "to", "tora",
     "yere", "bee", "mogo",
 }
