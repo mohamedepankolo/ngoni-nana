@@ -46,7 +46,7 @@ def test_parcours_vente_complet_jusqu_a_l_enregistrement(agent):
 
     r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # "oui"
     assert r["contrat"]["action"] == "enregistrer"
-    assert "enregistré" in r["message"]
+    assert "sɛbɛnna" in r["message"]  # "c'est enregistré", en bambara (messages_bambara.py)
 
     bd = agent._session_factory()
     transactions = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id).all()
@@ -76,7 +76,7 @@ def test_consultation_capital_ne_demande_pas_de_confirmation(agent):
     r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ka jagokun ye waa tan ye")
 
     assert r["contrat"]["intention"] == "capital"
-    assert "francs" in r["message"]
+    assert "jagokun" in r["message"]  # "capital", en bambara (messages_bambara.reponse_capital)
     bd = agent._session_factory()
     assert bd.get(db.SessionAppel, sid).statut == "complete"
 

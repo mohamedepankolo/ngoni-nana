@@ -95,7 +95,7 @@ Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction
 - La hiérarchie de rôles complète (section 4 : animatrice, gestionnaire de coopérative, administratrice) n'existe pas encore : l'API n'a qu'un seul jeton statique (`API_TOKEN`), pas de vrais comptes.
 - Les seuils de vraisemblance des montants (R5), la politique de rétention audio (R7) et le mécanisme d'escalade humaine réel (R6) restent à définir avec Fadima/CFA ; l'escalade ici se limite à un message, rien n'est câblé vers une vraie animatrice.
 - Pas de vraie téléphonie (R2) ni d'hébergement tranché (R1) : la page `/web` et `/call_audio` simulent un appel à partir d'un enregistrement navigateur, pas d'un vrai réseau téléphonique.
-- Les messages du système (`agent_vocal.py`) sont des gabarits **en français** ("J'ai compris : 3 saga, 250000 francs. C'est bien ça ?") : le TTS (configuré en bambara) les lit donc avec un accent bambara sur du texte français, pas en bambara. Les formuler en bambara demande une vraie traduction/construction de phrase validée par une personne bambaraphone, pas une simple substitution de mots.
+- Les messages du système (`moteur/messages_bambara.py`) sont maintenant **en bambara**, mais c'est un premier jet non validé : les nombres (`nombres_bambara.py`) sont vérifiés automatiquement par aller-retour avec `montants.py`, mais la grammaire des phrases elle-même ne peut pas s'auto-tester — seule une personne bambaraphone peut confirmer qu'une phrase est correcte et naturelle. À faire relire avant tout usage devant de vraies utilisatrices.
 
 ### Lancer l'API en local (avec ASR + TTS réels)
 

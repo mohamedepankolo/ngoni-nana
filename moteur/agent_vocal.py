@@ -10,14 +10,14 @@ réel. `transcrire`/`syntheser` sont injectés (voir asr_robotsmali.py /
 tts_maliba.py) : un test peut passer des fonctions factices à la place des
 vrais modèles, lourds et dépendants d'un accès réseau/HF_TOKEN.
 
-Les messages parlés ci-dessous sont en français : un gabarit, pas le texte
-final. Les formulations bambara exactes restent à valider par une personne
-bambaraphone (même réserve que pour le dictionnaire de mots-clés).
+Les messages parlés sont en bambara (messages_bambara.py) : un premier jet de
+traduction, pas un texte validé. Voir la réserve en tête de ce module-là.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from moteur import base_donnees as db
+from moteur import messages_bambara as msg
 from moteur.dictionnaire_mots_cles import reconnaitre_confirmation
 from moteur.moteur_decision import Session
 
@@ -27,24 +27,11 @@ from moteur.moteur_decision import Session
 # confirmation, mais enregistrer un paiement, oui.
 INTENTIONS_LECTURE_SEULE = {"capital", "consultation", "stock"}
 
-MAX_MESSAGE_REFORMULATION = [
-    "Je n'ai pas compris. Pouvez-vous répéter ?",
-    "Je n'ai toujours pas compris. Dites clairement : vente, dépense, capital, client, ou stock.",
-]
-MESSAGE_ESCALADE = "Je vous mets en relation avec une animatrice."
-
-
-def _libelle_champs(champs: dict) -> str:
-    parties = []
-    if "quantite" in champs and "article" in champs:
-        parties.append(f"{champs['quantite']} {champs['article']}")
-    elif "article" in champs:
-        parties.append(champs["article"])
-    if "client" in champs:
-        parties.append(champs["client"])
-    if "montant_fcfa" in champs:
-        parties.append(f"{champs['montant_fcfa']} francs")
-    return ", ".join(parties)
+CONSTRUCTEURS_CONFIRMATION = {
+    "vente": msg.confirmation_vente,
+    "depense": msg.confirmation_depense,
+    "client": msg.confirmation_client,
+}
 
 
 @dataclass
@@ -101,24 +88,23 @@ class AgentVocal:
                 champ = etat.champ_en_correction or (list(s.champs_confirmes)[-1] if s.champs_confirmes else None)
                 if champ is None:
                     contrat = {"intention": s.intention, "champs": {}, "confiance": "echec", "action": "reformuler"}
-                    return self._repondre(bd, session_id, contrat, "Pouvez-vous répéter le montant ?")
+                    return self._repondre(bd, session_id, contrat, msg.demander_precision_montant())
                 contrat = s.corriger(champ, "")  # vide : on redemandera la valeur au tour suivant
                 etat.en_attente_confirmation = False
                 etat.champ_en_correction = champ
-                return self._repondre(bd, session_id, contrat, f"D'accord, répétez {champ}, s'il vous plaît.")
+                return self._repondre(bd, session_id, contrat, msg.reformulation(1))
             # Ni oui ni non : peut-être la valeur corrigée (cas 8/9), on la traite normalement.
             etat.en_attente_confirmation = False
 
         contrat = s.recevoir(texte)
 
         if contrat["action"] == "reformuler":
-            idx = min(s.tentatives_reformulation, len(MAX_MESSAGE_REFORMULATION)) - 1
-            message = MAX_MESSAGE_REFORMULATION[max(idx, 0)]
+            message = msg.reformulation(s.tentatives_reformulation)
             return self._repondre(bd, session_id, contrat, message)
 
         if contrat["action"] == "escalade_humaine":
             self._cloturer_session(bd, session_id, statut="incomplete")
-            return self._repondre(bd, session_id, contrat, MESSAGE_ESCALADE)
+            return self._repondre(bd, session_id, contrat, msg.escalade())
 
         # action == "demander_confirmation"
         if contrat["intention"] in INTENTIONS_LECTURE_SEULE and contrat["confiance"] == "haute":
@@ -129,24 +115,25 @@ class AgentVocal:
 
         if contrat["confiance"] == "haute":
             etat.en_attente_confirmation = True
-            message = f"J'ai compris : {_libelle_champs(contrat['champs'])}. C'est bien ça ?"
+            construire = CONSTRUCTEURS_CONFIRMATION.get(contrat["intention"])
+            message = construire(contrat["champs"]) if construire else msg.demander_precision_montant()
         else:
-            message = "Pouvez-vous préciser le montant ?"
+            message = msg.demander_precision_montant()
         return self._repondre(bd, session_id, contrat, message)
 
     def _repondre_lecture(self, bd, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]
         if intention == "capital":
             capital = db.calculer_capital(bd, utilisatrice_id)
-            return f"Votre capital est de {capital} francs."
+            return msg.reponse_capital(capital)
         if intention == "stock":
             article = contrat["champs"].get("article", "")
             ligne = db.consulter_stock(bd, utilisatrice_id, article)
             if ligne is None:
-                return f"Aucun stock enregistré pour {article}."
-            alerte = " Attention, stock bas." if ligne.quantite_actuelle <= (ligne.seuil_alerte or 0) else ""
-            return f"Il vous reste {ligne.quantite_actuelle} {article}.{alerte}"
-        return "Voulez-vous faire autre chose ?"
+                return f"An ma {article} sɔrɔ."
+            seuil_bas = ligne.quantite_actuelle <= (ligne.seuil_alerte or 0)
+            return msg.reponse_stock(article, ligne.quantite_actuelle, seuil_bas)
+        return msg.continuer()
 
     def _conclure(self, bd, session_id: int, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]
@@ -160,7 +147,7 @@ class AgentVocal:
                                              montant_fcfa=champs["montant_fcfa"],
                                              est_un_paiement=champs.get("est_un_paiement", False))
         self._cloturer_session(bd, session_id, statut="complete")
-        return "C'est enregistré. Voulez-vous faire autre chose ?"
+        return msg.enregistrement_confirme()
 
     def _cloturer_session(self, bd, session_id: int, statut: str) -> None:
         s = bd.get(db.SessionAppel, session_id)
