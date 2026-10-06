@@ -14,8 +14,8 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 | Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | **validé en réel** sur téléphone (2026-10-05) ; licence CC-BY-NC toujours non confirmée pour la production (R4) ; lit du texte français pour l'instant (voir plus bas) |
 | Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **validé en réel** : vente complète enregistrée via vraie voix, capital mis à jour |
 | API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS |
-| Téléphonie (remplaçant de Retell AI) | — | à choisir (R2) |
-| Hébergement réel (API, base de données) | — | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
+| Téléphonie (remplaçant de Retell AI) | n/d | à choisir (R2) |
+| Hébergement réel (API, base de données) | n/d | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
 | Tableau de bord ABIC | `moteur/admin/` | **en cours**, branché sur les vraies données (voir plus bas) |
 
 ## Test ASR : `asr_test/`
@@ -85,7 +85,7 @@ moteur/
 
 Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne le fait de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
 
-- reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase) — pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
+- reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase), pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
 - montant FCFA reconstruit exactement : **96 %** (49/51).
 
 Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
@@ -95,11 +95,11 @@ Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction
 - La hiérarchie de rôles complète (section 4 : animatrice, gestionnaire de coopérative, administratrice) n'existe pas encore : l'API n'a qu'un seul jeton statique (`API_TOKEN`), pas de vrais comptes.
 - Les seuils de vraisemblance des montants (R5), la politique de rétention audio (R7) et le mécanisme d'escalade humaine réel (R6) restent à définir avec Fadima/CFA ; l'escalade ici se limite à un message, rien n'est câblé vers une vraie animatrice.
 - Pas de vraie téléphonie (R2) ni d'hébergement tranché (R1) : la page `/web` et `/call_audio` simulent un appel à partir d'un enregistrement navigateur, pas d'un vrai réseau téléphonique.
-- Les messages du système (`moteur/messages_bambara.py`) sont maintenant **en bambara**, mais c'est un premier jet non validé : les nombres (`nombres_bambara.py`) sont vérifiés automatiquement par aller-retour avec `montants.py`, mais la grammaire des phrases elle-même ne peut pas s'auto-tester — seule une personne bambaraphone peut confirmer qu'une phrase est correcte et naturelle. À faire relire avant tout usage devant de vraies utilisatrices.
+- Les messages du système (`moteur/messages_bambara.py`) sont maintenant **en bambara**, mais c'est un premier jet non validé : les nombres (`nombres_bambara.py`) sont vérifiés automatiquement par aller-retour avec `montants.py`, mais la grammaire des phrases elle-même ne peut pas s'auto-tester : seule une personne bambaraphone peut confirmer qu'une phrase est correcte et naturelle. À faire relire avant tout usage devant de vraies utilisatrices.
 
 ### Lancer l'API en local (avec ASR + TTS réels)
 
-**Python 3.11, pas une version plus récente.** NeMo (ASR) tire des dépendances (numpy, onnx, protobuf, ml_dtypes...) qui, en pratique, ne sont pas encore stables sur Python 3.14 : la combinaison a produit en test une chaîne d'incompatibilités (`numpy`/longdouble, `onnx`/`protobuf`, `onnx`/`ml_dtypes`), chacune corrigeable une à une mais sans fin propre. Un environnement virtuel dédié en 3.11 évite tout ça d'un coup — testé de bout en bout (ASR + TTS réels) le 2026-10-05 dans cette configuration.
+**Python 3.11, pas une version plus récente.** NeMo (ASR) tire des dépendances (numpy, onnx, protobuf, ml_dtypes...) qui, en pratique, ne sont pas encore stables sur Python 3.14 : la combinaison a produit en test une chaîne d'incompatibilités (`numpy`/longdouble, `onnx`/`protobuf`, `onnx`/`ml_dtypes`), chacune corrigeable une à une mais sans fin propre. Un environnement virtuel dédié en 3.11 évite tout ça d'un coup, testé de bout en bout (ASR + TTS réels) le 2026-10-05 dans cette configuration.
 
 ```bash
 py -3.11 -m venv .venv
@@ -111,7 +111,7 @@ cp .env.example .env
 
 `ffmpeg` doit être installé et sur le PATH (conversion de l'audio navigateur avant l'ASR).
 
-**Pour tester depuis un téléphone, servir en HTTPS** : les navigateurs mobiles bloquent l'accès au micro (`getUserMedia`) hors HTTPS ou localhost — sans ça, le bouton de la page de test ne fait rien, sans message d'erreur. Un certificat auto-signé suffit (le navigateur affichera un avertissement à accepter une fois) :
+**Pour tester depuis un téléphone, servir en HTTPS** : les navigateurs mobiles bloquent l'accès au micro (`getUserMedia`) hors HTTPS ou localhost : sans ça, le bouton de la page de test ne fait rien, sans message d'erreur. Un certificat auto-signé suffit (le navigateur affichera un avertissement à accepter une fois) :
 
 ```bash
 mkdir .certs
@@ -140,7 +140,7 @@ curl -X POST http://127.0.0.1:8000/call -H "Authorization: Bearer $API_TOKEN" \
 
 ## Dashboard admin ABIC : `moteur/admin/`
 
-Interface web en lecture seule pour les administratrices ABIC (architecture section 3.8) : suivi des sessions, rapports GERME Comptabilité par coopérative, liste des utilisatrices. Branchée sur la même base de données que l'agent vocal — les sessions et transactions de test apparaissent immédiatement dedans.
+Interface web en lecture seule pour les administratrices ABIC (architecture section 3.8) : suivi des sessions, rapports GERME Comptabilité par coopérative, liste des utilisatrices. Branchée sur la même base de données que l'agent vocal : les sessions et transactions de test apparaissent immédiatement dedans.
 
 ```
 moteur/admin/
@@ -151,7 +151,7 @@ moteur/admin/
 
 Accessible sur `https://.../admin/` une fois l'API lancée (voir ci-dessus) : identifiant libre, mot de passe = `API_TOKEN` du `.env` (le navigateur affiche une boîte de connexion native). 4 pages : Vue d'ensemble (KPIs, répartition par coopérative, alertes stock bas), Utilisatrices (filtrable par coopérative/recherche), Sessions (filtrable par coopérative/statut/canal), Rapports (recettes/dépenses/solde par coopérative, export CSV).
 
-**Limite connue** : un seul niveau d'accès ("Administratrice ABIC", tout voir) — les deux autres rôles qui touchent à un dashboard (animatrice : ses utilisatrices assignées seulement ; gestionnaire de coopérative : rapports agrégés de sa coopérative seulement, section 4 de l'architecture) demandent de vrais comptes, qui n'existent pas encore.
+**Limite connue** : un seul niveau d'accès ("Administratrice ABIC", tout voir) : les deux autres rôles qui touchent à un dashboard (animatrice : ses utilisatrices assignées seulement ; gestionnaire de coopérative : rapports agrégés de sa coopérative seulement, section 4 de l'architecture) demandent de vrais comptes, qui n'existent pas encore.
 
 ### Tests
 

@@ -28,8 +28,8 @@
     <tr>
       <td>{{ s.date_debut.strftime("%d/%m/%Y %H:%M") }}</td>
       <td>{{ u.code_anonyme }}</td>
-      <td>{{ coop.nom if coop else "—" }}</td>
-      <td>{{ s.canal or "—" }}</td>
+      <td>{{ coop.nom if coop else "n/d" }}</td>
+      <td>{{ s.canal or "n/d" }}</td>
       <td>
         {% if s.statut == "complete" %}<span class="badge ok">Terminée</span>
         {% else %}<span class="badge pending">Incomplète</span>{% endif %}

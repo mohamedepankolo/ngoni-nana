@@ -1,4 +1,4 @@
-# Rapport de test ASR bambara — RobotsMali/soloni-114m-tdt-ctc-v3
+# Rapport de test ASR bambara : RobotsMali/soloni-114m-tdt-ctc-v3
 
 ## Synthèse
 
@@ -33,9 +33,9 @@ WER/CER = taux d'erreur par mot / par caractère (plus bas = mieux). Montant exa
 | P14 | n ka kɛmɛ wolonwula jurumu bɛ Fanta la, a y'o sara | nɛkɛmɛ wolonwula jurumu bi fa ta la a y'o sara | 50 % | 700 | 7 | ❌ |
 | P15 | n ka jagokun ye waa tan ye | ne ka jagokun ye waa tan | 29 % | 10000 | 10000 | ✅ |
 | P16 | n ye wa naani fara n ka jagokun kan | n ye wa naani fara n ka jagokun kan | 0 % | 4000 | 4000 | ✅ |
-| P17 | n ye joli feere nin kalo in na | ne ye joli de feere nin kalo in na | 25 % | — | aucun | — |
-| P18 | n ka juru bɛ mɔgɔ jɔn na | ne ka juru bɛ mɔgɔ jɔn na | 14 % | — | aucun | — |
-| P19 | sanɲɔgɔn bɔrɔ naani de bɛ ne bolo | sanɲɔgɔn bɔrɔ naani de bɛ ne bolo a tɔ la | 43 % | — | 4 | — |
+| P17 | n ye joli feere nin kalo in na | ne ye joli de feere nin kalo in na | 25 % | n/d | aucun | n/d |
+| P18 | n ka juru bɛ mɔgɔ jɔn na | ne ka juru bɛ mɔgɔ jɔn na | 14 % | n/d | aucun | n/d |
+| P19 | sanɲɔgɔn bɔrɔ naani de bɛ ne bolo | sanɲɔgɔn bɔrɔ naani de bɛ ne bolo a tɔ la | 43 % | n/d | 4 | n/d |
 | P20 | n ye saga saba feere wa mugan ni duuru | n ye saga saba feere wa mugan ni duuru | 0 % | 25000 | 3, 25000 | ✅ |
 | P01b | n ka kɛmɛ duuru bɛ Mariam min na | ne ka kɛmɛ duuru bɛ mariage na | 38 % | 500 | 500 | ✅ |
 | P02b | n ye saga saba feere waa bi duuru | ne ye saga saba feere wa duuru | 38 % | 50000 | 3, 5000 | ❌ |
@@ -53,9 +53,9 @@ WER/CER = taux d'erreur par mot / par caractère (plus bas = mieux). Montant exa
 | P14b | Fanta ye kɛmɛ wolonwula sara, n ka juru la | fanta ye kɛmɛ wolonwula sara ne ka juru la | 11 % | 700 | 700 | ✅ |
 | P15b | n ka jagokun bɛɛ ye waa tan | ne ka jagokun bɛɛ ye waa tan | 14 % | 10000 | 10000 | ✅ |
 | P16b | n ye wa naani fara n ka jagokun kan | n ye wa naani fara n ka jagokun kan | 0 % | 4000 | 4000 | ✅ |
-| P17b | n yɛrɛ ka minɛn tɔ tora joli nin kalo in na | ne yɛrɛ ka minɛn tɔ tora joli nin kalo in na | 9 % | — | aucun | — |
-| P18b | mɔgɔ jɔn ni jɔn de ka n ka juru b'olu la | mɔgɔ jɔn ni jɔn de ka ne ka juru b'olu la | 8 % | — | aucun | — |
-| P19b | ɲɔ bɔrɛ naani de tora an bolo | ɛɛ ɲɔ bɔrɛ naani de tora an bolo | 14 % | — | 4 | — |
+| P17b | n yɛrɛ ka minɛn tɔ tora joli nin kalo in na | ne yɛrɛ ka minɛn tɔ tora joli nin kalo in na | 9 % | n/d | aucun | n/d |
+| P18b | mɔgɔ jɔn ni jɔn de ka n ka juru b'olu la | mɔgɔ jɔn ni jɔn de ka ne ka juru b'olu la | 8 % | n/d | aucun | n/d |
+| P19b | ɲɔ bɔrɛ naani de tora an bolo | ɛɛ ɲɔ bɔrɛ naani de tora an bolo | 14 % | n/d | 4 | n/d |
 | P20b | n ye saga saba feere waa mugan ni duuru | n'i ye saga fere wa mugan ni duuru | 44 % | 25000 | 25000 | ✅ |
 | P01c | n ka kɛmɛ duuru bɛ Mariama fɛ | ne ka kɛmɛ duuru bɛ mariama fɛ | 14 % | 500 | 500 | ✅ |
 | P02c | saga saba feerelen bɛ na waa bi duuru ma, i sɔnna | saga saba feere bɛ na wa abizulu ma i sɔnna | 36 % | 50000 | 3 | ❌ |
@@ -73,26 +73,26 @@ WER/CER = taux d'erreur par mot / par caractère (plus bas = mieux). Montant exa
 | P14c | Fanta ye n ka kɛmɛ wolonwula sara | fanta ye ne ka kɛmɛ wolonwula sara | 14 % | 700 | 700 | ✅ |
 | P15c | n ka jagokun tun ye waa tan ye | ne ka jagokun tun ye waa tan ye | 12 % | 10000 | 10000 | ✅ |
 | P16c | n ye wa naani fara'o kan | ne ye waa tan fa o kan | 57 % | 4000 | 10000 | ❌ |
-| P17c | n ye joli feere nin kalo in na | ne ye joli feere ni kalo in na | 25 % | — | aucun | — |
-| P18c | n ka wari bɛ jɔn na | ne ka wari bɛ jɔn na | 17 % | — | aucun | — |
-| P19c | n ka ɲɔ tun ye bɔrɔ naani ye | ne ka ɲɔ tun ye bɔrɔ naani ye | 12 % | — | 4 | — |
+| P17c | n ye joli feere nin kalo in na | ne ye joli feere ni kalo in na | 25 % | n/d | aucun | n/d |
+| P18c | n ka wari bɛ jɔn na | ne ka wari bɛ jɔn na | 17 % | n/d | aucun | n/d |
+| P19c | n ka ɲɔ tun ye bɔrɔ naani ye | ne ka ɲɔ tun ye bɔrɔ naani ye | 12 % | n/d | 4 | n/d |
 | P20c | n ye saga saba feere wa mugan ni duuru | ne ye saga saba feere wa mugan ni duuru | 11 % | 25000 | 3, 25000 | ✅ |
 
 ## Montants mal reconnus
 
-- **P01** : attendu 500, trouvé 5 — « nɛkɛmɛ duuru bɛ marriage na »
-- **P03** : attendu 3000, trouvé aucun nombre — « n ye tika bɔrɛ fere wa »
-- **P04** : attendu 500, trouvé 100 — « ne ye safunɛ feere kɛmɛ »
-- **P05** : attendu 500, trouvé 10 — « n ye gansara tan »
-- **P14** : attendu 700, trouvé 7 — « nɛkɛmɛ wolonwula jurumu bi fa ta la a y'o sara »
-- **P02b** : attendu 50000, trouvé 3, 5000 — « ne ye saga saba feere wa duuru »
-- **P03b** : attendu 3000, trouvé 2, 2 — « ne ye bɔrɔ fila t'a bɔrɔ fila nan yo feere wasa »
-- **P04b** : attendu 500, trouvé aucun nombre — « ne ye safunɛ fe yen »
-- **P05b** : attendu 500, trouvé aucun nombre — « ne ye gansa fere »
-- **P06b** : attendu 1500, trouvé 501 — « ne ye fini fere a kelen ni kɛmɛ duuru »
-- **P09b** : attendu 2500, trouvé 5, 5000 — « n'i ye sɛ duuru feere wa duuru »
-- **P12b** : attendu 1000, trouvé aucun nombre — « ɲɛ mana foroko ni bɔrɛw san »
-- **P02c** : attendu 50000, trouvé 3 — « saga saba feere bɛ na wa abizulu ma i sɔnna »
-- **P03c** : attendu 3000, trouvé aucun nombre — « ne ye tika bɔrɔ feere wasa »
-- **P04c** : attendu 500, trouvé aucun nombre — « ne ye safunɛ san »
-- **P16c** : attendu 4000, trouvé 10000 — « ne ye waa tan fa o kan »
+- **P01** : attendu 500, trouvé 5 : « nɛkɛmɛ duuru bɛ marriage na »
+- **P03** : attendu 3000, trouvé aucun nombre : « n ye tika bɔrɛ fere wa »
+- **P04** : attendu 500, trouvé 100 : « ne ye safunɛ feere kɛmɛ »
+- **P05** : attendu 500, trouvé 10 : « n ye gansara tan »
+- **P14** : attendu 700, trouvé 7 : « nɛkɛmɛ wolonwula jurumu bi fa ta la a y'o sara »
+- **P02b** : attendu 50000, trouvé 3, 5000 : « ne ye saga saba feere wa duuru »
+- **P03b** : attendu 3000, trouvé 2, 2 : « ne ye bɔrɔ fila t'a bɔrɔ fila nan yo feere wasa »
+- **P04b** : attendu 500, trouvé aucun nombre : « ne ye safunɛ fe yen »
+- **P05b** : attendu 500, trouvé aucun nombre : « ne ye gansa fere »
+- **P06b** : attendu 1500, trouvé 501 : « ne ye fini fere a kelen ni kɛmɛ duuru »
+- **P09b** : attendu 2500, trouvé 5, 5000 : « n'i ye sɛ duuru feere wa duuru »
+- **P12b** : attendu 1000, trouvé aucun nombre : « ɲɛ mana foroko ni bɔrɛw san »
+- **P02c** : attendu 50000, trouvé 3 : « saga saba feere bɛ na wa abizulu ma i sɔnna »
+- **P03c** : attendu 3000, trouvé aucun nombre : « ne ye tika bɔrɔ feere wasa »
+- **P04c** : attendu 500, trouvé aucun nombre : « ne ye safunɛ san »
+- **P16c** : attendu 4000, trouvé 10000 : « ne ye waa tan fa o kan »

@@ -31,7 +31,7 @@ import unicodedata
 UNITES = {
     "kelen": 1, "fila": 2, "saba": 3, "naani": 4, "nani": 4,
     # "dou" : troncature de dourou/duuru observée en sortie ASR (RobotsMali/
-    # soloni-114m-tdt-ctc-v3 sur "wa bi dourou") — à valider avec un·e
+    # soloni-114m-tdt-ctc-v3 sur "wa bi dourou"), à valider avec un·e
     # linguiste comme le reste de ces règles, mais sans ce variant le
     # montant n'est simplement jamais retrouvé.
     "duuru": 5, "duru": 5, "dourou": 5, "dou": 5, "wooro": 6, "woro": 6,

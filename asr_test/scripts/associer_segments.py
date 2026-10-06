@@ -20,7 +20,7 @@ from montants import extraire_nombres  # noqa: E402
 
 
 def nombres_attendus(ref: dict) -> dict:
-    """Renvoie {interprétation: valeur} — on ne sait pas encore, avant
+    """Renvoie {interprétation: valeur}. On ne sait pas encore, avant
     d'écouter, si la locutrice a dit le montant en francs ou en dɔrɔmɛ
     (le protocole demande de corriger `unite` après coup selon ce qui a
     été dit) : on cherche donc les deux valeurs possibles dans les
@@ -56,9 +56,9 @@ def main():
     for ref in phrases:
         valeurs = nombres_attendus(ref)
         if not valeurs:
-            print(f"{ref['id']:4} {'—':>8} {'—':>7}  (pas de montant — à faire à l'oreille : « {ref['sens_fr']} »)")
+            print(f"{ref['id']:4} {'n/d':>8} {'n/d':>7}  (pas de montant, à faire à l'oreille : « {ref['sens_fr']} »)")
             continue
-        etiquette = f"{valeurs.get('fcfa', '—'):>8} {valeurs.get('dorome', '—'):>7}"
+        etiquette = f"{valeurs.get('fcfa', 'n/d'):>8} {valeurs.get('dorome', 'n/d'):>7}"
         candidats = []
         for s in segments:
             for interpretation, val in valeurs.items():
@@ -66,7 +66,7 @@ def main():
                     candidats.append((s, interpretation))
                     break
         if not candidats:
-            print(f"{ref['id']:4} {etiquette}  AUCUN candidat — « {ref['sens_fr']} »")
+            print(f"{ref['id']:4} {etiquette}  AUCUN candidat : « {ref['sens_fr']} »")
         elif len(candidats) == 1:
             s, interpretation = candidats[0]
             utilises.add(s["segment"])

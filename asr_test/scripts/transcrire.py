@@ -14,7 +14,7 @@ Deux moteurs (--backend) :
   - transformers (défaut) : modèles Hugging Face `pipeline`, ex. le modèle
     actuel FarmRadioInternational/bambara-whisper-asr ou MALIBA-AI/bambara-asr-v3.
   - nemo : modèles publiés au format NVIDIA NeMo, ex. RobotsMali/soloni-114m-tdt-ctc-v3
-    (voir COMPARAISON_MODELES.md — bien plus rapide, licence libre, mais pas
+    (voir COMPARAISON_MODELES.md, bien plus rapide, licence libre, mais pas
     compatible `transformers`). Installer avec `pip install nemo-toolkit[asr]`.
 """
 import argparse

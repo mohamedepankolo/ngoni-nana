@@ -1,11 +1,11 @@
 # Comparaison de modèles ASR bambara (23/09/2026)
 
-## Résultat définitif (27/09/2026) — vrai corpus terrain, référence vérifiée
+## Résultat définitif (27/09/2026) : vrai corpus terrain, référence vérifiée
 
 Premier test sur de vraies personnes : 3 locutrices (L01, L02, L03),
 20 phrases chacune (60 au total), voir `corpus/phrases_reelles.csv`.
 Référence `texte_bambara` écoutée et vérifiée à l'oreille (voir
-`corpus/a_corriger.xlsx`) — ce résultat n'est plus une estimation, c'est
+`corpus/a_corriger.xlsx`), ce résultat n'est plus une estimation, c'est
 la comparaison qui compte pour trancher.
 
 | | FarmRadioInternational<br>(modèle actuel) | RobotsMali/<br>soloni-114m-tdt-ctc-v3 |
@@ -13,7 +13,7 @@ la comparaison qui compte pour trancher.
 | WER | 52 % | **30 %** |
 | CER | 23 % | **16 %** |
 | Montants exacts | 47 % (24/51) | **69 % (35/51)** |
-| Montants — locutrice L03 | 18 % | **76 %** |
+| Montants (locutrice L03) | 18 % | **76 %** |
 | Latence | 25,2 s | **0,3 s** |
 
 **RobotsMali gagne nettement sur les trois critères du cahier des
@@ -27,24 +27,24 @@ Rapports complets : `results/reelles_farmradio_rapport.md`,
 **Recommandation à ce stade** : basculer le test/développement sur
 RobotsMali/soloni-114m-tdt-ctc-v3 comme modèle de référence, sous réserve
 de la faisabilité du déploiement NeMo sur le GAIC Sandbox (à vérifier
-avec Isaak/CFA — voir plus bas).
+avec Isaak/CFA, voir plus bas).
 
 ---
 
-## Résultat préliminaire (23/09/2026) — échantillon synthétique, superseded
+## Résultat préliminaire (23/09/2026) : échantillon synthétique, superseded
 
 *Section conservée pour historique ; le résultat ci-dessus (27/09) sur
 données réelles fait foi.*
 
 **Mise à jour** : RobotsMali/soloni-114m-tdt-ctc-v3 est maintenant intégré
-au pipeline officiel — `transcrire.py --modele RobotsMali/soloni-114m-tdt-ctc-v3`
+au pipeline officiel : `transcrire.py --modele RobotsMali/soloni-114m-tdt-ctc-v3`
 suffit (le backend NeMo est auto-détecté au préfixe `RobotsMali/`, sinon
 `--backend nemo` explicite). Les deux bugs de compatibilité NeMo notés plus
 bas sont maintenant corrigés automatiquement au runtime par `transcrire.py`,
 plus besoin de patcher site-packages à la main. `montants.py` a aussi été
 corrigé (dictionnaire élargi + tolérance aux mots collés) : le montant P02
 est maintenant retrouvé avec RobotsMali (1/2 au lieu de 0/2, voir détail
-plus bas — inchangé pour P01, qui reste un problème de synthèse TTS, pas
+plus bas, inchangé pour P01, qui reste un problème de synthèse TTS, pas
 du parseur).
 
 Le modèle prévu dans Réponses_Amina (`FarmRadioInternational/bambara-whisper-asr`)
@@ -56,7 +56,7 @@ cahier des charges (lues en synthèse vocale par MALIBA-AI TTS, voir
 `audio_synthetique/`) + 5 extraits de vrai bambara parlé (dataset public
 [RobotsMali/afvoices](https://huggingface.co/datasets/RobotsMali/afvoices)).
 
-⚠️ Échantillon minuscule (n=7, dont seulement 2 avec montant) — ces chiffres
+⚠️ Échantillon minuscule (n=7, dont seulement 2 avec montant). Ces chiffres
 indiquent une tendance, pas une conclusion statistique. Rien ne remplace un
 vrai test sur les enregistrements terrain à venir.
 
@@ -64,8 +64,8 @@ vrai test sur les enregistrements terrain à venir.
 
 | | FarmRadioInternational<br>(modèle actuel) | RobotsMali/<br>soloni-114m-tdt-ctc-v3 | MALIBA-AI/<br>bambara-asr-v3 |
 |---|---|---|---|
-| WER — 5 échantillons réels | 36 % | **21 %** | 50 % |
-| WER — 2 phrases à montants | 60 % | 64 % | 56 % |
+| WER (5 échantillons réels) | 36 % | **21 %** | 50 % |
+| WER (2 phrases à montants) | 60 % | 64 % | 56 % |
 | Montants exacts trouvés | 0/2 | 0/2 | 0/2 |
 | Latence (CPU, par phrase) | 16 – 38 s | **0,1 – 0,4 s** | 58 – 84 s |
 | Taille | ~0,8 Md param. (Whisper-medium) | **114 M param.** | 2 Md param. (Whisper-large-v3) |
@@ -84,7 +84,7 @@ qu'un vrai échec de compréhension :
   absente du dictionnaire de `montants.py`.
 - **MALIBA-AI/bambara-asr-v3** : ne prononce/entend pas du tout "2500" (le
   chiffre écrit en digits dans le texte de référence disparaît entièrement,
-  y compris pour les deux autres modèles — sur ce point précis, le
+  y compris pour les deux autres modèles. Sur ce point précis, le
   problème vient peut-être de la synthèse MALIBA-AI TTS elle-même, pas de
   l'ASR. Voir `audio_synthetique/README.md`).
 
@@ -102,7 +102,7 @@ Sur 2 des 5 échantillons de bambara réel (AFV00, AFV02), le modèle n'a pas
 transcrit en bambara mais a produit une **phrase anglaise sans rapport**
 (« I can't wait until she gets old. », « It's a good idea. »). C'est un
 comportement d'hallucination de traduction connu sur les modèles Whisper
-multilingues quand ils hésitent sur la langue source — un risque sérieux
+multilingues quand ils hésitent sur la langue source : un risque sérieux
 pour un assistant vocal en production, où une réponse plausible mais fausse
 est pire qu'une erreur de reconnaissance.
 
@@ -112,7 +112,7 @@ est pire qu'une erreur de reconnaissance.
 creuser en priorité :
 - Meilleur WER sur de la parole naturelle (21 % vs 36 % pour le modèle
   actuel).
-- Considérablement plus rapide (sous la seconde, même sur CPU) — décisif
+- Considérablement plus rapide (sous la seconde, même sur CPU), décisif
   pour l'objectif de latence < 5 s du cahier des charges, qu'aucun des
   deux autres modèles ne tient sur CPU.
 - Vraiment libre (CC-BY-4.0, pas de compte ni de token requis).
@@ -120,7 +120,7 @@ creuser en priorité :
   bien moindres.
 
 **Inconvénient à peser** : il tourne sur le toolkit **NVIDIA NeMo**, pas sur
-`transformers` comme le reste du pipeline — une dépendance nettement plus
+`transformers` comme le reste du pipeline : une dépendance nettement plus
 lourde à faire fonctionner sur le GAIC Sandbox. À vérifier avec Isaak/CFA.
 Le pipeline de test (`transcrire.py`) gère déjà les deux backends de façon
 transparente, mais ça ne dit rien de la faisabilité d'un déploiement NeMo
@@ -142,12 +142,12 @@ qualité des modèles eux-mêmes :
    touche `BoostingTreeModelConfig.is_empty()` (accès à un champ de config
    absent d'un checkpoint plus ancien). **Désormais corrigé automatiquement**
    par `transcrire.py` (`_patch_compat_nemo()`, appliqué au runtime avant
-   de charger un modèle NeMo — sans effet si NeMo a corrigé ces bugs
+   de charger un modèle NeMo, sans effet si NeMo a corrigé ces bugs
    entre-temps).
 2. **MALIBA-AI/bambara-asr-v3 en fp16 sur CPU** : le pipeline `transformers`
    charge le modèle dans le dtype natif du checkpoint (fp16), ce qui l'a
    fait tourner plus d'une heure sans produire le moindre résultat sur un
-   clip de 2 s (CPU à ~270 %, donc pas un vrai blocage — juste des calculs
+   clip de 2 s (CPU à ~270 %, donc pas un vrai blocage, juste des calculs
    fp16 non optimisés sur CPU). Forcer `torch_dtype=torch.float32` à
    l'instanciation du pipeline règle le problème (64-84 s/phrase ensuite,
    toujours trop lent pour l'objectif de latence).

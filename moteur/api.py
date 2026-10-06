@@ -11,7 +11,7 @@ entrant n'a qu'à être transcrit avant d'appeler la même fonction
 Authentification : jeton statique simple (API_TOKEN, variable d'environnement),
 exigé sur tous les endpoints sauf /health, conformément à l'architecture.
 Volontairement minimal pour ce premier jet : la hiérarchie de rôles complète
-(section 4 de l'architecture — utilisatrice / animatrice / gestionnaire /
+(section 4 de l'architecture : utilisatrice / animatrice / gestionnaire /
 administratrice) suppose des comptes réels et reste à construire, pas un
 prérequis pour tester le pipeline ASR -> moteur -> TTS de bout en bout.
 """
@@ -32,7 +32,7 @@ from moteur.agent_vocal import AgentVocal
 
 load_dotenv()  # lit .env (API_TOKEN, HF_TOKEN, DATABASE_URL) s'il existe, jamais commité
 
-app = FastAPI(title="N'GONI NANA — API")
+app = FastAPI(title="N'GONI NANA : API")
 
 # Page de test "appui pour parler" (voir moteur/web/README.md) : usage
 # interne/développement uniquement, pas une interface destinée aux
@@ -129,7 +129,7 @@ def health():
         bd = _SessionLocal()
         bd.execute(db.Base.metadata.tables["cooperatives"].select().limit(1))
         etat["base_de_donnees"] = "ok"
-    except Exception as e:  # noqa: BLE001 — on veut remonter n'importe quelle panne ici
+    except Exception as e:  # noqa: BLE001 : on veut remonter n'importe quelle panne ici
         etat["base_de_donnees"] = f"erreur: {e}"
     etat["asr"] = "non chargé (chargement à la demande, voir asr_robotsmali.py)"
     etat["tts"] = "non chargé (chargement à la demande, voir tts_maliba.py)"

@@ -58,7 +58,7 @@ def _termes_milliers(mille: int) -> list[str]:
     imbriqué sous waa se reparse en additionnant le reste HORS du ×1000,
     donc faux). Un millier comme 125 (= 100 + 25, pas 100×quelque chose)
     doit donc sortir comme deux termes "waa" additionnés par "ni" plutôt
-    qu'un seul — d'où la récursion plutôt qu'un simple appel à _centaine().
+    qu'un seul, d'où la récursion plutôt qu'un simple appel à _centaine().
     """
     if mille == 0:
         return []

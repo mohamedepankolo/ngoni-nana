@@ -2,7 +2,7 @@
 
 Tout en lecture seule : le dashboard ne modifie jamais directement les
 transactions, le capital ou le stock (ce sont les écritures de l'agent vocal,
-après confirmation, qui font foi — principe de non-perte silencieuse,
+après confirmation, qui font foi (principe de non-perte silencieuse,
 section 1). Les seules écritures d'ici concernent la gestion des comptes
 (utilisatrices, relais), pas les données comptables elles-mêmes.
 """

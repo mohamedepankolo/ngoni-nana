@@ -2,7 +2,7 @@
 
 Premier jet de traduction, construit à partir : du vocabulaire déjà utilisé
 ailleurs dans ce dépôt (feere=vendre, juru=dette, jagokun=capital, sara=payer,
-san=acheter — dictionnaire_mots_cles.py), des tournures réellement observées
+san=acheter, dictionnaire_mots_cles.py), des tournures réellement observées
 dans phrases_reelles.csv (ex. "..., i sɔnna" = "..., tu es d'accord" dans
 P02c ; "{qté} {article} de bɛ [X] bolo" = structure de P19/P19b pour un
 niveau de stock), et de connaissances générales de la langue pour le reste.
@@ -53,7 +53,7 @@ def reponse_capital(montant_fcfa: int) -> str:
 def reponse_stock(article: str, quantite: int, seuil_bas: bool) -> str:
     base = f"{article} {nombre_en_bambara(quantite)} de bɛ i bolo."
     if seuil_bas:
-        base += " Bɔrɛ ka dɔgɔ."  # "le stock est bas/insuffisant" — sens correct, formulation à valider
+        base += " Bɔrɛ ka dɔgɔ."  # "le stock est bas/insuffisant" : sens correct, formulation à valider
     return base
 
 
@@ -69,7 +69,7 @@ def reformulation(tentative: int) -> str:
     if tentative <= 1:
         return "Ne ma a faamu. A fɔ tuguni."
     # 2e tentative : propose explicitement les mots que le moteur reconnaît
-    # (dictionnaire_mots_cles.MOTS_CLES), pas les noms français des actions —
+    # (dictionnaire_mots_cles.MOTS_CLES), pas les noms français des actions,
     # ce sont ces mots-là, et pas leur traduction, que le moteur écoute.
     return "Ne ma a faamu fɔlɔ. A fɔ ka jɛya : feere, sara, jagokun, juru, walima bolo."
 

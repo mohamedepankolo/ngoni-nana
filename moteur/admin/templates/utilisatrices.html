@@ -17,7 +17,7 @@
     {% for ligne in utilisatrices %}
     <tr>
       <td>{{ ligne.utilisatrice.code_anonyme }}</td>
-      <td>{{ ligne.cooperative.nom if ligne.cooperative else "—" }}</td>
+      <td>{{ ligne.cooperative.nom if ligne.cooperative else "n/d" }}</td>
       <td>{{ ligne.utilisatrice.date_creation.strftime("%d/%m/%Y") }}</td>
       <td>{{ ligne.utilisatrice.langue }}</td>
       <td>{{ ligne.nb_transactions }}</td>

@@ -84,13 +84,13 @@ def pct(x: float) -> str:
 
 def ligne_synthese(nom: str, s: dict) -> str:
     ok, total = s["montants"]
-    montants = f"{ok}/{total} ({pct(ok / total)})" if total else "—"
+    montants = f"{ok}/{total} ({pct(ok / total)})" if total else "n/d"
     return f"| {nom} | {s['n']} | {pct(s['wer'])} | {pct(s['cer'])} | {montants} |"
 
 
 def rapport(lignes: list[dict], modele: str) -> str:
     g = synthese(lignes)
-    out = [f"# Rapport de test ASR bambara — {modele}", ""]
+    out = [f"# Rapport de test ASR bambara : {modele}", ""]
     out += ["## Synthèse", "",
             "| Groupe | Phrases | WER | CER | Montants exacts |", "|---|---|---|---|---|",
             ligne_synthese("**Total**", g)]
@@ -111,9 +111,9 @@ def rapport(lignes: list[dict], modele: str) -> str:
             "| id | Référence | Transcription | WER | Nombre attendu | Nombres trouvés | Montant |",
             "|---|---|---|---|---|---|---|"]
     for l in lignes:
-        verdict = {True: "✅", False: "❌", None: "—"}[l["montant_ok"]]
+        verdict = {True: "✅", False: "❌", None: "n/d"}[l["montant_ok"]]
         trouves = ", ".join(map(str, l["trouves"])) or "aucun"
-        attendu = l["attendu"] if l["attendu"] is not None else "—"
+        attendu = l["attendu"] if l["attendu"] is not None else "n/d"
         out.append(f"| {l['id']} | {l['reference']} | {l['transcription']} | {pct(l['wer'])} "
                    f"| {attendu} | {trouves} | {verdict} |")
 
@@ -121,7 +121,7 @@ def rapport(lignes: list[dict], modele: str) -> str:
     if erreurs:
         out += ["", "## Montants mal reconnus", ""]
         out += [f"- **{l['id']}** : attendu {l['attendu']}, trouvé "
-                f"{', '.join(map(str, l['trouves'])) or 'aucun nombre'} — « {l['transcription']} »"
+                f"{', '.join(map(str, l['trouves'])) or 'aucun nombre'} : « {l['transcription']} »"
                 for l in erreurs]
     return "\n".join(out) + "\n"
 

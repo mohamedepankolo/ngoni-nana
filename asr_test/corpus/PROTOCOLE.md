@@ -1,4 +1,4 @@
-# Protocole d'enregistrement — test ASR bambara
+# Protocole d'enregistrement : test ASR bambara
 
 ## Avant d'enregistrer
 

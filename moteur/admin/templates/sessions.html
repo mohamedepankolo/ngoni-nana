@@ -26,10 +26,10 @@
     <tr>
       <td>{{ ligne.session.date_debut.strftime("%d/%m/%Y %H:%M") }}</td>
       <td>{{ ligne.utilisatrice.code_anonyme }}</td>
-      <td>{{ ligne.cooperative.nom if ligne.cooperative else "—" }}</td>
-      <td>{{ ligne.session.canal or "—" }}</td>
-      <td>{{ (ligne.duree_s ~ " s") if ligne.duree_s is not none else "—" }}</td>
-      <td>{{ ligne.derniere_action or "—" }}</td>
+      <td>{{ ligne.cooperative.nom if ligne.cooperative else "n/d" }}</td>
+      <td>{{ ligne.session.canal or "n/d" }}</td>
+      <td>{{ (ligne.duree_s ~ " s") if ligne.duree_s is not none else "n/d" }}</td>
+      <td>{{ ligne.derniere_action or "n/d" }}</td>
       <td>
         {% if ligne.session.statut == "complete" %}<span class="badge ok">Terminée</span>
         {% else %}<span class="badge pending">Incomplète</span>{% endif %}

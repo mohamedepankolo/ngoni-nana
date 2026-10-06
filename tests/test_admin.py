@@ -7,7 +7,7 @@ sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "asr_test" / "scripts"))
 
 # Même fichier/jeton que test_api.py : moteur.api est un singleton construit
-# une seule fois au premier import (voir ce fichier) — ces lignes n'ont d'effet
+# une seule fois au premier import (voir ce fichier). Ces lignes n'ont d'effet
 # que si ce module est collecté avant test_api.py, mais restent nécessaires
 # pour que ce fichier reste exécutable seul (`pytest tests/test_admin.py`).
 os.environ["API_TOKEN"] = "jeton-de-test"

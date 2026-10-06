@@ -70,7 +70,7 @@ def main():
                     help="transcrit chaque segment pour prévisualisation (activé par défaut)")
     p.add_argument("--no-transcrire", dest="transcrire", action="store_false")
     # RobotsMali par défaut : sous la seconde par segment, contre 16-38s pour
-    # FarmRadioInternational — indispensable ici vu le nombre de segments à
+    # FarmRadioInternational, indispensable ici vu le nombre de segments à
     # prévisualiser d'un coup. C'est un aperçu de travail, pas le test final.
     p.add_argument("--modele", default="RobotsMali/soloni-114m-tdt-ctc-v3")
     p.add_argument("--backend", choices=["transformers", "nemo"], default=None)

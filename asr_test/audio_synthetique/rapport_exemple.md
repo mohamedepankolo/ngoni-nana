@@ -1,4 +1,4 @@
-# Rapport de test ASR bambara — FarmRadioInternational/bambara-whisper-asr
+# Rapport de test ASR bambara : FarmRadioInternational/bambara-whisper-asr
 
 ## Synthèse
 
@@ -19,5 +19,5 @@ WER/CER = taux d'erreur par mot / par caractère (plus bas = mieux). Montant exa
 
 ## Montants mal reconnus
 
-- **P01** : attendu 2500, trouvé aucun nombre — « madamu ka jɛnɛ ye fansi »
-- **P02** : attendu 50000, trouvé 5, 50 — « sana duuru fɛli bɛ biwa bi duuru ma i sona »
+- **P01** : attendu 2500, trouvé aucun nombre : « madamu ka jɛnɛ ye fansi »
+- **P02** : attendu 50000, trouvé 5, 50 : « sana duuru fɛli bɛ biwa bi duuru ma i sona »

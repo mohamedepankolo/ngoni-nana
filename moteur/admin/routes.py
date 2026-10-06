@@ -11,7 +11,7 @@ inventée ici.
 
 Authentification HTTP Basic (couple utilisateur/mot de passe natif du
 navigateur, pas de formulaire à construire) : seul le mot de passe compte,
-comparé à API_TOKEN — cohérent avec le jeton unique déjà utilisé par le
+comparé à API_TOKEN, cohérent avec le jeton unique déjà utilisé par le
 reste de l'API (voir api.py).
 """
 import csv

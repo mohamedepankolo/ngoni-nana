@@ -107,7 +107,7 @@ def test_variante_ne_pour_n_ne_pollue_pas_larticle():
 ])
 def test_reconnaitre_confirmation(texte, attendu):
     # "aawo" : graphie observée en test réel (ASR RobotsMali, 2026-10-05) pour
-    # le "oui" bambara — a fait planter une vraie session avant d'être ajoutée.
+    # le "oui" bambara, a fait planter une vraie session avant d'être ajoutée.
     assert reconnaitre_confirmation(texte) == attendu
 
 
