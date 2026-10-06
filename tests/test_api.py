@@ -16,8 +16,12 @@ DB_TEST = RACINE / "tests" / "_api_test.db"
 # Windows, SQLAlchemy/SQLite peut garder le fichier verrouillé après usage
 # tant que le processus Python tourne, ce qui rend un `unlink` en fin de
 # session peu fiable. Un fichier orphelin d'un run précédent (ex. process tué)
-# ne gêne donc jamais le suivant.
-DB_TEST.unlink(missing_ok=True)
+# ne gêne donc jamais le suivant. PermissionError : test_admin.py (collecté
+# avant celui-ci) a déjà importé moteur.api et ouvert ce même fichier.
+try:
+    DB_TEST.unlink(missing_ok=True)
+except PermissionError:
+    pass
 os.environ["DATABASE_URL"] = f"sqlite:///{DB_TEST}"
 
 import pytest  # noqa: E402

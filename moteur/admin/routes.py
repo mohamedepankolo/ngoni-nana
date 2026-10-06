@@ -42,6 +42,14 @@ def _session_factory_app(request: Request):
     return request.app.state.admin_session_factory()
 
 
+def _entier_ou_none(valeur: str | None) -> int | None:
+    """Un <select> dont l'option "Toutes/Tous" vaut "" envoie cooperative_id="" en
+    GET : FastAPI rejette ça pour un paramètre typé int (ce n'est pas un entier
+    valide), d'où ce passage par une chaîne convertie à la main.
+    """
+    return int(valeur) if valeur else None
+
+
 @router.get("/", response_class=HTMLResponse, dependencies=[Depends(verifier_acces)])
 def vue_ensemble(request: Request):
     bd = _session_factory_app(request)
@@ -50,26 +58,28 @@ def vue_ensemble(request: Request):
 
 
 @router.get("/utilisatrices", response_class=HTMLResponse, dependencies=[Depends(verifier_acces)])
-def utilisatrices(request: Request, cooperative_id: int | None = None, recherche: str | None = None):
+def utilisatrices(request: Request, cooperative_id: str | None = None, recherche: str | None = None):
     bd = _session_factory_app(request)
+    coop_id = _entier_ou_none(cooperative_id)
     return templates.TemplateResponse(request, "utilisatrices.html", {
         "page": "utilisatrices",
         "cooperatives": donnees.lister_cooperatives(bd),
-        "utilisatrices": donnees.lister_utilisatrices(bd, cooperative_id, recherche),
-        "cooperative_id": cooperative_id,
+        "utilisatrices": donnees.lister_utilisatrices(bd, coop_id, recherche),
+        "cooperative_id": coop_id,
         "recherche": recherche,
     })
 
 
 @router.get("/sessions", response_class=HTMLResponse, dependencies=[Depends(verifier_acces)])
-def sessions(request: Request, cooperative_id: int | None = None,
+def sessions(request: Request, cooperative_id: str | None = None,
              statut: str | None = None, canal: str | None = None):
     bd = _session_factory_app(request)
+    coop_id = _entier_ou_none(cooperative_id)
     return templates.TemplateResponse(request, "sessions.html", {
         "page": "sessions",
         "cooperatives": donnees.lister_cooperatives(bd),
-        "sessions": donnees.lister_sessions(bd, cooperative_id, statut, canal),
-        "cooperative_id": cooperative_id, "statut": statut, "canal": canal,
+        "sessions": donnees.lister_sessions(bd, coop_id, statut or None, canal or None),
+        "cooperative_id": coop_id, "statut": statut, "canal": canal,
     })
 
 
