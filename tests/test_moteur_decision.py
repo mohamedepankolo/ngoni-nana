@@ -86,6 +86,7 @@ def test_montant_reconstruit_exactement_sur_corpus_reel():
     ("n ka jagokun ye waa tan ye", "capital"),
     ("n ka waa fila juru bɛ Awa la", "client"),
     ("n ye joli feere nin kalo in na", "consultation"),
+    ("mɔgɔ jɔnw la ka juru bɛ", "consultation"),
     ("phrase totalement hors sujet sans aucun mot-clé", None),
 ])
 def test_reconnaitre_intention_cas_simples(texte, intention_attendue):

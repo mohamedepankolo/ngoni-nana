@@ -10,7 +10,7 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 |---|---|---|
 | Test du modèle ASR bambara | `asr_test/` | **en cours** |
 | Moteur de décision GERME Comptabilité | `moteur/moteur_decision.py` | **en cours** (premier jet : dictionnaire de mots-clés + machine à états) |
-| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | **validé en réel** sur téléphone (2026-10-05), transcription correcte, ~0,3 s |
+| Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | **validé en réel** sur téléphone (2026-10-05) et sur 60 phrases (2026-10-06, 83 % intention), ~0,3 s |
 | Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | **validé en réel** sur téléphone (2026-10-05) ; licence CC-BY-NC toujours non confirmée pour la production (R4) ; lit du texte français pour l'instant (voir plus bas) |
 | Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **validé en réel** : vente complète enregistrée via vraie voix, capital mis à jour |
 | API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS |
@@ -77,7 +77,7 @@ moteur/
   moteur_decision.py          couches 2 à 4 : entités, nombres (réutilise montants.py), machine à états de session
   base_donnees.py             schéma SQLAlchemy (section 3.7) ; SQLite par défaut, Postgres/Neon via DATABASE_URL
   agent_vocal.py              orchestrateur (section 3.5) : relie moteur + base de données, gère la confirmation oui/non
-  asr_robotsmali.py           intégration ASR (RobotsMali/soloni-114m-tdt-ctc-v3, backend NeMo) + conversion audio (ffmpeg)
+  asr_robotsmali.py           intégration ASR (RobotsMali/soloni-be-kalan-v0, backend NeMo) + conversion audio (ffmpeg)
   tts_maliba.py                intégration TTS (MALIBA-AI/MalianTTS, licence CC-BY-NC à confirmer pour la prod, R4)
   api.py                      API Gateway (section 3.6) : /health, /session, /call, /call_audio, /modules, /sms
   web/index.html              page de test "maintenir pour parler" (navigateur, y compris mobile), servie sur /web
@@ -88,7 +88,7 @@ Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèl
 - reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase), pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
 - montant FCFA reconstruit exactement : **96 %** (49/51).
 
-Ces chiffres partent du texte de référence, pas de l'ASR réel. Le vrai chiffre de bout en bout (ASR + moteur, `asr_test/scripts/tester_pipeline_complet.py`, résultat dans `asr_test/results/pipeline_complet.md`) est plus bas, logiquement : **78 % d'intention correcte, 71 % de montant exact** sur les mêmes 60 enregistrements réels, cette fois transcrits par le modèle plutôt que lus depuis le corpus. L'écart vient presque entièrement du bruit de l'ASR (mots tronqués, fusionnés, ou mal transcrits), pas du moteur lui-même. Deux bugs réels trouvés et corrigés grâce à ce test (variante "fere" pour "feere", fusion "ne"+numéral collé) ; le reste des écarts restants est documenté dans le rapport comme du bruit ASR non corrigeable sans réentraîner le modèle.
+Ces chiffres partent du texte de référence, pas de l'ASR réel. Le vrai chiffre de bout en bout (ASR + moteur, `asr_test/scripts/tester_pipeline_complet.py`, résultat dans `asr_test/results/pipeline_complet.md`) est plus bas, logiquement : **83 % d'intention correcte, 76 % de montant exact** sur les mêmes 60 enregistrements réels (modèle RobotsMali/soloni-be-kalan-v0, voir `asr_test/COMPARAISON_MODELES.md`), cette fois transcrits par le modèle plutôt que lus depuis le corpus. L'écart vient presque entièrement du bruit de l'ASR (mots tronqués, fusionnés, ou mal transcrits), pas du moteur lui-même. Trois bugs réels trouvés et corrigés grâce à ce test (variante "fere" pour "feere", fusion "ne"+numéral collé, variante "jonw" pour "jɔn"), plus un changement de modèle ASR (nouveau modèle RobotsMali publié début octobre 2026, meilleur sur nos propres phrases) ; le reste des écarts restants est documenté dans le rapport comme du bruit ASR non corrigeable sans réentraîner le modèle.
 
 Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
 

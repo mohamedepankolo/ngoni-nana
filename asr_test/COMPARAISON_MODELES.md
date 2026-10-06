@@ -1,5 +1,30 @@
 # Comparaison de modèles ASR bambara (23/09/2026)
 
+## Mise à jour (06/10/2026) : changement de modèle, RobotsMali/soloni-be-kalan-v0
+
+RobotsMali a publié un nouveau modèle début octobre 2026 (même architecture
+Hybrid FastConformer-TDT-CTC, 114M paramètres, licence CC-BY-4.0, même façon
+de le charger que soloni-114m-tdt-ctc-v3). Testé directement sur le pipeline
+complet du projet (ASR réel + moteur de décision, pas juste WER/CER) via
+`asr_test/scripts/tester_pipeline_complet.py`, sur les mêmes 60 phrases
+réelles vérifiées :
+
+| | soloni-114m-tdt-ctc-v3 | soloni-be-kalan-v0 |
+|---|---|---|
+| Intention correcte (bout en bout) | 78 % | **83 %** |
+| Montant exact (bout en bout) | 71 % | **76 %** |
+| Latence | ~0,3 s | ~0,3 s |
+
+Retenu comme nouveau modèle par défaut (`moteur/asr_robotsmali.py`). Détail
+complet dans `results/pipeline_complet.md`.
+
+Recherche faite à cette occasion : un autre modèle RobotsMali (`bam-vits`,
+TTS cette fois, VITS) existe aussi en CC-BY-4.0, mais les développeurs le
+documentent eux-mêmes comme expérimental et déconseillé en production, avec
+explicitement des difficultés sur les nombres : écarté sans test, le MALIBA-AI
+TTS actuel reste le bon choix malgré sa latence plus élevée (justesse sur les
+montants non négociable pour ce projet).
+
 ## Résultat définitif (27/09/2026) : vrai corpus terrain, référence vérifiée
 
 Premier test sur de vraies personnes : 3 locutrices (L01, L02, L03),

@@ -27,7 +27,9 @@ MOTS_CLES: dict[str, list[str]] = {
     # Marqueurs interrogatifs : une question prime toujours sur le mot-clé
     # métier qu'elle contient (ex. "combien ai-je VENDU" n'est pas une vente).
     # "jɔn" (qui/lequel) est stocké normalisé ("jon", voir montants.normaliser).
-    "consultation": ["joli", "jon"],
+    # "jonw" : variante avec marque du pluriel, observée en test réel
+    # (RobotsMali/soloni-be-kalan-v0, 2026-10-06).
+    "consultation": ["joli", "jon", "jonw"],
     # "juru" = dette/créance (le préfixe absorbe la variante "jurumu" du corpus).
     "client": ["juru"],
     # "feere" = vendre/vendu, couvre aussi "feerelen" (participe). "fere" (un

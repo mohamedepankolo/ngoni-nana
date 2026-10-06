@@ -1,10 +1,14 @@
 """Intégration ASR (Architecture_Technique_NGONI_NANA.docx, section 3.2).
 
-Modèle retenu : RobotsMali/soloni-114m-tdt-ctc-v3 (backend NVIDIA NeMo),
-~0,3 s par phrase mesuré sur CPU, 69% de montants exacts sur le corpus réel
-vérifié (voir COMPARAISON_MODELES.md). Réutilise directement le chargement
-déjà écrit et testé dans asr_test/scripts/transcrire.py plutôt que de le
-dupliquer.
+Modèle retenu : RobotsMali/soloni-be-kalan-v0 (backend NVIDIA NeMo, même
+famille et même licence CC-BY-4.0 que soloni-114m-tdt-ctc-v3, publié par
+RobotsMali début octobre 2026). ~0,3 s par phrase sur CPU. Testé en direct
+sur le pipeline complet (ASR + moteur) du projet le 2026-10-06 contre
+soloni-114m-tdt-ctc-v3 : 82 % d'intention correcte et 76 % de montant exact
+sur les 60 phrases réelles vérifiées, contre 78 %/71 % pour v3 (voir
+asr_test/results/pipeline_complet_bekalan.md). Réutilise directement le
+chargement déjà écrit et testé dans asr_test/scripts/transcrire.py plutôt
+que de le dupliquer.
 
 Dépendance lourde et volontairement optionnelle : `nemo-toolkit[asr]` n'est
 pas dans requirements.txt par défaut (voir ce fichier). Rien dans ce module
@@ -20,7 +24,7 @@ _SCRIPTS = Path(__file__).resolve().parent.parent / "asr_test" / "scripts"
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-MODELE_PAR_DEFAUT = "RobotsMali/soloni-114m-tdt-ctc-v3"
+MODELE_PAR_DEFAUT = "RobotsMali/soloni-be-kalan-v0"
 
 
 def convertir_en_wav(chemin_entree: str, chemin_sortie: str) -> str:
