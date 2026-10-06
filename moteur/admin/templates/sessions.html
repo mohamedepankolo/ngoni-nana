@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block contenu %}
+<form class="filtres" method="get">
+  <select name="cooperative_id">
+    <option value="">Toutes les coopératives</option>
+    {% for c in cooperatives %}
+    <option value="{{ c.id }}" {{ "selected" if cooperative_id == c.id else "" }}>{{ c.nom }}</option>
+    {% endfor %}
+  </select>
+  <select name="statut">
+    <option value="">Tous les statuts</option>
+    <option value="complete" {{ "selected" if statut == "complete" else "" }}>Terminée</option>
+    <option value="incomplete" {{ "selected" if statut == "incomplete" else "" }}>Incomplète</option>
+  </select>
+  <select name="canal">
+    <option value="">Tous les canaux</option>
+    <option value="voix" {{ "selected" if canal == "voix" else "" }}>Voix</option>
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+
+<div class="carte">
+  <table>
+    <tr><th>Date</th><th>Utilisatrice</th><th>Coopérative</th><th>Canal</th><th>Durée</th><th>Dernière action</th><th>Statut</th></tr>
+    {% for ligne in sessions %}
+    <tr>
+      <td>{{ ligne.session.date_debut.strftime("%d/%m/%Y %H:%M") }}</td>
+      <td>{{ ligne.utilisatrice.code_anonyme }}</td>
+      <td>{{ ligne.cooperative.nom if ligne.cooperative else "—" }}</td>
+      <td>{{ ligne.session.canal or "—" }}</td>
+      <td>{{ (ligne.duree_s ~ " s") if ligne.duree_s is not none else "—" }}</td>
+      <td>{{ ligne.derniere_action or "—" }}</td>
+      <td>
+        {% if ligne.session.statut == "complete" %}<span class="badge ok">Terminée</span>
+        {% else %}<span class="badge pending">Incomplète</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" style="color:var(--text-soft)">Aucune session ne correspond.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

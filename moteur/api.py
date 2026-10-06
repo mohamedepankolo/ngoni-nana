@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from moteur import base_donnees as db
+from moteur.admin.routes import router as admin_router
 from moteur.agent_vocal import AgentVocal
 
 load_dotenv()  # lit .env (API_TOKEN, HF_TOKEN, DATABASE_URL) s'il existe, jamais commité
@@ -42,6 +43,9 @@ app.mount("/web", StaticFiles(directory=str(Path(__file__).parent / "web"), html
 @app.get("/")
 def racine():
     return RedirectResponse("/web/")
+
+
+app.include_router(admin_router)
 
 MODULES_GERME = [
     {"action": "vente", "description": "Enregistrer une vente"},
@@ -61,6 +65,12 @@ _SessionLocal = db.get_session_factory(_engine)
 # Une seule instance partagée par le processus : l'état des sessions en
 # mémoire (voir agent_vocal.py) doit survivre entre deux appels HTTP.
 _agent = AgentVocal(session_factory=_SessionLocal)
+
+# Dashboard admin ABIC (section 3.8) : mêmes moteur/fabrique de session que
+# le reste de l'API, exposés via app.state pour que moteur/admin/routes.py
+# n'ait pas à importer ce module (éviterait un import circulaire : api.py
+# inclura ce routeur plus bas).
+app.state.admin_session_factory = _SessionLocal
 
 
 def obtenir_agent() -> AgentVocal:

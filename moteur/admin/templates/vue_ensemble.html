@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block contenu %}
+<div class="cartes-kpi">
+  <div class="carte"><p class="libelle">Utilisatrices</p><p class="valeur">{{ kpis.total_utilisatrices }}</p></div>
+  <div class="carte"><p class="libelle">Sessions</p><p class="valeur">{{ kpis.total_sessions }}</p></div>
+  <div class="carte"><p class="libelle">Taux de complétion</p><p class="valeur">{{ kpis.taux_completion }}%</p></div>
+  <div class="carte"><p class="libelle">Alertes stock bas</p><p class="valeur">{{ kpis.alertes_stock|length }}</p></div>
+</div>
+
+<div class="carte" style="margin-bottom:24px">
+  <p class="section-titre">Répartition par coopérative</p>
+  {% for c in kpis.repartition_cooperatives %}
+  <div class="barre-coop">
+    <span style="width:120px">{{ c.nom }}</span>
+    <div class="piste"><div class="remplissage" style="width:{{ c.pct }}%"></div></div>
+    <span style="width:70px;text-align:right;color:var(--text-soft)">{{ c.nb }} ({{ c.pct }}%)</span>
+  </div>
+  {% else %}
+  <p style="color:var(--text-soft)">Aucune coopérative enregistrée.</p>
+  {% endfor %}
+</div>
+
+<div class="carte" style="margin-bottom:24px">
+  <p class="section-titre">Sessions récentes</p>
+  <table>
+    <tr><th>Date</th><th>Utilisatrice</th><th>Coopérative</th><th>Canal</th><th>Statut</th></tr>
+    {% for s, u, coop in kpis.sessions_recentes %}
+    <tr>
+      <td>{{ s.date_debut.strftime("%d/%m/%Y %H:%M") }}</td>
+      <td>{{ u.code_anonyme }}</td>
+      <td>{{ coop.nom if coop else "—" }}</td>
+      <td>{{ s.canal or "—" }}</td>
+      <td>
+        {% if s.statut == "complete" %}<span class="badge ok">Terminée</span>
+        {% else %}<span class="badge pending">Incomplète</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="color:var(--text-soft)">Aucune session pour l'instant.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="carte">
+  <p class="section-titre">Alertes stock bas</p>
+  <table>
+    <tr><th>Utilisatrice</th><th>Article</th><th>Quantité restante</th><th>Seuil</th></tr>
+    {% for ligne in kpis.alertes_stock %}
+    <tr>
+      <td>{{ ligne.utilisatrice_id }}</td>
+      <td>{{ ligne.article }}</td>
+      <td>{{ ligne.quantite_actuelle }}</td>
+      <td>{{ ligne.seuil_alerte }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" style="color:var(--text-soft)">Aucune alerte.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

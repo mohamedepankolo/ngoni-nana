@@ -16,7 +16,7 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 | API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS |
 | Téléphonie (remplaçant de Retell AI) | — | à choisir (R2) |
 | Hébergement réel (API, base de données) | — | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
-| Tableau de bord ABIC | — | maquette Figma faite, code à venir |
+| Tableau de bord ABIC | `moteur/admin/` | **en cours**, branché sur les vraies données (voir plus bas) |
 
 ## Test ASR : `asr_test/`
 
@@ -137,6 +137,21 @@ curl -X POST http://127.0.0.1:8000/call -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"session_id": 1, "utilisatrice_id": 1, "texte": "n ye saga saba feere wa bi duuru"}'
 ```
+
+## Dashboard admin ABIC : `moteur/admin/`
+
+Interface web en lecture seule pour les administratrices ABIC (architecture section 3.8) : suivi des sessions, rapports GERME Comptabilité par coopérative, liste des utilisatrices. Branchée sur la même base de données que l'agent vocal — les sessions et transactions de test apparaissent immédiatement dedans.
+
+```
+moteur/admin/
+  donnees.py              requêtes de lecture (KPIs, listes filtrées, rapport par coopérative)
+  routes.py               routes /admin/* (FastAPI), authentification HTTP Basic
+  templates/               pages Jinja2 (base, vue_ensemble, utilisatrices, sessions, rapports)
+```
+
+Accessible sur `https://.../admin/` une fois l'API lancée (voir ci-dessus) : identifiant libre, mot de passe = `API_TOKEN` du `.env` (le navigateur affiche une boîte de connexion native). 4 pages : Vue d'ensemble (KPIs, répartition par coopérative, alertes stock bas), Utilisatrices (filtrable par coopérative/recherche), Sessions (filtrable par coopérative/statut/canal), Rapports (recettes/dépenses/solde par coopérative, export CSV).
+
+**Limite connue** : un seul niveau d'accès ("Administratrice ABIC", tout voir) — les deux autres rôles qui touchent à un dashboard (animatrice : ses utilisatrices assignées seulement ; gestionnaire de coopérative : rapports agrégés de sa coopérative seulement, section 4 de l'architecture) demandent de vrais comptes, qui n'existent pas encore.
 
 ### Tests
 

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block contenu %}
+<form class="filtres" method="get">
+  <input type="text" name="recherche" placeholder="Rechercher un code" value="{{ recherche or '' }}">
+  <select name="cooperative_id">
+    <option value="">Toutes les coopératives</option>
+    {% for c in cooperatives %}
+    <option value="{{ c.id }}" {{ "selected" if cooperative_id == c.id else "" }}>{{ c.nom }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+
+<div class="carte">
+  <table>
+    <tr><th>Code</th><th>Coopérative</th><th>Inscrite le</th><th>Langue</th><th>Transactions</th></tr>
+    {% for ligne in utilisatrices %}
+    <tr>
+      <td>{{ ligne.utilisatrice.code_anonyme }}</td>
+      <td>{{ ligne.cooperative.nom if ligne.cooperative else "—" }}</td>
+      <td>{{ ligne.utilisatrice.date_creation.strftime("%d/%m/%Y") }}</td>
+      <td>{{ ligne.utilisatrice.langue }}</td>
+      <td>{{ ligne.nb_transactions }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="color:var(--text-soft)">Aucune utilisatrice ne correspond.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

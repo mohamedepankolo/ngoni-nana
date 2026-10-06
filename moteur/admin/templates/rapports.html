@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block contenu %}
+<form class="filtres" method="get" style="justify-content:space-between">
+  <div style="display:flex;gap:8px">
+    <span style="align-self:center;color:var(--text-soft)">Rapport GERME Comptabilité, par coopérative</span>
+  </div>
+  <a class="bouton" href="/admin/rapports.csv">Exporter en CSV</a>
+</form>
+
+<div class="cartes-kpi">
+  <div class="carte"><p class="libelle">Recettes totales</p><p class="valeur" style="color:var(--recette)">{{ total_recettes }} F</p></div>
+  <div class="carte"><p class="libelle">Dépenses totales</p><p class="valeur" style="color:var(--depense)">{{ total_depenses }} F</p></div>
+  <div class="carte"><p class="libelle">Solde net</p><p class="valeur" style="color:var(--accent)">{{ total_solde }} F</p></div>
+</div>
+
+<div class="carte">
+  <p class="section-titre">Résumé par coopérative</p>
+  <table>
+    <tr><th>Coopérative</th><th>Recettes</th><th>Dépenses</th><th>Solde</th></tr>
+    {% for r in rapport %}
+    <tr>
+      <td>{{ r.cooperative.nom }}</td>
+      <td>{{ r.recettes }} F</td>
+      <td>{{ r.depenses }} F</td>
+      <td>{{ r.solde }} F</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" style="color:var(--text-soft)">Aucune coopérative enregistrée.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
