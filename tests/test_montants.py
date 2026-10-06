@@ -54,5 +54,15 @@ def test_mots_colles():
     assert extraire_nombres("kemebi saba") == [3000]  # "kɛmɛ" + "bi saba" collés
 
 
+def test_pronom_ne_colle_a_un_numeral():
+    # "nɛkɛmɛ duuru" pour "ne kɛmɛ duuru" (500) : observé deux fois en test
+    # réel, pipeline complet ASR + moteur (RobotsMali, 2026-10-06), même
+    # locutrice, phrases différentes.
+    assert extraire_nombres("nɛkɛmɛ duuru bɛ mariama na") == [500]
+    assert extraire_nombres("nɛkɛmɛ wolonwula jurumu") == [700]
+    # Un mot qui commence juste par "ne" sans rapport ne doit rien casser.
+    assert extraire_nombres("nebɛ taa") == []
+
+
 def test_normaliser():
     assert normaliser("Kɛmɛ DUURU, ɲɔgɔn!") == "keme duuru nyogon"

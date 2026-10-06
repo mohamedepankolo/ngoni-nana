@@ -30,8 +30,10 @@ MOTS_CLES: dict[str, list[str]] = {
     "consultation": ["joli", "jon"],
     # "juru" = dette/créance (le préfixe absorbe la variante "jurumu" du corpus).
     "client": ["juru"],
-    # "feere" = vendre/vendu. Couvre aussi la forme "feerelen" (participe).
-    "vente": ["feere"],
+    # "feere" = vendre/vendu, couvre aussi "feerelen" (participe). "fere" (un
+    # seul e) : variante ASR observée à 4 reprises en test réel (RobotsMali,
+    # 2026-10-06, sur 3 locutrices différentes), pas une erreur isolée.
+    "vente": ["feere", "fere"],
     # "sara" = payer ; "san" = acheter (englobe "achat", voir note ci-dessus).
     "depense": ["sara", "san"],
     # "jagokun" = capital, cité explicitement dans le document d'architecture.

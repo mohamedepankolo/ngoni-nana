@@ -142,6 +142,27 @@ def _decouper_mot_colle(mot: str, profondeur_max: int = 4) -> list[str] | None:
     return None
 
 
+def _detacher_pronom_colle(mot: str) -> list[str] | None:
+    """Détache "ne" (pronom "je") collé au numéral qui suit, ex. "nɛkɛmɛ"
+    (normalisé "nekeme") pour "ne kɛmɛ", sans pause audible entre les deux.
+
+    Observé deux fois en test réel (RobotsMali, 2026-10-06, même locutrice,
+    phrases différentes) : pas une erreur isolée. Contrairement aux mots
+    pris en charge par `_decouper_mot_colle`, "ne" n'est pas lui-même un
+    numéral, donc traité à part : on ne le détache que si ça laisse un
+    numéral valide derrière lui, jamais pour un mot qui commence juste par
+    "ne" sans rapport (ex. "nebɛ").
+    """
+    prefixe = "ne"
+    if not mot.startswith(prefixe) or len(mot) <= len(prefixe):
+        return None
+    reste = mot[len(prefixe):]
+    if reste in NUMERAUX:
+        return [prefixe, reste]
+    suite = _decouper_mot_colle(reste)
+    return [prefixe] + suite if suite else None
+
+
 def extraire_nombres(texte: str) -> list[int]:
     """Tous les nombres prononcés (chiffres ou toutes lettres), sans conversion d'unité."""
     tokens = normaliser(texte).split()
@@ -153,7 +174,7 @@ def extraire_nombres(texte: str) -> list[int]:
             i += 1
             continue
         if tokens[i] not in NUMERAUX:
-            morceaux = _decouper_mot_colle(tokens[i])
+            morceaux = _detacher_pronom_colle(tokens[i]) or _decouper_mot_colle(tokens[i])
             if morceaux and len(morceaux) > 1:
                 tokens[i:i + 1] = morceaux
         if tokens[i] in NUMERAUX:

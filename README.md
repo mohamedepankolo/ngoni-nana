@@ -88,6 +88,8 @@ Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèl
 - reconnaissance d'intention : **87 %** (52/60), échecs restants documentés et listés explicitement dans le test (substitutions de verbe par une locutrice précise, ou mot-clé absent de cette phrase), pas corrigés au cas par cas pour ne pas surapprendre ce corpus de 60 phrases ;
 - montant FCFA reconstruit exactement : **96 %** (49/51).
 
+Ces chiffres partent du texte de référence, pas de l'ASR réel. Le vrai chiffre de bout en bout (ASR + moteur, `asr_test/scripts/tester_pipeline_complet.py`, résultat dans `asr_test/results/pipeline_complet.md`) est plus bas, logiquement : **78 % d'intention correcte, 71 % de montant exact** sur les mêmes 60 enregistrements réels, cette fois transcrits par le modèle plutôt que lus depuis le corpus. L'écart vient presque entièrement du bruit de l'ASR (mots tronqués, fusionnés, ou mal transcrits), pas du moteur lui-même. Deux bugs réels trouvés et corrigés grâce à ce test (variante "fere" pour "feere", fusion "ne"+numéral collé) ; le reste des écarts restants est documenté dans le rapport comme du bruit ASR non corrigeable sans réentraîner le modèle.
+
 Le dictionnaire de mots-clés, les mots de confirmation oui/non, et l'extraction d'article/nom propre (heuristique simple, pas d'étiquetage grammatical réel) restent **à valider et compléter par une personne bambaraphone**, comme `montants.py`.
 
 ### Pas encore fait, à savoir avant de tester
