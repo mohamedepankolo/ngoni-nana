@@ -13,7 +13,7 @@ Parcours visé : l'utilisatrice appelle → **reconnaissance vocale (ASR, bambar
 | Intégration ASR (RobotsMali, NeMo) | `moteur/asr_robotsmali.py` | **validé en réel** sur téléphone (2026-10-05) et sur 60 phrases (2026-10-06, 83 % intention), ~0,3 s |
 | Intégration TTS (MALIBA-AI) | `moteur/tts_maliba.py` | **validé en réel** sur téléphone (2026-10-05) ; licence CC-BY-NC toujours non confirmée pour la production (R4) ; lit du texte français pour l'instant (voir plus bas) |
 | Agent vocal (orchestrateur) + base de données | `moteur/agent_vocal.py`, `moteur/base_donnees.py` | **validé en réel** : vente complète enregistrée via vraie voix, capital mis à jour |
-| API Gateway (+ page de test vocal `/web`) | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS |
+| API Gateway + app mobile (PWA) `/web` | `moteur/api.py`, `moteur/web/` | **validé en réel** : test vocal complet depuis un téléphone, en HTTPS ; interface épurée pour utilisatrice non lettrée |
 | Téléphonie (remplaçant de Retell AI) | n/d | à choisir (R2) |
 | Hébergement réel (API, base de données) | n/d | à trancher avec CFA (R1) ; SQLite/Neon en attendant |
 | Tableau de bord ABIC | `moteur/admin/` | **en cours**, branché sur les vraies données (voir plus bas) |
@@ -80,7 +80,7 @@ moteur/
   asr_robotsmali.py           intégration ASR (RobotsMali/soloni-be-kalan-v0, backend NeMo) + conversion audio (ffmpeg)
   tts_maliba.py                intégration TTS (MALIBA-AI/MalianTTS, licence CC-BY-NC à confirmer pour la prod, R4)
   api.py                      API Gateway (section 3.6) : /health, /session, /call, /call_audio, /modules, /sms
-  web/index.html              page de test "maintenir pour parler" (navigateur, y compris mobile), servie sur /web
+  web/                        petite app mobile (PWA) "maintenir pour parler", servie sur /web (voir plus bas)
 ```
 
 Jamais de LLM génératif pour comprendre le bambara : le test sur les 42 modèles du sandbox (voir `Rapport comprehension Bambara - Sandbox`) a montré qu'aucun ne le fait de façon fiable. Le moteur est donc un système à règles, testé sur les 60 phrases vérifiées de `asr_test/corpus/phrases_reelles.csv` (`tests/test_moteur_decision.py`) :
@@ -124,7 +124,9 @@ MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout .certs/key.pem -ou
   --ssl-keyfile .certs/key.pem --ssl-certfile .certs/cert.pem
 ```
 
-**Page de test "maintenir pour parler"** : ouvrir `https://VOTRE_IP_LOCALE:8099/` depuis un téléphone sur le même réseau Wi-Fi, accepter l'avertissement de certificat, entrer l'`API_TOKEN` du `.env`, puis maintenir le bouton pour parler et relâcher pour envoyer. L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+**App mobile "maintenir pour parler"** (`moteur/web/`) : ouvrir `https://VOTRE_IP_LOCALE:8099/` depuis un téléphone sur le même réseau Wi-Fi, accepter l'avertissement de certificat. C'est une PWA installable (icône sur l'écran d'accueil, via "Ajouter à l'écran d'accueil" dans le navigateur) : un seul bouton rond, pas de texte ni de jargon technique à l'écran, pensée pour une utilisatrice qui ne lit pas (cohérent avec le parcours 100% vocal du projet). Couleur du bouton = état (orange : prêt ou en traitement ; rouge qui pulse : enregistrement ; vert : réponse qui parle). L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+
+Réglage réservé à l'équipe (jeton API, journal de débogage) : 5 appuis rapides sur le logo en haut de l'écran font apparaître l'écran de réglage, à faire une seule fois au moment de préparer le téléphone (pas quelque chose qu'une utilisatrice découvre ou a besoin de toucher).
 
 Diagnostic : `NGONI_DEBUG_AUDIO=1` (variable d'environnement) conserve une copie de chaque enregistrement reçu dans `debug_audio/` (brut + converti en WAV), utile si une transcription revient vide sans erreur.
 
