@@ -261,7 +261,11 @@ const bouton = $("bouton");
 let enTraitement = false;
 bouton.addEventListener("pointerdown", (e) => {
   e.preventDefault();
-  if (enTraitement) return; // deja un tour en cours : ignore un second appui
+  // L'attribut HTML "disabled" n'empeche pas toujours un pointerdown de se
+  // declencher (observe en test reel, 2026-10-08 : bouton grise car demarrer()
+  // n'avait pas encore reussi, mais le micro s'activait quand meme et l'envoi
+  // echouait en 401 plus loin, au lieu de simplement ne rien faire).
+  if (bouton.disabled || enTraitement) return;
   commencerEnregistrement().catch((err) => signalerErreur("Micro indisponible : " + err.message));
 });
 ["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
