@@ -5,7 +5,10 @@
 // pour qu'une correction publiee atteigne une utilisatrice qui a deja
 // installe l'app des sa prochaine ouverture avec reseau, plutot que de
 // rester bloquee sur une version en cache jusqu'a desinstallation manuelle.
-const CACHE = "ngoni-nana-v2";
+// v3 : meme strategie "reseau d'abord" etendue a config.js (jeton fourni par
+// le serveur, voir api.py) : sans ca, un appareil ayant deja charge l'app
+// garderait un jeton perime en cache si API_TOKEN change un jour.
+const CACHE = "ngoni-nana-v3";
 const FICHIERS = ["/web/", "/web/index.html", "/web/manifest.json",
                   "/web/icon-192.png", "/web/icon-512.png",
                   "/web/assets/erreur.wav"];
@@ -24,7 +27,11 @@ self.addEventListener("activate", (evt) => {
 
 self.addEventListener("fetch", (evt) => {
   if (evt.request.method !== "GET") return;
-  const estCoquille = evt.request.mode === "navigate" || evt.request.url.endsWith("/index.html");
+  // config.js est genere a la volee par le serveur a partir de API_TOKEN
+  // (voir api.py) : jamais mis en cache durablement, sinon un jeton change
+  // cote serveur resterait fige sur un appareil qui l'aurait deja recu.
+  const estCoquille = evt.request.mode === "navigate" || evt.request.url.endsWith("/index.html")
+                      || evt.request.url.endsWith("/config.js");
   if (estCoquille) {
     // Reseau d'abord : l'utilisatrice a presque toujours du reseau pour
     // parler avec N'GONI NANA de toute facon (ASR/TTS le demandent), donc ca

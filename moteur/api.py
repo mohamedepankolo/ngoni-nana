@@ -16,6 +16,7 @@ administratrice) suppose des comptes réels et reste à construire, pas un
 prérequis pour tester le pipeline ASR -> moteur -> TTS de bout en bout.
 """
 import base64
+import json
 import logging
 import os
 import tempfile
@@ -23,7 +24,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -42,6 +43,24 @@ logger = logging.getLogger("ngoni_nana")
 TAILLE_MAX_AUDIO_OCTETS = 15 * 1024 * 1024  # 15 Mo
 
 app = FastAPI(title="N'GONI NANA : API")
+
+
+@app.get("/web/config.js")
+def config_web():
+    """Fournit le jeton API à la page de test sans que l'équipe ait à le
+
+    taper à la main sur chaque appareil (geste caché 5 appuis en secours
+    seulement, voir index.html). Pas d'authentification ici par construction
+    (une page qui doit D'ABORD obtenir le jeton ne peut pas déjà le
+    présenter) : cohérent avec le reste de ce module, qui documente déjà ce
+    jeton comme une protection minimale contre les accès accidentels, pas un
+    vrai contrôle d'accès (section 1, à construire pour de vrai avec des
+    comptes réels). Enregistré AVANT le mount StaticFiles ci-dessous pour
+    que cette route explicite soit essayée en premier.
+    """
+    jeton = os.environ.get("API_TOKEN", "")
+    return PlainTextResponse(f"window.NGONI_JETON = {json.dumps(jeton)};\n", media_type="application/javascript")
+
 
 # Page de test "appui pour parler" (voir moteur/web/README.md) : usage
 # interne/développement uniquement, pas une interface destinée aux

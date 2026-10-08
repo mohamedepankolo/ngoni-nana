@@ -53,6 +53,17 @@ def base_propre():
     moteur_api._syntheser = None
 
 
+def test_web_config_js_fournit_le_jeton_sans_authentification():
+    # La page de test doit pouvoir obtenir son propre jeton sans deja en
+    # presenter un (sinon impossible a amorcer) : voir api.py, config_web().
+    # Evite au testeur de devoir taper le jeton a la main sur chaque appareil.
+    client = TestClient(app)
+    r = client.get("/web/config.js")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/javascript")
+    assert r.text == 'window.NGONI_JETON = "jeton-de-test";\n'
+
+
 def test_health_ne_demande_aucune_authentification():
     client = TestClient(app)
     r = client.get("/health")

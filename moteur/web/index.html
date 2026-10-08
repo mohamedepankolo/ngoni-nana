@@ -107,9 +107,16 @@
 
 <audio id="lecteur"></audio>
 
+<!-- Fourni par le serveur (voir api.py, /web/config.js) : window.NGONI_JETON.
+     Evite d'avoir a taper le jeton a la main sur chaque appareil (geste
+     cache 5 appuis en secours seulement, si ce script ne charge pas). -->
+<script src="config.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-let jeton = localStorage.getItem("ngoni_jeton") || "";
+// Priorite : un jeton saisi a la main (reglage equipe, pour pointer vers un
+// autre serveur par ex.) > celui fourni automatiquement par ce serveur
+// (config.js) > vide (jamais atteint en usage normal).
+let jeton = localStorage.getItem("ngoni_jeton") || window.NGONI_JETON || "";
 let utilisatriceId = null;
 let sessionId = null;
 let media = null, enregistreur = null, morceaux = [];
