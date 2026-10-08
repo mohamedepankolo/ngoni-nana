@@ -88,9 +88,23 @@ def test_montant_reconstruit_exactement_sur_corpus_reel():
     ("n ye joli feere nin kalo in na", "consultation"),
     ("mɔgɔ jɔnw la ka juru bɛ", "consultation"),
     ("phrase totalement hors sujet sans aucun mot-clé", None),
+    # "Sarata"/"Saran" (prénoms maliens courants) commencent comme "sara"
+    # (payer) : une phrase qui ne fait que nommer la cliente ne doit pas être
+    # prise pour une dépense (voir EXCEPTIONS_NOMS_PROPRES, dictionnaire_mots_cles.py).
+    ("Sarata bɛ yan", None),
+    ("Saran bɛ yan", None),
 ])
 def test_reconnaitre_intention_cas_simples(texte, intention_attendue):
     assert reconnaitre_intention(texte) == intention_attendue
+
+
+def test_nom_propre_sarata_ne_declenche_pas_est_un_paiement():
+    # Meme collision que ci-dessus, mais dans extraire_entites directement
+    # (champ "est_un_paiement", calcule separement du dictionnaire de
+    # mots-cles) : nommer la cliente ne doit pas faire croire a un paiement
+    # recu alors que la phrase ne fait que declarer une nouvelle dette.
+    champs = extraire_entites("Sarata ka juru ye wari kɛmɛ ye", "client")
+    assert champs["est_un_paiement"] is False
 
 
 def test_variante_ne_pour_n_ne_pollue_pas_larticle():

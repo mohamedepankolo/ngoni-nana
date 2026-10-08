@@ -37,12 +37,17 @@
   #bouton.traitement { background: #c9892f; }
   #bouton.traitement svg { animation: tourne 1.2s linear infinite; }
   #bouton.parle { background: #4f8f5a; animation: pouls-doux 1.6s ease-in-out infinite; }
+  #bouton.erreur { background: #a33a3a; animation: flash-erreur 0.5s ease-in-out 2; }
   #bouton:active { transform: scale(0.96); }
   #bouton:disabled { opacity: 0.55; }
 
   @keyframes pouls {
     0%, 100% { box-shadow: 0 0 0 0 rgba(194,59,46,0.45); }
     50% { box-shadow: 0 0 0 28px rgba(194,59,46,0); }
+  }
+  @keyframes flash-erreur {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
   }
   @keyframes pouls-doux {
     0%, 100% { box-shadow: 0 0 0 0 rgba(79,143,90,0.35); }
@@ -123,6 +128,24 @@ function etatBouton(nom) {
   point.className = nom === "parle" ? "ok" : (nom === "" ? "" : "attention");
 }
 
+// Chemin de secours en cas d'echec (reseau, ASR, TTS, micro refuse...) :
+// contrairement a journal() (ecran reglage cache, jamais vu par
+// l'utilisatrice), ceci doit etre percu sans savoir lire : un son joue + le
+// bouton flashe rouge brievement, puis revient a l'etat pret. Le clip audio
+// est embarque dans l'app (assets/erreur.wav), donc disponible meme si le
+// serveur ne repond plus du tout.
+async function signalerErreur(texteJournal) {
+  journal(texteJournal);
+  if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+  etatBouton("erreur");
+  try {
+    const lecteur = $("lecteur");
+    lecteur.src = "assets/erreur.wav";
+    await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
+  } catch (e) { /* lecture best-effort : l'etat visuel suffit si le son echoue aussi */ }
+  etatBouton("");
+}
+
 // 5 appuis rapides sur le logo = ouvrir le reglage (geste reserve a l'equipe,
 // invisible et improbable pour une utilisatrice qui ne cherche pas a l'activer).
 function gererTapLogo() {
@@ -143,14 +166,27 @@ function enregistrerJeton() {
   demarrer();
 }
 
+const DELAI_MAX_MS = 25000; // au-dela, le reseau est considere mort plutot que juste lent
+
 async function appelApi(chemin, options = {}) {
   const entetes = options.entetes || {};
   if (!(options.corps instanceof FormData)) entetes["Content-Type"] = "application/json";
   entetes["Authorization"] = "Bearer " + jeton;
-  const reponse = await fetch(chemin, {
-    method: options.methode || "GET", headers: entetes,
-    body: options.corps instanceof FormData ? options.corps : options.corps ? JSON.stringify(options.corps) : undefined,
-  });
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => controleur.abort(), DELAI_MAX_MS);
+  let reponse;
+  try {
+    reponse = await fetch(chemin, {
+      method: options.methode || "GET", headers: entetes,
+      body: options.corps instanceof FormData ? options.corps : options.corps ? JSON.stringify(options.corps) : undefined,
+      signal: controleur.signal,
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("reseau trop lent, reessaie");
+    throw e;
+  } finally {
+    clearTimeout(minuteur);
+  }
   if (!reponse.ok) throw new Error(`${reponse.status} : ${await reponse.text()}`);
   return reponse.json();
 }
@@ -164,7 +200,7 @@ async function demarrer() {
     journal("Pret.");
     $("bouton").disabled = false;
   } catch (e) {
-    journal("Erreur de connexion : " + e.message);
+    await signalerErreur("Erreur de connexion : " + e.message);
   }
 }
 
@@ -217,8 +253,7 @@ async function envoyerTour(blobAudio) {
       await nouvelleSession();
     }
   } catch (e) {
-    journal("Erreur : " + e.message);
-    if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+    await signalerErreur("Erreur : " + e.message);
   } finally {
     etatBouton("");
     $("bouton").disabled = false;
@@ -226,16 +261,28 @@ async function envoyerTour(blobAudio) {
 }
 
 const bouton = $("bouton");
+let enTraitement = false;
 bouton.addEventListener("pointerdown", (e) => {
   e.preventDefault();
-  commencerEnregistrement().catch((err) => journal("Micro indisponible : " + err.message));
+  if (enTraitement) return; // deja un tour en cours : ignore un second appui
+  commencerEnregistrement().catch((err) => signalerErreur("Micro indisponible : " + err.message));
 });
 ["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
   bouton.addEventListener(evt, async () => {
     if (!enregistreur || enregistreur.state !== "recording") return;
+    // Desactive IMMEDIATEMENT, avant tout await : sinon un second
+    // pointerdown entre ce relachement et l'envoi reel peut demarrer un
+    // nouvel enregistrement qui ecrase `morceaux` en plein milieu.
+    enTraitement = true;
+    $("bouton").disabled = true;
     const blob = await arreterEnregistrement();
-    if (blob && blob.size > 0) envoyerTour(blob);
-    else etatBouton("");
+    if (blob && blob.size > 0) {
+      await envoyerTour(blob);
+    } else {
+      etatBouton("");
+      $("bouton").disabled = false;
+    }
+    enTraitement = false;
   })
 );
 

@@ -47,6 +47,15 @@ MOTS_CLES: dict[str, list[str]] = {
 }
 
 
+# Prénoms maliens courants qui, en préfixe, collisionnent avec une racine de
+# mot-clé (ex. "Sarata"/"Saran" commencent comme "sara" = payer) : un énoncé
+# qui ne fait que nommer un ou une cliente ne doit pas être pris pour une
+# dépense. Liste volontairement restreinte à des collisions réellement
+# observées ; à compléter si une personne bambaraphone en identifie d'autres
+# (R9), pas une liste exhaustive de prénoms.
+EXCEPTIONS_NOMS_PROPRES = {"sarata", "saran"}
+
+
 def _mot_present(mot_cle: str, tokens: list[str]) -> bool:
     """Un token du texte correspond-il à ce mot-clé ?
 
@@ -57,7 +66,7 @@ def _mot_present(mot_cle: str, tokens: list[str]) -> bool:
     """
     if len(mot_cle) < 4:
         return mot_cle in tokens
-    return any(tok.startswith(mot_cle) for tok in tokens)
+    return any(tok.startswith(mot_cle) and tok not in EXCEPTIONS_NOMS_PROPRES for tok in tokens)
 
 
 def intentions_correspondantes(texte: str) -> list[str]:

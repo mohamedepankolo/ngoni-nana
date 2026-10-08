@@ -16,6 +16,7 @@ administratrice) suppose des comptes réels et reste à construire, pas un
 prérequis pour tester le pipeline ASR -> moteur -> TTS de bout en bout.
 """
 import base64
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -27,10 +28,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from moteur import base_donnees as db
+from moteur import messages_bambara as msg
 from moteur.admin.routes import router as admin_router
 from moteur.agent_vocal import AgentVocal
 
 load_dotenv()  # lit .env (API_TOKEN, HF_TOKEN, DATABASE_URL) s'il existe, jamais commité
+
+logger = logging.getLogger("ngoni_nana")
+
+# Taille max d'un enregistrement vocal brut (un tour de parole dure quelques
+# secondes) : au-delà, probablement un flux bloqué plutôt qu'un vrai
+# enregistrement, à rejeter avant de le charger entièrement en mémoire.
+TAILLE_MAX_AUDIO_OCTETS = 15 * 1024 * 1024  # 15 Mo
 
 app = FastAPI(title="N'GONI NANA : API")
 
@@ -100,6 +109,35 @@ def _obtenir_syntheser():
     return _syntheser
 
 
+# Message audio de secours, pré-synthétisé une seule fois (voir
+# scripts/generer_audio_secours.py) et bundlé avec l'app plutôt que généré à
+# la volée : si le TTS en ligne (Space Gradio, section tts_maliba.py) est en
+# panne ou injoignable, l'utilisatrice doit quand même entendre quelque chose
+# ("Ne ma a faamu. A fɔ tuguni." = "je n'ai pas compris, répète") plutôt qu'un
+# silence total. Chargé une fois en mémoire, jamais régénéré par requête.
+_CHEMIN_AUDIO_SECOURS = Path(__file__).parent / "web" / "assets" / "erreur.wav"
+_audio_secours_base64: str | None = None
+
+
+def _obtenir_audio_secours() -> str | None:
+    global _audio_secours_base64
+    if _audio_secours_base64 is None and _CHEMIN_AUDIO_SECOURS.exists():
+        _audio_secours_base64 = base64.b64encode(_CHEMIN_AUDIO_SECOURS.read_bytes()).decode()
+    return _audio_secours_base64
+
+
+def _reponse_secours(texte_reconnu: str | None, message: str) -> dict:
+    return {
+        "texte_reconnu": texte_reconnu,
+        "message": message,
+        "intention": None,
+        "action": "reformuler",
+        "champs": {},
+        "audio_base64": _obtenir_audio_secours(),
+        "type_audio": "wav",
+    }
+
+
 def verifier_jeton(authorization: str | None = Header(default=None)) -> None:
     jeton_attendu = os.environ.get("API_TOKEN")
     if not jeton_attendu:
@@ -126,8 +164,8 @@ def health():
     """Vérifie l'état réel des dépendances, pas seulement que l'API répond (section 7)."""
     etat = {"api": "ok"}
     try:
-        bd = _SessionLocal()
-        bd.execute(db.Base.metadata.tables["cooperatives"].select().limit(1))
+        with _SessionLocal() as bd:
+            bd.execute(db.Base.metadata.tables["cooperatives"].select().limit(1))
         etat["base_de_donnees"] = "ok"
     except Exception as e:  # noqa: BLE001 : on veut remonter n'importe quelle panne ici
         etat["base_de_donnees"] = f"erreur: {e}"
@@ -149,12 +187,12 @@ def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obte
 
 @app.get("/session/{session_id}", dependencies=[Depends(verifier_jeton)])
 def consulter_session(session_id: int):
-    bd = _SessionLocal()
-    s = bd.get(db.SessionAppel, session_id)
-    if s is None:
-        raise HTTPException(status_code=404, detail="Session introuvable.")
-    return {"session_id": s.id, "statut": s.statut, "canal": s.canal,
-             "date_debut": s.date_debut, "date_fin": s.date_fin}
+    with _SessionLocal() as bd:
+        s = bd.get(db.SessionAppel, session_id)
+        if s is None:
+            raise HTTPException(status_code=404, detail="Session introuvable.")
+        return {"session_id": s.id, "statut": s.statut, "canal": s.canal,
+                 "date_debut": s.date_debut, "date_fin": s.date_fin}
 
 
 @app.post("/demo/bootstrap", dependencies=[Depends(verifier_jeton)])
@@ -162,17 +200,17 @@ def bootstrap_demo():
     """Crée (une seule fois) une coopérative et une utilisatrice de démonstration,
     pour que la page de test n'ait pas à gérer d'inscription réelle.
     """
-    bd = _SessionLocal()
-    u = bd.get(db.Utilisatrice, 1)
-    if u is None:
-        coop = db.Cooperative(nom="ABIC Dioïla (démo)", site="Dioïla")
-        bd.add(coop)
-        bd.commit()
-        u = db.Utilisatrice(id=1, code_anonyme="DEMO", telephone_hash="demo", cooperative_id=coop.id)
-        bd.add(u)
-        bd.commit()
-        bd.refresh(u)
-    return {"utilisatrice_id": u.id}
+    with _SessionLocal() as bd:
+        u = bd.get(db.Utilisatrice, 1)
+        if u is None:
+            coop = db.Cooperative(nom="ABIC Dioïla (démo)", site="Dioïla")
+            bd.add(coop)
+            bd.commit()
+            u = db.Utilisatrice(id=1, code_anonyme="DEMO", telephone_hash="demo", cooperative_id=coop.id)
+            bd.add(u)
+            bd.commit()
+            bd.refresh(u)
+        return {"utilisatrice_id": u.id}
 
 
 @app.post("/call", dependencies=[Depends(verifier_jeton)])
@@ -200,36 +238,70 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
     """
     from moteur.asr_robotsmali import convertir_en_wav
 
+    contenu = await fichier.read()
+    if not contenu:
+        return _reponse_secours(None, msg.reformulation(0))
+    if len(contenu) > TAILLE_MAX_AUDIO_OCTETS:
+        logger.warning("Enregistrement rejeté (%d octets > limite) pour la session %s", len(contenu), session_id)
+        return _reponse_secours(None, msg.reformulation(0))
+
     suffixe_entree = Path(fichier.filename or "audio.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffixe_entree, delete=False) as brut:
-        brut.write(await fichier.read())
+        brut.write(contenu)
         chemin_brut = brut.name
     chemin_wav = chemin_brut + ".wav"
 
+    texte_reconnu = None
     try:
-        convertir_en_wav(chemin_brut, chemin_wav)
-        if os.environ.get("NGONI_DEBUG_AUDIO"):
-            # Diagnostic temporaire (désactivé par défaut) : garde une copie du
-            # brut et du WAV converti pour inspecter pourquoi une transcription
-            # reviendrait vide depuis un enregistrement navigateur.
-            import shutil
-            import time
-            debug_dir = Path("debug_audio")
-            debug_dir.mkdir(exist_ok=True)
-            horodatage = int(time.time())
-            shutil.copy(chemin_brut, debug_dir / f"{horodatage}{suffixe_entree}")
-            shutil.copy(chemin_wav, debug_dir / f"{horodatage}.wav")
-        texte_reconnu = _obtenir_transcrire()(chemin_wav)
+        try:
+            convertir_en_wav(chemin_brut, chemin_wav)
+            if os.environ.get("NGONI_DEBUG_AUDIO"):
+                # Diagnostic temporaire (désactivé par défaut) : garde une copie du
+                # brut et du WAV converti pour inspecter pourquoi une transcription
+                # reviendrait vide depuis un enregistrement navigateur.
+                import shutil
+                import time
+                debug_dir = Path("debug_audio")
+                debug_dir.mkdir(exist_ok=True)
+                horodatage = int(time.time())
+                shutil.copy(chemin_brut, debug_dir / f"{horodatage}{suffixe_entree}")
+                shutil.copy(chemin_wav, debug_dir / f"{horodatage}.wav")
+            texte_reconnu = _obtenir_transcrire()(chemin_wav)
+        except Exception:
+            # Conversion ffmpeg ou ASR en panne (fichier corrompu, modèle
+            # indisponible, etc.) : jamais un 500 muet pour une utilisatrice au
+            # téléphone, elle doit entendre qu'il faut réessayer (voir
+            # _reponse_secours, section audit robustesse).
+            logger.exception("Échec conversion/ASR pour la session %s", session_id)
+            return _reponse_secours(None, msg.reformulation(0))
     finally:
         os.unlink(chemin_brut)
         Path(chemin_wav).unlink(missing_ok=True)
 
-    resultat = _agent.traiter_texte(session_id, utilisatrice_id, texte_reconnu)
+    if not texte_reconnu or not texte_reconnu.strip():
+        return _reponse_secours(texte_reconnu, msg.reformulation(0))
 
-    chemin_audio_reponse = _obtenir_syntheser()(resultat["message"])
-    with open(chemin_audio_reponse, "rb") as f:
-        audio_base64 = base64.b64encode(f.read()).decode()
-    type_audio = Path(chemin_audio_reponse).suffix.lstrip(".") or "wav"
+    try:
+        resultat = _agent.traiter_texte(session_id, utilisatrice_id, texte_reconnu)
+    except Exception:
+        logger.exception("Échec du moteur de décision pour la session %s", session_id)
+        return _reponse_secours(texte_reconnu, msg.reformulation(0))
+
+    try:
+        chemin_audio_reponse = _obtenir_syntheser()(resultat["message"])
+        with open(chemin_audio_reponse, "rb") as f:
+            audio_base64 = base64.b64encode(f.read()).decode()
+        type_audio = Path(chemin_audio_reponse).suffix.lstrip(".") or "wav"
+    except Exception:
+        # Le TTS en ligne a échoué, mais le moteur a bien traité la demande
+        # (et, si l'action était "enregistrer", la transaction est déjà en
+        # base : voir _conclure dans agent_vocal.py). On ne doit surtout pas
+        # redire à l'utilisatrice de répéter son tour, ça créerait un doublon
+        # si elle recommence. On renvoie le vrai message, avec la voix de
+        # secours pré-enregistrée à la place de l'audio généré à la volée.
+        logger.exception("Échec TTS pour la session %s (message texte conservé)", session_id)
+        audio_base64 = _obtenir_audio_secours()
+        type_audio = "wav"
 
     return {
         "texte_reconnu": texte_reconnu,
@@ -254,7 +326,7 @@ def envoyer_sms(requete: SmsRequete):
     envoyer réellement de SMS, pour ne pas donner une fausse impression de
     fonctionnalité livrée.
     """
-    bd = _SessionLocal()
-    db.journaliser(bd, session_id=None, etape="sms",
-                    confiance="haute", resultat=f"à envoyer à {requete.utilisatrice_id}: {requete.message}")
+    with _SessionLocal() as bd:
+        db.journaliser(bd, session_id=None, etape="sms",
+                        confiance="haute", resultat=f"à envoyer à {requete.utilisatrice_id}: {requete.message}")
     return {"statut": "journalisé, envoi réel non implémenté (R2 non tranché)"}

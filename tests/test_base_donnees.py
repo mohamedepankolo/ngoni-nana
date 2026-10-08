@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -59,3 +60,22 @@ def test_dette_client_nouvelle_puis_paiement_partiel(bd):
 
 def test_consulter_stock_inexistant_renvoie_none(bd):
     assert db.consulter_stock(bd, bd.utilisatrice_id, "savon") is None
+
+
+def test_expirer_sessions_anciennes_marque_les_vieilles_incompletes(bd):
+    # Une utilisatrice qui raccroche en plein milieu d'une confirmation laisse
+    # une session "incomplete" en base pour toujours si rien ne la nettoie
+    # (voir agent_vocal.py, appelé à chaque nouvelle session).
+    vieille = db.SessionAppel(utilisatrice_id=bd.utilisatrice_id, canal="voix", statut="incomplete")
+    vieille.date_debut = datetime.now(timezone.utc) - timedelta(minutes=60)
+    recente = db.SessionAppel(utilisatrice_id=bd.utilisatrice_id, canal="voix", statut="incomplete")
+    bd.add_all([vieille, recente])
+    bd.commit()
+    bd.refresh(vieille)
+    bd.refresh(recente)
+
+    expirees = db.expirer_sessions_anciennes(bd, minutes=30)
+
+    assert expirees == [vieille.id]
+    assert bd.get(db.SessionAppel, vieille.id).statut == "expiree"
+    assert bd.get(db.SessionAppel, recente.id).statut == "incomplete"

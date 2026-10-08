@@ -15,7 +15,7 @@ confirmation explicite (voir agent_vocal.py). Aucune autre fonction de ce
 module n'écrit de transaction partielle.
 """
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session as SessionSQLAlchemy, sessionmaker
@@ -140,8 +140,15 @@ def enregistrer_transaction(db: SessionSQLAlchemy, *, utilisatrice_id: int, type
             ligne_stock = Stock(utilisatrice_id=utilisatrice_id, article=champs["article"],
                                  quantite_actuelle=0, seuil_alerte=0)
             db.add(ligne_stock)
+            db.flush()  # assigne ligne_stock.id avant l'UPDATE atomique ci-dessous
         delta = champs["quantite"] if type_ == "depense" else -champs["quantite"]
-        ligne_stock.quantite_actuelle = (ligne_stock.quantite_actuelle or 0) + delta
+        # UPDATE atomique (lu et écrit en une seule instruction SQL) plutôt que
+        # lire puis réécrire quantite_actuelle en Python : deux ventes du même
+        # article arrivant en même temps (deux requêtes HTTP concurrentes) ne
+        # doivent jamais s'écraser l'une l'autre (perte de mise à jour).
+        (db.query(Stock)
+         .filter_by(id=ligne_stock.id)
+         .update({Stock.quantite_actuelle: Stock.quantite_actuelle + delta}))
 
     db.commit()
     db.refresh(t)
@@ -190,6 +197,29 @@ def consulter_stock(db: SessionSQLAlchemy, utilisatrice_id: int, article: str) -
     return (db.query(Stock)
             .filter_by(utilisatrice_id=utilisatrice_id, article=article)
             .one_or_none())
+
+
+def expirer_sessions_anciennes(db: SessionSQLAlchemy, minutes: int = 30) -> list[int]:
+    """Marque "expiree" toute session restée "incomplete" depuis plus de `minutes`.
+
+    Sans ça, une utilisatrice qui raccroche/ferme l'onglet en plein milieu
+    d'une confirmation laisse une session ouverte indéfiniment (ligne en base
+    ET état en mémoire dans AgentVocal._etats, voir agent_vocal.py) : appelé à
+    chaque nouvelle session (balayage paresseux, pas de tâche planifiée à
+    faire tourner séparément). Renvoie les id expirés pour que l'appelant
+    purge aussi son état en mémoire.
+    """
+    limite = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    perimees = (db.query(SessionAppel)
+                .filter(SessionAppel.statut == "incomplete", SessionAppel.date_debut < limite)
+                .all())
+    ids = [s.id for s in perimees]
+    for s in perimees:
+        s.statut = "expiree"
+        s.date_fin = datetime.now(timezone.utc)
+    if ids:
+        db.commit()
+    return ids
 
 
 def journaliser(db: SessionSQLAlchemy, *, session_id: int | None, etape: str,

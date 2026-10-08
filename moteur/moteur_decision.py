@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from montants import ET, NUMERAUX, extraire_nombres, normaliser
 
-from moteur.dictionnaire_mots_cles import MOTS_CLES, reconnaitre_intention
+from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, reconnaitre_intention
 
 # Conversion dɔrɔmɛ -> FCFA (1 dɔrɔmɛ = 5 FCFA). La plupart des montants sont
 # énoncés en dɔrɔmɛ sans que le mot soit prononcé (voir montants.py) ; ce
@@ -109,7 +109,8 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
         # qui RÉDUIT la dette (P14 : "Fanta m'a remboursé..., a y'o sara").
         # Signal tiré des 60 phrases vérifiées, voir tests/test_moteur_decision.py.
         tokens_bruts = normaliser(texte).split()
-        champs["est_un_paiement"] = any(t.startswith("sara") for t in tokens_bruts)
+        champs["est_un_paiement"] = any(t.startswith("sara") and t not in EXCEPTIONS_NOMS_PROPRES
+                                         for t in tokens_bruts)
 
     return champs
 

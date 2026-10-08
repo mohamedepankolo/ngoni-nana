@@ -59,12 +59,17 @@ class AgentVocal:
 
     def demarrer_session(self, utilisatrice_id: int, canal: str = "voix") -> int:
         bd = self._session_factory()
-        s = db.SessionAppel(utilisatrice_id=utilisatrice_id, canal=canal, statut="incomplete")
-        bd.add(s)
-        bd.commit()
-        bd.refresh(s)
-        self._etats[s.id] = _EtatSession()
-        return s.id
+        try:
+            for id_expire in db.expirer_sessions_anciennes(bd):
+                self._etats.pop(id_expire, None)
+            s = db.SessionAppel(utilisatrice_id=utilisatrice_id, canal=canal, statut="incomplete")
+            bd.add(s)
+            bd.commit()
+            bd.refresh(s)
+            self._etats[s.id] = _EtatSession()
+            return s.id
+        finally:
+            bd.close()
 
     def traiter_audio(self, session_id: int, utilisatrice_id: int, chemin_audio: str) -> dict:
         if self._transcrire is None:
@@ -75,6 +80,13 @@ class AgentVocal:
     def traiter_texte(self, session_id: int, utilisatrice_id: int, texte: str) -> dict:
         etat = self._etats.setdefault(session_id, _EtatSession())
         bd = self._session_factory()
+        try:
+            return self._traiter_texte_interne(bd, etat, session_id, utilisatrice_id, texte)
+        finally:
+            bd.close()
+
+    def _traiter_texte_interne(self, bd, etat: "_EtatSession", session_id: int,
+                                utilisatrice_id: int, texte: str) -> dict:
         s = etat.session_moteur
 
         if etat.en_attente_confirmation:
@@ -159,5 +171,10 @@ class AgentVocal:
     def _repondre(self, bd, session_id: int, contrat: dict, message: str) -> dict:
         db.journaliser(bd, session_id=session_id, etape=contrat.get("intention") or "incompris",
                         confiance=contrat["confiance"], resultat=contrat["action"])
-        audio = self._syntheser(message) if self._syntheser else None
+        audio = None
+        if self._syntheser:
+            try:
+                audio = self._syntheser(message)
+            except Exception:  # noqa: BLE001 : une panne TTS ne doit jamais faire échouer la réponse
+                audio = None
         return {"contrat": contrat, "message": message, "audio": audio}

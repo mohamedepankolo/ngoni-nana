@@ -156,3 +156,78 @@ def _ecrire_wav_temporaire() -> str:
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         f.write(_wav_silence(0.2))
         return f.name
+
+
+def _demarrer_session(client):
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    session_id = client.post("/session", json={"utilisatrice_id": u.id}, headers=ENTETES).json()["session_id"]
+    return u.id, session_id
+
+
+def test_call_audio_fichier_vide_renvoie_un_message_de_secours_sans_planter():
+    # Un enregistrement vide (micro coupe trop tot, upload interrompu) ne doit
+    # jamais faire planter l'appel : l'utilisatrice doit entendre qu'il faut
+    # reessayer, pas un silence suivi d'une erreur serveur brute.
+    client = TestClient(app)
+    utilisatrice_id, session_id = _demarrer_session(client)
+
+    r = client.post(
+        "/call_audio", headers=ENTETES,
+        data={"session_id": session_id, "utilisatrice_id": utilisatrice_id},
+        files={"fichier": ("tour.webm", b"", "audio/webm")},
+    )
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["action"] == "reformuler"
+    assert corps["audio_base64"]  # le clip de secours bundlé (assets/erreur.wav)
+
+
+def test_call_audio_echec_asr_renvoie_un_message_de_secours_sans_planter(monkeypatch):
+    # Fichier qui n'est pas un vrai audio : ffmpeg/convertir_en_wav doit
+    # echouer (CalledProcessError), ce qui ne doit jamais remonter en 500.
+    client = TestClient(app)
+    utilisatrice_id, session_id = _demarrer_session(client)
+
+    r = client.post(
+        "/call_audio", headers=ENTETES,
+        data={"session_id": session_id, "utilisatrice_id": utilisatrice_id},
+        files={"fichier": ("tour.webm", b"ceci n'est pas de l'audio", "audio/webm")},
+    )
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["action"] == "reformuler"
+    assert corps["audio_base64"]
+
+
+def test_call_audio_echec_tts_garde_quand_meme_le_message_du_moteur(monkeypatch):
+    # Le moteur a bien traite la demande (le message texte est correct, et si
+    # l'action est "enregistrer" la transaction est deja en base) : une panne
+    # du TTS en ligne ne doit pas effacer ce resultat, seulement remplacer
+    # l'audio genere par le clip de secours.
+    monkeypatch.setattr(moteur_api, "_obtenir_transcrire",
+                         lambda: (lambda chemin_wav: "n ye saga saba feere wa bi duuru"))
+
+    def _tts_en_panne(*a, **k):
+        raise RuntimeError("Space Gradio injoignable")
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: _tts_en_panne)
+
+    client = TestClient(app)
+    utilisatrice_id, session_id = _demarrer_session(client)
+
+    r = client.post(
+        "/call_audio", headers=ENTETES,
+        data={"session_id": session_id, "utilisatrice_id": utilisatrice_id},
+        files={"fichier": ("tour.webm", _wav_silence(), "audio/wav")},
+    )
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["intention"] == "vente"
+    assert corps["action"] == "demander_confirmation"
+    assert corps["audio_base64"]  # clip de secours, pas l'audio genere (qui a echoue)
