@@ -170,7 +170,12 @@ function enregistrerJeton() {
   demarrer();
 }
 
-const DELAI_MAX_MS = 25000; // au-dela, le reseau est considere mort plutot que juste lent
+// Marge large : un /call_audio reel enchaine conversion ffmpeg + ASR + TTS
+// (Space Gradio distant), et le tout premier appel apres un redemarrage
+// serveur sans prechauffage (NGONI_PREWARM, api.py) peut a lui seul prendre
+// plusieurs secondes rien que pour charger le modele NeMo. Observe en test
+// reel (2026-10-08) : 25s coupait avant que la vraie reponse n'arrive.
+const DELAI_MAX_MS = 45000;
 
 async function appelApi(chemin, options = {}) {
   const entetes = options.entetes || {};

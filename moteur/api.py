@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -42,7 +43,36 @@ logger = logging.getLogger("ngoni_nana")
 # enregistrement, à rejeter avant de le charger entièrement en mémoire.
 TAILLE_MAX_AUDIO_OCTETS = 15 * 1024 * 1024  # 15 Mo
 
-app = FastAPI(title="N'GONI NANA : API")
+
+@asynccontextmanager
+async def _cycle_de_vie(_app: FastAPI):
+    """Charge l'ASR et le TTS au démarrage plutôt qu'au premier appel réel.
+
+    Mesuré en conditions réelles (2026-10-08) : le premier /call_audio après
+    un démarrage du serveur paie le chargement du modèle NeMo (plusieurs
+    secondes sur CPU, "CUDA is not available") PLUS la connexion au Space
+    Gradio du TTS, assez pour dépasser le délai maximal côté PWA
+    (DELAI_MAX_MS, index.html) : l'utilisatrice voit le bouton tourner puis
+    passer en erreur alors que la vraie transcription a fini par aboutir,
+    trop tard. Activé seulement si NGONI_PREWARM=1 (jamais en test : charger
+    le vrai modèle NeMo ou joindre le vrai Space HF à chaque lancement de la
+    suite de tests serait lent et dépendant du réseau).
+    """
+    if os.environ.get("NGONI_PREWARM") == "1":
+        try:
+            _obtenir_transcrire()
+            logger.info("ASR préchargé.")
+        except Exception:
+            logger.exception("Préchauffage ASR impossible (nemo-toolkit absent ? voir requirements.txt).")
+        try:
+            _obtenir_syntheser()
+            logger.info("TTS préchargé.")
+        except Exception:
+            logger.exception("Préchauffage TTS impossible (réseau/HF_TOKEN ?).")
+    yield
+
+
+app = FastAPI(title="N'GONI NANA : API", lifespan=_cycle_de_vie)
 
 
 @app.get("/web/config.js")

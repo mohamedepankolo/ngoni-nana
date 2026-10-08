@@ -120,15 +120,15 @@ mkdir .certs
 MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout .certs/key.pem -out .certs/cert.pem -days 365 -nodes \
   -subj "/CN=ngoni-nana-test" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:VOTRE_IP_LOCALE"
 
-./.venv/Scripts/python.exe -m uvicorn moteur.api:app --host 0.0.0.0 --port 8099 \
+NGONI_PREWARM=1 ./.venv/Scripts/python.exe -m uvicorn moteur.api:app --host 0.0.0.0 --port 8099 \
   --ssl-keyfile .certs/key.pem --ssl-certfile .certs/cert.pem
 ```
 
-**App mobile "maintenir pour parler"** (`moteur/web/`) : ouvrir `https://VOTRE_IP_LOCALE:8099/` depuis un téléphone sur le même réseau Wi-Fi, accepter l'avertissement de certificat. C'est une PWA installable (icône sur l'écran d'accueil, via "Ajouter à l'écran d'accueil" dans le navigateur) : un seul bouton rond, pas de texte ni de jargon technique à l'écran, pensée pour une utilisatrice qui ne lit pas (cohérent avec le parcours 100% vocal du projet). Couleur du bouton = état (orange : prêt ou en traitement ; rouge qui pulse : enregistrement ; vert : réponse qui parle). L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie.
+**App mobile "maintenir pour parler"** (`moteur/web/`) : ouvrir `https://VOTRE_IP_LOCALE:8099/` depuis un téléphone sur le même réseau Wi-Fi, accepter l'avertissement de certificat. C'est une PWA installable (icône sur l'écran d'accueil, via "Ajouter à l'écran d'accueil" dans le navigateur) : un seul bouton rond, pas de texte ni de jargon technique à l'écran, pensée pour une utilisatrice qui ne lit pas (cohérent avec le parcours 100% vocal du projet). Couleur du bouton = état (orange : prêt ; rouge qui pulse : enregistrement ; orange qui tourne : traitement ; vert : réponse qui parle ; gris-bleu : erreur). L'ASR (RobotsMali), le moteur de décision et le TTS (MALIBA-AI) tournent réellement, sans téléphonie. Le jeton API est fourni automatiquement à la page par le serveur (`/web/config.js`) : aucune configuration manuelle requise sur un nouvel appareil.
 
-Réglage réservé à l'équipe (jeton API, journal de débogage) : 5 appuis rapides sur le logo en haut de l'écran font apparaître l'écran de réglage, à faire une seule fois au moment de préparer le téléphone (pas quelque chose qu'une utilisatrice découvre ou a besoin de toucher).
+Réglage réservé à l'équipe (changer de jeton pour pointer vers un autre serveur, journal de débogage) : 5 appuis rapides dans le coin en haut à gauche de l'écran (zone invisible, volontairement) font apparaître l'écran de réglage.
 
-Diagnostic : `NGONI_DEBUG_AUDIO=1` (variable d'environnement) conserve une copie de chaque enregistrement reçu dans `debug_audio/` (brut + converti en WAV), utile si une transcription revient vide sans erreur.
+Diagnostic : `NGONI_DEBUG_AUDIO=1` (variable d'environnement) conserve une copie de chaque enregistrement reçu dans `debug_audio/` (brut + converti en WAV), utile si une transcription revient vide sans erreur. `NGONI_PREWARM=1` charge l'ASR et se connecte au TTS dès le démarrage du serveur plutôt qu'au premier appel réel : sans ça, le tout premier `/call_audio` après un lancement peut dépasser le délai maximal côté PWA (le modèle NeMo seul prend plusieurs secondes à charger sur CPU), ce que l'utilisatrice perçoit comme une fausse incompréhension.
 
 **En ligne de commande, en texte** (sans ASR/TTS, juste moteur + base de données) :
 

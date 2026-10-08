@@ -53,6 +53,29 @@ def base_propre():
     moteur_api._syntheser = None
 
 
+def test_prechauffage_desactive_par_defaut(monkeypatch):
+    # Doit rester silencieux/rapide par defaut (jamais charger le vrai modele
+    # NeMo ni joindre le vrai Space HF a chaque lancement de la suite de
+    # tests) : voir _cycle_de_vie, api.py.
+    appels = []
+    monkeypatch.setattr(moteur_api, "_obtenir_transcrire", lambda: appels.append("asr"))
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: appels.append("tts"))
+    monkeypatch.delenv("NGONI_PREWARM", raising=False)
+    with TestClient(app):
+        pass
+    assert appels == []
+
+
+def test_prechauffage_actif_charge_asr_et_tts_au_demarrage(monkeypatch):
+    appels = []
+    monkeypatch.setattr(moteur_api, "_obtenir_transcrire", lambda: appels.append("asr"))
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: appels.append("tts"))
+    monkeypatch.setenv("NGONI_PREWARM", "1")
+    with TestClient(app):
+        pass
+    assert appels == ["asr", "tts"]
+
+
 def test_web_config_js_fournit_le_jeton_sans_authentification():
     # La page de test doit pouvoir obtenir son propre jeton sans deja en
     # presenter un (sinon impossible a amorcer) : voir api.py, config_web().
