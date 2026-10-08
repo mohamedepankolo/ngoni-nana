@@ -17,11 +17,17 @@
   }
 
   /* ---------- Vue principale (utilisatrice) ---------- */
+  /* Un seul element visible et interactif sur cet ecran : le gros bouton.
+     Pas de logo, pas de point d'etat separe (la couleur du bouton suffit) :
+     un deuxieme element qui ressemble a un micro ou a un bouton a cote du
+     vrai bouton a cause une vraie confusion en test reel (2026-10-08). */
   #vuePrincipale {
-    height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 48px; padding: 24px;
+    height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px;
   }
-  #logo { width: 56px; height: 56px; opacity: 0.9; }
+
+  /* Zone invisible, coin haut-gauche : 5 appuis rapides ouvrent le reglage
+     equipe. Remplace l'ancien logo visible (qui ressemblait a un micro). */
+  #zoneReglageSecrete { position: absolute; top: 0; left: 0; width: 72px; height: 72px; }
 
   #bouton {
     width: 220px; height: 220px; border-radius: 50%; border: none;
@@ -37,7 +43,12 @@
   #bouton.traitement { background: #c9892f; }
   #bouton.traitement svg { animation: tourne 1.2s linear infinite; }
   #bouton.parle { background: #4f8f5a; animation: pouls-doux 1.6s ease-in-out infinite; }
-  #bouton.erreur { background: #a33a3a; animation: flash-erreur 0.5s ease-in-out 2; }
+  /* Gris-bleu, deliberement hors de la palette chaude (pret/enregistre/
+     traitement/parle sont tous orange-rouge-vert) : doit se distinguer d'un
+     coup d'oeil de "enregistre" (rouge vif), pas juste par une nuance de
+     rouge differente. Verifie par capture d'ecran comparant les 5 etats
+     cote a cote (2026-10-08). */
+  #bouton.erreur { background: #5c6670; animation: flash-erreur 0.5s ease-in-out 2; }
   #bouton:active { transform: scale(0.96); }
   #bouton:disabled { opacity: 0.55; }
 
@@ -54,11 +65,6 @@
     50% { box-shadow: 0 0 0 20px rgba(79,143,90,0); }
   }
   @keyframes tourne { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-  /* Petit repère visuel neutre (pas de texte) en bas : point qui change de couleur. */
-  #pointEtat { width: 12px; height: 12px; border-radius: 50%; background: #d9d2c5; transition: background-color 0.25s; }
-  #pointEtat.ok { background: #4f8f5a; }
-  #pointEtat.attention { background: #c9892f; }
 
   audio { display: none; }
 
@@ -79,12 +85,7 @@
 <body>
 
 <div id="vuePrincipale">
-  <svg id="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="gererTapLogo()">
-    <circle cx="12" cy="12" r="11" fill="#b85424"/>
-    <rect x="9" y="5" width="6" height="9" rx="3" fill="#fff"/>
-    <path d="M7 11a5 5 0 0 0 10 0" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-    <line x1="12" y1="16" x2="12" y2="18.5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
-  </svg>
+  <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
 
   <button id="bouton" disabled>
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -93,8 +94,6 @@
       <line x1="12" y1="18" x2="12" y2="21" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
     </svg>
   </button>
-
-  <div id="pointEtat"></div>
 </div>
 
 <div id="vueReglage">
@@ -122,10 +121,7 @@ function journal(texte) {
 }
 
 function etatBouton(nom) {
-  const b = $("bouton");
-  b.className = nom || "";
-  const point = $("pointEtat");
-  point.className = nom === "parle" ? "ok" : (nom === "" ? "" : "attention");
+  $("bouton").className = nom || "";
 }
 
 // Chemin de secours en cas d'echec (reseau, ASR, TTS, micro refuse...) :
@@ -146,8 +142,9 @@ async function signalerErreur(texteJournal) {
   etatBouton("");
 }
 
-// 5 appuis rapides sur le logo = ouvrir le reglage (geste reserve a l'equipe,
-// invisible et improbable pour une utilisatrice qui ne cherche pas a l'activer).
+// 5 appuis rapides dans le coin haut-gauche (zone invisible) = ouvrir le
+// reglage (geste reserve a l'equipe, improbable pour une utilisatrice qui ne
+// cherche pas a l'activer).
 function gererTapLogo() {
   compteurTapLogo++;
   clearTimeout(minuteurTapLogo);
@@ -294,7 +291,7 @@ if ("serviceWorker" in navigator) {
 }
 
 if (jeton) demarrer();
-else journal("Aucun jeton : ouvrir le reglage (5 appuis sur le logo).");
+else journal("Aucun jeton : ouvrir le reglage (5 appuis coin haut-gauche de l'ecran).");
 </script>
 </body>
 </html>
