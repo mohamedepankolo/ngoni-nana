@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from montants import ET, NUMERAUX, extraire_nombres, normaliser
 
-from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, reconnaitre_intention
+from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, _mot_present, reconnaitre_intention
 
 # Conversion dɔrɔmɛ -> FCFA (1 dɔrɔmɛ = 5 FCFA). La plupart des montants sont
 # énoncés en dɔrɔmɛ sans que le mot soit prononcé (voir montants.py) ; ce
@@ -55,7 +55,16 @@ MOTS_GRAMMATICAUX = {
     "n", "ne", "ka", "ye", "y", "ni", "be", "la", "na", "min", "fe", "de", "o",
     "a", "i", "in", "tun", "ke", "don", "son", "sonna", "olu", "to", "tora",
     "yere", "bee", "mogo",
+    # "ma" : marqueur grammatical très courant (négation, objet indirect...),
+    # aussi utilisé dans la négation "ma sɔn" (voir dictionnaire_mots_cles.
+    # reconnaitre_confirmation). Ajouté après un test réel (2026-10-09) où
+    # il se retrouvait dans l'article extrait.
+    "ma",
 }
+
+_TOUS_MOTS_CLES: set[str] = set()
+for _mots in MOTS_CLES.values():
+    _TOUS_MOTS_CLES.update(_mots)
 
 
 def _mots_restants(texte: str) -> list[str]:
@@ -67,13 +76,17 @@ def _mots_restants(texte: str) -> list[str]:
     test ne suffit pas.
     """
     tokens = normaliser(texte).split()
-    mots_cles: set[str] = set()
-    for mots in MOTS_CLES.values():
-        mots_cles.update(mots)
 
     restants = []
     for tok in tokens:
-        if tok.isdigit() or tok in MOTS_GRAMMATICAUX or tok in mots_cles:
+        if tok.isdigit() or tok in MOTS_GRAMMATICAUX:
+            continue
+        # _mot_present (préfixe pour les racines >=4 lettres) : une variante
+        # conjuguée d'un mot-clé ("feereli" pour "feere") doit être filtrée
+        # comme le mot-clé lui-même, pas seulement une correspondance exacte
+        # - sinon elle polluait l'article (bug réel, test téléphone
+        # 2026-10-09 : "feereli" se retrouvait dans l'article extrait).
+        if any(_mot_present(m, [tok]) for m in _TOUS_MOTS_CLES):
             continue
         # Retire aussi les tokens qui sont uniquement des mots-nombres
         # (kelen, fila, waa, kɛmɛ...), déjà capturés par extraire_nombres.
@@ -261,7 +274,14 @@ class Session:
             self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
             self.champs_confirmes["unite_dite"] = "dorome"
         elif champ == "quantite" and nombres:
-            self.champs_confirmes["quantite"] = max(nombres)
+            # min(), pas max() : coherent avec extraire_entites (le montant
+            # est toujours le plus grand des deux chiffres, la quantite le
+            # plus petit). Avec un seul chiffre les deux sont identiques,
+            # donc ca ne change rien au cas courant (juste un nombre redit) ;
+            # mais si l'enonce contient aussi un autre chiffre (ex. parce que
+            # la phrase entiere a ete repetee), max() assignait a tort le
+            # plus gros chiffre a la quantite (bug reel, 2026-10-09).
+            self.champs_confirmes["quantite"] = min(nombres)
         elif champ in ("article", "client") and mots:
             self.champs_confirmes[champ] = " ".join(mots) if champ == "article" else mots[0]
         else:

@@ -119,6 +119,14 @@ MOTS_NON = ["ayi", "non"]
 def reconnaitre_confirmation(texte: str) -> bool | None:
     """True = oui, False = non, None = ni l'un ni l'autre (pas une réponse de confirmation)."""
     tokens = normaliser(texte).split()
+    # "ma sɔn(na)" = "n'est pas d'accord" : négation du même verbe que la
+    # question elle-même ("... I sɔnna wa ?"), forme de "non" naturelle en
+    # bambara. Vérifiée AVANT le simple "sonna" => oui ci-dessous, sinon ce
+    # "non" grammatical serait lu comme un "oui" (observé en test réel,
+    # 2026-10-09 : "a ye ne ma sɔn" jamais reconnu comme un refus).
+    for i, tok in enumerate(tokens[:-1]):
+        if tok == "ma" and tokens[i + 1].startswith("son"):
+            return False
     if any(_mot_present(m, tokens) for m in MOTS_OUI):
         return True
     if any(_mot_present(m, tokens) for m in MOTS_NON):

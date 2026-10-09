@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from moteur import base_donnees as db
 from moteur import messages_bambara as msg
-from moteur.dictionnaire_mots_cles import reconnaitre_confirmation
+from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention
 from moteur.moteur_decision import Session, est_une_redite_numerique_fiable
 
 # Intentions qui ne font que lire des données déjà en base : rien à écrire, et
@@ -134,15 +134,25 @@ class AgentVocal:
                 return self._repondre(bd, session_id, contrat, message)
             if reponse is False:
                 return self._demarrer_correction(bd, etat, session_id)
-            # Ni oui ni non. Cas 9 (redire un nombre directement, sans dire
-            # "non" d'abord) : seulement si l'énoncé est PUREMENT numérique
-            # (voir est_une_redite_numerique_fiable), jamais s'il contient
-            # aussi un mot non reconnu. Régression réelle trouvée en test
-            # (2026-10-09, deux fois) : un mot de bruit ASR contenant un
-            # chiffre par coïncidence (ex. "hamaden fila don", "fila"=2)
-            # était accepté comme redite et écrasait silencieusement
-            # l'article déjà confirmé avec ce bruit.
-            if est_une_redite_numerique_fiable(texte):
+            # Ni oui ni non. Deux façons légitimes de corriger sans dire
+            # "non" d'abord :
+            # (a) redire la phrase ENTIÈRE (même mot-clé d'action reconnu) :
+            #     passe par le même chemin qu'un énoncé frais (s.recevoir),
+            #     qui fusionne proprement les nouvelles valeurs - utile en
+            #     particulier quand un seul chiffre avait été pris à tort
+            #     pour le montant plutôt que la quantité (ou l'inverse) :
+            #     redire les DEUX chiffres ensemble corrige les deux d'un
+            #     coup (bug réel, test téléphone 2026-10-09 : la phrase
+            #     complète était rejetée comme "bruit" et finissait par
+            #     escalader au lieu de corriger).
+            # (b) redire UNIQUEMENT un nombre (cas 9), seulement si l'énoncé
+            #     est PUREMENT numérique (voir est_une_redite_numerique_fiable),
+            #     jamais s'il contient aussi un mot non reconnu : un mot de
+            #     bruit ASR contenant un chiffre par coïncidence (ex.
+            #     "hamaden fila don", "fila"=2) a déjà écrasé silencieusement
+            #     l'article déjà confirmé avec ce bruit (bug réel, même date).
+            meme_action_redite = s.intention is not None and reconnaitre_intention(texte) == s.intention
+            if meme_action_redite or est_une_redite_numerique_fiable(texte):
                 etat.en_attente_confirmation = False
             else:
                 return self._repeter_confirmation_ou_escalader(bd, etat, session_id)
@@ -266,6 +276,28 @@ class AgentVocal:
         """
         s = etat.session_moteur
         champ = etat.champ_en_attente
+
+        # Si l'utilisatrice redit la phrase ENTIÈRE (même mot-clé d'action
+        # reconnu) plutôt qu'un seul mot/chiffre pour ce champ précis, fusionne
+        # proprement via le chemin normal (s.recevoir) au lieu de ne combler
+        # que CE champ : sinon un montant déjà faux (pris à tort dans un
+        # énoncé précédent) restait figé même quand la phrase redite le
+        # corrigeait (bug réel, test téléphone 2026-10-09).
+        if s.intention is not None and reconnaitre_intention(texte) == s.intention:
+            etat.champ_en_attente = None
+            contrat = s.recevoir(texte)
+            if contrat["action"] == "reformuler":
+                return self._repondre(bd, session_id, contrat, msg.reformulation(s.tentatives_reformulation))
+            if contrat["confiance"] == "haute":
+                etat.en_attente_confirmation = True
+                construire = CONSTRUCTEURS_CONFIRMATION.get(contrat["intention"])
+                message = construire(contrat["champs"]) if construire else msg.demander_precision_montant()
+                return self._repondre(bd, session_id, contrat, message)
+            manquant = s.premier_champ_manquant()
+            etat.champ_en_attente = manquant
+            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
+            return self._repondre(bd, session_id, contrat, construire())
+
         contrat = s.combler_champ(champ, texte)
 
         if contrat["action"] == "reformuler":

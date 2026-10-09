@@ -118,7 +118,7 @@ def test_variante_ne_pour_n_ne_pollue_pas_larticle():
 @pytest.mark.parametrize("texte, attendu", [
     ("owo", True), ("awo", True), ("aawo", True), ("oui", True),
     ("n sɔnna", True), ("awo ne sɔnna", True), ("awa", True),
-    ("ayi", False), ("non", False),
+    ("ayi", False), ("non", False), ("a ye ne ma sɔn", False), ("ne ma son", False),
     ("n ye saga saba feere", None),
 ])
 def test_reconnaitre_confirmation(texte, attendu):
@@ -129,6 +129,9 @@ def test_reconnaitre_confirmation(texte, attendu):
     # "owo" isolé (test réel, 2026-10-09). "awa" : transcription exacte et
     # répétée (3/3) d'un vrai "oui" prononcé par une vraie locutrice, obtenue
     # en rejouant ses enregistrements captés (NGONI_DEBUG_AUDIO, même date).
+    # "a ye ne ma sɔn" : forme négative naturelle ("n'est pas d'accord", avec
+    # "ma" + le même verbe que la question) pour dire "non" - observée en
+    # test réel (2026-10-09), jamais reconnue avant cet ajout.
     assert reconnaitre_confirmation(texte) == attendu
 
 
@@ -187,3 +190,17 @@ def test_session_correction_ne_touche_que_le_champ_signale():
     resultat = session.corriger("montant_fcfa", "waa saba")
     assert resultat["champs"]["article"] == avant["article"]
     assert resultat["champs"]["montant_fcfa"] == 3000 * 5
+
+
+def test_combler_champ_quantite_prend_le_plus_petit_chiffre():
+    """Régression réelle (2026-10-09) : si l'énoncé qui comble "quantite"
+
+    contient AUSSI un autre chiffre (ex. la phrase entière redite pour
+    corriger le montant en même temps), le plus petit doit aller à la
+    quantité et le plus grand au montant - cohérent avec extraire_entites.
+    max() assignait à tort le plus gros chiffre à la quantité.
+    """
+    session = Session()
+    session.recevoir("n ye misi naani feere")  # un seul chiffre : pris pour le montant
+    resultat = session.combler_champ("quantite", "misi naani feere wa bi duuru")
+    assert resultat["champs"]["quantite"] == 4

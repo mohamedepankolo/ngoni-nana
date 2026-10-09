@@ -167,6 +167,37 @@ def test_bruit_avec_un_chiffre_fortuit_ne_passe_pas_pour_une_redite(agent):
     assert r["contrat"]["champs"]["montant_fcfa"] == 250_000  # inchangé
 
 
+def test_redire_toute_la_phrase_pendant_la_confirmation_corrige_le_montant(agent):
+    """Régression réelle (2026-10-09, test téléphone) : "ne ye misi naani de
+
+    feere" (j'ai vendu 4 vaches, sans montant) ne donne qu'un seul chiffre,
+    pris à tort pour le MONTANT (heuristique : un seul chiffre = toujours
+    le montant) ; la quantité est alors redemandée et comblée correctement
+    (combler_champ), mais le montant erroné reste figé jusqu'à la
+    confirmation. Redire la phrase ENTIÈRE à ce moment-là (avec les deux
+    chiffres) doit corriger le montant au lieu d'être rejeté comme bruit et
+    de finir par escalader.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi naani feere")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["confiance"] == "a_confirmer"
+    assert r["contrat"]["champs"]["montant_fcfa"] == 4 * 5  # faux (4 pris pour le montant), sera corrige
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "naani")  # comble la quantite manquante
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["confiance"] == "haute"
+    assert r["contrat"]["champs"]["quantite"] == 4
+    assert r["contrat"]["champs"]["montant_fcfa"] == 4 * 5  # toujours faux, pas encore corrige
+
+    # Maintenant en attente de confirmation (oui/non) : redire toute la
+    # phrase, avec les deux chiffres cette fois, doit corriger le montant.
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi naani feere wa bi duuru")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["champs"]["quantite"] == 4
+    assert r["contrat"]["champs"]["montant_fcfa"] == 250_000
+
+
 def test_rien_n_est_ecrit_si_lutilisatrice_dit_non(agent):
     sid = agent.demarrer_session(agent.utilisatrice_id)
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
