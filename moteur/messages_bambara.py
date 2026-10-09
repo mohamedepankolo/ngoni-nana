@@ -62,7 +62,14 @@ def continuer() -> str:
 
 
 def enregistrement_confirme() -> str:
-    return f"A sɛbɛnna. {continuer()}"
+    # N'ajoute plus "Yala i b'a fɛ ka dɔ wɛrɛ kɛ wa ?" (veux-tu faire autre
+    # chose ?) : cette question n'attendait jamais vraiment de réponse (une
+    # nouvelle session démarre de toute façon automatiquement côté PWA,
+    # index.html), et une utilisatrice réelle qui y répondait ("awa"/"oui")
+    # voyait sa réponse traitée comme une tentative d'action ratée (bug réel,
+    # test téléphone 2026-10-09). Dire juste "c'est enregistré" évite
+    # d'inviter une réponse qui ne sera jamais écoutée.
+    return "A sɛbɛnna."
 
 
 def reformulation(tentative: int) -> str:

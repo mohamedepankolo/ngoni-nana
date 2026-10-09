@@ -83,6 +83,20 @@ def _mots_restants(texte: str) -> list[str]:
     return restants
 
 
+def est_une_redite_numerique_fiable(texte: str) -> bool:
+    """Vrai si l'énoncé ne contient QUE des nombres (et des mots-clés/mots
+
+    grammaticaux), rien d'autre. Sert à distinguer une vraie redite de
+    valeur (cas 9 : redire un montant sans dire "non" d'abord) d'un mot de
+    bruit qui contiendrait un chiffre par coïncidence - ex. "hamaden fila
+    don" contient "fila" (2), mais "hamaden"/"don" ne sont ni un chiffre ni
+    un mot reconnu : accepter ce genre d'énoncé comme redite a déjà écrasé
+    silencieusement un article confirmé avec du bruit (bug réel, test
+    réel 2026-10-09, voir agent_vocal.py).
+    """
+    return bool(extraire_nombres(texte)) and not _mots_restants(texte)
+
+
 def extraire_entites(texte: str, intention: str | None) -> dict:
     """Couche 2 + 3 : isole article/quantité/montant/client selon l'intention reconnue."""
     champs: dict = {}

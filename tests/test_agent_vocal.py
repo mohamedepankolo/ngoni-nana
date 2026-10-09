@@ -115,6 +115,24 @@ def test_redire_un_montant_sans_dire_non_corrige_quand_meme(agent):
     assert r["contrat"]["confiance"] == "haute"
 
 
+def test_bruit_avec_un_chiffre_fortuit_ne_passe_pas_pour_une_redite(agent):
+    """Régression réelle (2026-10-09, test téléphone) : "hamaden fila don"
+
+    contient "fila" (2, un chiffre valide) mais "hamaden" et "don" ne sont
+    reconnus ni comme mot-clé ni comme nombre. Accepté à tort comme redite
+    du cas 9, ça écrasait l'article déjà confirmé ("saga") avec "hamaden",
+    produisant une confirmation absurde. Un énoncé qui contient aussi du
+    texte non reconnu ne doit jamais valoir comme redite numérique fiable.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "hamaden fila don")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["champs"]["article"] == "saga"  # inchangé, pas "hamaden"
+    assert r["contrat"]["champs"]["montant_fcfa"] == 250_000  # inchangé
+
+
 def test_rien_n_est_ecrit_si_lutilisatrice_dit_non(agent):
     sid = agent.demarrer_session(agent.utilisatrice_id)
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")

@@ -16,12 +16,10 @@ traduction, pas un texte validé. Voir la réserve en tête de ce module-là.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from montants import extraire_nombres
-
 from moteur import base_donnees as db
 from moteur import messages_bambara as msg
 from moteur.dictionnaire_mots_cles import reconnaitre_confirmation
-from moteur.moteur_decision import Session
+from moteur.moteur_decision import Session, est_une_redite_numerique_fiable
 
 # Intentions qui ne font que lire des données déjà en base : rien à écrire, et
 # donc rien à faire confirmer par un "oui" avant de répondre (cas 4 et 6 du
@@ -126,15 +124,14 @@ class AgentVocal:
             if reponse is False:
                 return self._demarrer_correction(bd, etat, session_id)
             # Ni oui ni non. Cas 9 (redire un nombre directement, sans dire
-            # "non" d'abord) : seulement si un VRAI nombre est prononcé,
-            # jamais sur un mot isolé seul. Régression réelle trouvée en test
-            # (2026-10-09) : un mot de bruit ASR (ni oui/non, ni mot-clé, pas
-            # de nombre) était jusqu'ici traité comme une correction directe
-            # de l'article, l'écrasant silencieusement avec du bruit et
-            # redemandant confirmation avec ce faux article - perçu comme
-            # "la même question qui boucle", avec un vrai risque d'enregistrer
-            # la mauvaise marchandise si un "oui" finissait par être reconnu.
-            if extraire_nombres(texte):
+            # "non" d'abord) : seulement si l'énoncé est PUREMENT numérique
+            # (voir est_une_redite_numerique_fiable), jamais s'il contient
+            # aussi un mot non reconnu. Régression réelle trouvée en test
+            # (2026-10-09, deux fois) : un mot de bruit ASR contenant un
+            # chiffre par coïncidence (ex. "hamaden fila don", "fila"=2)
+            # était accepté comme redite et écrasait silencieusement
+            # l'article déjà confirmé avec ce bruit.
+            if est_une_redite_numerique_fiable(texte):
                 etat.en_attente_confirmation = False
             else:
                 return self._repeter_confirmation_ou_escalader(bd, etat, session_id)
