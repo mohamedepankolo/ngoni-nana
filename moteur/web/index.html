@@ -291,9 +291,15 @@ async function envoyerTour(blobAudio) {
       await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
     }
 
-    if (resultat.action === "enregistrer" || resultat.action === "escalade_humaine") {
-      // Fin logique de cette action : prepare la suivante sans jamais
-      // exposer la notion de "session" a l'utilisatrice.
+    if (resultat.action === "fin_session" || resultat.action === "escalade_humaine") {
+      // "enregistrer" ne declenche plus une nouvelle session tout de suite :
+      // le systeme demande d'abord "veux-tu faire autre chose ?" et attend
+      // une vraie reponse (voir agent_vocal.py, _traiter_reponse_continuer).
+      // Une nouvelle session ne demarre qu'une fois cet echange termine
+      // (oui -> "continuer_session" reste sur la meme session ; non ->
+      // "fin_session" ici). Avant ce correctif, la session changeait tout de
+      // suite apres l'enregistrement et la reponse a la question etait
+      // traitee comme une tentative d'action ratee (bug reel, 2026-10-09).
       await nouvelleSession();
     }
   } catch (e) {

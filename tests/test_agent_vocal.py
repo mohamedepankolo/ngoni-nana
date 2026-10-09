@@ -60,6 +60,40 @@ def test_parcours_vente_complet_jusqu_a_l_enregistrement(agent):
     assert session_bd.statut == "complete"
 
 
+def test_oui_apres_enregistrement_relance_sans_redemander_un_montant(agent):
+    """Après "veux-tu faire autre chose ?", répondre "oui" doit juste rendre
+
+    la session prête pour une nouvelle action - pas redemander un montant au
+    hasard (bug réel, test téléphone 2026-10-09 : répondre à cette question
+    finissait par relancer une demande de vente incomplète sans aucun sens).
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["contrat"]["action"] == "enregistrer"
+    assert "wa?" in r["message"] or "wa ?" in r["message"]  # "veux-tu faire autre chose ?" toujours inclus
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # "oui, autre chose"
+    assert r["contrat"]["action"] == "continuer_session"
+    assert "lamɛnna" in r["message"]  # "j'écoute", pas une question de montant
+
+    # Une nouvelle vente, juste après, doit repartir de zéro (pas de champs
+    # de la vente précédente qui traîneraient).
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi feere wa bi duuru")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["champs"]["article"] == "misi"
+
+
+def test_non_apres_enregistrement_dit_au_revoir(agent):
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non, rien d'autre"
+    assert r["contrat"]["action"] == "fin_session"
+    assert "ce" in r["message"] or "bɛn" in r["message"]  # message de salutation/fin
+
+
 def test_bruit_asr_pendant_la_confirmation_ne_corrompt_pas_larticle(agent):
     """Régression réelle (2026-10-09) : une utilisatrice confirme "oui" plusieurs
 

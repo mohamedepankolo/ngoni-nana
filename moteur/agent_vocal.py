@@ -61,6 +61,13 @@ class _EtatSession:
     # mal comblé ne faisait jamais progresser aucun compteur d'échec et ne
     # pouvait donc jamais escalader (bug réel, 2026-10-09).
     refus_consecutifs: int = 0
+    # Vrai juste après un enregistrement réussi, le temps de savoir si
+    # l'utilisatrice veut faire autre chose ou arrêter là (voir
+    # _traiter_reponse_continuer). Distinct de en_attente_confirmation : ici
+    # on attend un oui/non sur "veux-tu faire autre chose ?", pas sur une
+    # transaction à enregistrer.
+    attente_continuer: bool = False
+    tentatives_continuer: int = 0
 
 
 class AgentVocal:
@@ -111,6 +118,9 @@ class AgentVocal:
                                 utilisatrice_id: int, texte: str) -> dict:
         s = etat.session_moteur
 
+        if etat.attente_continuer:
+            return self._traiter_reponse_continuer(bd, etat, session_id, texte)
+
         if etat.champ_en_attente:
             return self._combler_champ_en_attente(bd, etat, session_id, texte)
 
@@ -120,6 +130,7 @@ class AgentVocal:
                 contrat = s.confirmer()
                 message = self._conclure(bd, session_id, utilisatrice_id, contrat)
                 etat.en_attente_confirmation = False
+                etat.attente_continuer = True
                 return self._repondre(bd, session_id, contrat, message)
             if reponse is False:
                 return self._demarrer_correction(bd, etat, session_id)
@@ -167,6 +178,36 @@ class AgentVocal:
         etat.champ_en_attente = manquant
         construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
         return self._repondre(bd, session_id, contrat, construire())
+
+    def _traiter_reponse_continuer(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+        """Répond à "veux-tu faire autre chose ?" (posée après un enregistrement).
+
+        "oui" : la session continue, prête pour une nouvelle action (sans
+        redemander un montant au hasard). "non" : clôture nette avec un vrai
+        message de fin, au lieu de laisser la réponse se faire interpréter
+        comme une tentative d'action ratée (bug réel, test téléphone
+        2026-10-09 : répondre à cette question finissait par redemander des
+        informations de vente sans aucun sens).
+        """
+        reponse = reconnaitre_confirmation(texte)
+        if reponse is True:
+            etat.attente_continuer = False
+            etat.tentatives_continuer = 0
+            etat.session_moteur = Session()
+            contrat = {"intention": None, "champs": {}, "confiance": "haute", "action": "continuer_session"}
+            return self._repondre(bd, session_id, contrat, msg.pret_a_ecouter())
+        if reponse is False:
+            etat.attente_continuer = False
+            contrat = {"intention": None, "champs": {}, "confiance": "haute", "action": "fin_session"}
+            return self._repondre(bd, session_id, contrat, msg.au_revoir())
+
+        etat.tentatives_continuer += 1
+        if etat.tentatives_continuer > Session.MAX_REFORMULATIONS:
+            etat.attente_continuer = False
+            contrat = {"intention": None, "champs": {}, "confiance": "echec", "action": "fin_session"}
+            return self._repondre(bd, session_id, contrat, msg.au_revoir())
+        contrat = {"intention": None, "champs": {}, "confiance": "a_confirmer", "action": "demander_confirmation"}
+        return self._repondre(bd, session_id, contrat, msg.continuer())
 
     def _demarrer_correction(self, bd, etat: "_EtatSession", session_id: int) -> dict:
         """L'utilisatrice dit "non" à la confirmation : cible un champ précis à

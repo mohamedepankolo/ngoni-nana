@@ -62,14 +62,28 @@ def continuer() -> str:
 
 
 def enregistrement_confirme() -> str:
-    # N'ajoute plus "Yala i b'a fɛ ka dɔ wɛrɛ kɛ wa ?" (veux-tu faire autre
-    # chose ?) : cette question n'attendait jamais vraiment de réponse (une
-    # nouvelle session démarre de toute façon automatiquement côté PWA,
-    # index.html), et une utilisatrice réelle qui y répondait ("awa"/"oui")
-    # voyait sa réponse traitée comme une tentative d'action ratée (bug réel,
-    # test téléphone 2026-10-09). Dire juste "c'est enregistré" évite
-    # d'inviter une réponse qui ne sera jamais écoutée.
-    return "A sɛbɛnna."
+    # La question qui suit ("veux-tu faire autre chose ?") a maintenant une
+    # vraie suite : voir AgentVocal._traiter_reponse_continuer (agent_vocal.py).
+    # Un premier essai l'avait retirée faute d'écoute réelle derrière (bug
+    # réel, test téléphone 2026-10-09) ; corrigé pour de vrai au lieu de
+    # simplement supprimer la question.
+    return f"A sɛbɛnna. {continuer()}"
+
+
+def pret_a_ecouter() -> str:
+    """Dit après un "oui" à "veux-tu faire autre chose ?" : la session
+
+    continue, prête pour une nouvelle action, sans redemander de montant.
+    """
+    return "Ne lamɛnna."
+
+
+def au_revoir() -> str:
+    """Dit après un "non" à "veux-tu faire autre chose ?" : clôture nette,
+
+    pas une nouvelle tentative d'action mal comprise.
+    """
+    return "I ni ce. K'an bɛn."
 
 
 def reformulation(tentative: int) -> str:
