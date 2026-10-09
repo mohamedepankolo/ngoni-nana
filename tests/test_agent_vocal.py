@@ -60,6 +60,61 @@ def test_parcours_vente_complet_jusqu_a_l_enregistrement(agent):
     assert session_bd.statut == "complete"
 
 
+def test_bruit_asr_pendant_la_confirmation_ne_corrompt_pas_larticle(agent):
+    """Régression réelle (2026-10-09) : une utilisatrice confirme "oui" plusieurs
+
+    fois de suite et entend toujours "la même question". Cause : un mot bruit
+    de l'ASR (ni "oui" ni "non" reconnu, voir reconnaitre_confirmation) était
+    traité comme une correction directe de l'article (cas 9), l'écrasant
+    silencieusement avec du bruit et redemandant confirmation avec le nouveau
+    (faux) article - d'où l'impression de boucle infinie, et un risque réel
+    d'enregistrer la mauvaise marchandise si l'utilisatrice finit par dire un
+    "oui" reconnu. Seul un nombre explicitement redit doit valoir correction
+    directe (cas 9) ; un mot isolé sans chiffre doit juste redemander oui/non,
+    sans toucher aux champs déjà confirmés.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    # "wo" : ni oui/non reconnu, ni mot-clé, ni nombre - un mot de bruit plausible.
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "wo")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["champs"]["article"] == "saga"  # inchangé, pas "wo"
+    assert "saga" in r["message"]
+
+    # Confirmer pour de vrai doit encore marcher, avec les bonnes valeurs d'origine.
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["contrat"]["action"] == "enregistrer"
+    bd = agent._session_factory()
+    transactions = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id).all()
+    assert len(transactions) == 1
+    assert transactions[0].article == "saga"
+    assert transactions[0].montant_fcfa == 250_000
+
+
+def test_bruit_repete_pendant_la_confirmation_finit_par_escalader(agent):
+    # Sans escalade, du bruit ASR repete indefiniment ferait boucler
+    # l'utilisatrice sans fin (c'est exactement le symptome rapporte).
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    for _ in range(2):
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "wo")
+        assert r["contrat"]["action"] == "demander_confirmation"
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "wo")
+    assert r["contrat"]["action"] == "escalade_humaine"
+
+
+def test_redire_un_montant_sans_dire_non_corrige_quand_meme(agent):
+    """Cas 9 : l'utilisatrice redit directement un nombre sans dire "non" d'abord."""
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "waa bi duuru")  # un nouveau montant, redit directement
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["confiance"] == "haute"
+
+
 def test_rien_n_est_ecrit_si_lutilisatrice_dit_non(agent):
     sid = agent.demarrer_session(agent.utilisatrice_id)
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")

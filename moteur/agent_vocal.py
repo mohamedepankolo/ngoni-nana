@@ -16,6 +16,8 @@ traduction, pas un texte validé. Voir la réserve en tête de ce module-là.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from montants import extraire_nombres
+
 from moteur import base_donnees as db
 from moteur import messages_bambara as msg
 from moteur.dictionnaire_mots_cles import reconnaitre_confirmation
@@ -105,8 +107,30 @@ class AgentVocal:
                 etat.en_attente_confirmation = False
                 etat.champ_en_correction = champ
                 return self._repondre(bd, session_id, contrat, msg.reformulation(1))
-            # Ni oui ni non : peut-être la valeur corrigée (cas 8/9), on la traite normalement.
-            etat.en_attente_confirmation = False
+            # Ni oui ni non. Cas 9 (redire un nombre directement, sans dire
+            # "non" d'abord) : seulement si un VRAI nombre est prononcé,
+            # jamais sur un mot isolé seul. Régression réelle trouvée en test
+            # (2026-10-09) : un mot de bruit ASR (ni oui/non, ni mot-clé, pas
+            # de nombre) était jusqu'ici traité comme une correction directe
+            # de l'article, l'écrasant silencieusement avec du bruit et
+            # redemandant confirmation avec ce faux article - perçu comme
+            # "la même question qui boucle", avec un vrai risque d'enregistrer
+            # la mauvaise marchandise si un "oui" finissait par être reconnu.
+            if extraire_nombres(texte):
+                etat.en_attente_confirmation = False
+            else:
+                s.tentatives_reformulation += 1
+                if s.tentatives_reformulation > s.MAX_REFORMULATIONS:
+                    s.escaladee = True
+                    contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                               "confiance": "echec", "action": "escalade_humaine"}
+                    self._cloturer_session(bd, session_id, statut="incomplete")
+                    return self._repondre(bd, session_id, contrat, msg.escalade())
+                contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                           "confiance": "a_confirmer", "action": "demander_confirmation"}
+                construire = CONSTRUCTEURS_CONFIRMATION.get(s.intention)
+                message = construire(s.champs_confirmes) if construire else msg.demander_precision_montant()
+                return self._repondre(bd, session_id, contrat, message)
 
         contrat = s.recevoir(texte)
 
