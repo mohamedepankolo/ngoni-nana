@@ -22,8 +22,22 @@
      un deuxieme element qui ressemble a un micro ou a un bouton a cote du
      vrai bouton a cause une vraie confusion en test reel (2026-10-08). */
   #vuePrincipale {
-    height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px;
+    height: 100%; display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px;
   }
+  #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 28px; }
+
+  /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
+     ce qui est reconnu/repondu pendant les tests internes, sans avoir a
+     ouvrir le reglage cache a chaque tour. A RETIRER avant un usage reel
+     avec une utilisatrice : elle ne doit rien voir d'ecrit a l'ecran. Pour
+     retirer : supprimer ce bloc de style, le <div id="filEchanges"> plus
+     bas, et les 2 appels a ajouterAuFil(...) dans envoyerTour(). */
+  #filEchanges {
+    flex: 1 1 auto; width: 100%; max-width: 480px; overflow-y: auto;
+    font-size: 13px; line-height: 1.4; color: #333;
+  }
+  #filEchanges .tour { margin-bottom: 10px; }
+  #filEchanges strong { color: #b85424; }
 
   /* Zone invisible, coin haut-gauche : 5 appuis rapides ouvrent le reglage
      equipe. Remplace l'ancien logo visible (qui ressemblait a un micro). */
@@ -87,13 +101,18 @@
 <div id="vuePrincipale">
   <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
 
-  <button id="bouton" disabled>
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="9" y="3" width="6" height="11" rx="3" fill="#fff"/>
-      <path d="M6 11a6 6 0 0 0 12 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <line x1="12" y1="18" x2="12" y2="21" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-  </button>
+  <div id="zoneBouton">
+    <button id="bouton" disabled>
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="9" y="3" width="6" height="11" rx="3" fill="#fff"/>
+        <path d="M6 11a6 6 0 0 0 12 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <line x1="12" y1="18" x2="12" y2="21" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- MODE TEST : voir le commentaire sur #filEchanges dans <style>. -->
+  <div id="filEchanges"></div>
 </div>
 
 <div id="vueReglage">
@@ -125,6 +144,20 @@ let compteurTapLogo = 0, minuteurTapLogo = null;
 function journal(texte) {
   const j = $("journalDebug");
   j.textContent = `[${new Date().toLocaleTimeString()}] ${texte}\n` + j.textContent;
+}
+
+// MODE TEST : voir le commentaire sur #filEchanges dans <style>. A retirer
+// avec le reste quand ce ne sera plus necessaire.
+function ajouterAuFil(etiquette, texte) {
+  const fil = $("filEchanges");
+  const ligne = document.createElement("div");
+  ligne.className = "tour";
+  const gras = document.createElement("strong");
+  gras.textContent = etiquette + " : ";
+  ligne.appendChild(gras);
+  ligne.appendChild(document.createTextNode(texte));
+  fil.appendChild(ligne);
+  fil.scrollTop = fil.scrollHeight;
 }
 
 function etatBouton(nom) {
@@ -248,6 +281,8 @@ async function envoyerTour(blobAudio) {
     const resultat = await appelApi("/call_audio", { methode: "POST", corps: donnees });
 
     journal(`reconnu: « ${resultat.texte_reconnu || "(rien)"} » -> ${resultat.message}`);
+    ajouterAuFil("Toi", resultat.texte_reconnu || "(rien compris)");  // MODE TEST, voir #filEchanges
+    ajouterAuFil("N'GONI NANA", resultat.message);                   // MODE TEST, voir #filEchanges
 
     if (resultat.audio_base64) {
       const lecteur = $("lecteur");
