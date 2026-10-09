@@ -35,12 +35,34 @@ CONSTRUCTEURS_CONFIRMATION = {
     "client": msg.confirmation_client,
 }
 
+# Une question ciblée par champ manquant, plutôt qu'un "redonne le montant"
+# générique qui n'avait aucun sens quand c'était l'article ou la quantité qui
+# manquait (bug réel constaté en test, 2026-10-09 : voir messages_bambara.py).
+CONSTRUCTEURS_DEMANDE_CHAMP = {
+    "montant_fcfa": msg.demander_precision_montant,
+    "quantite": msg.demander_quantite,
+    "article": msg.demander_article,
+    "client": msg.demander_client,
+}
+
 
 @dataclass
 class _EtatSession:
     session_moteur: Session = field(default_factory=Session)
     en_attente_confirmation: bool = False
-    champ_en_correction: str | None = None
+    # Un seul champ précis est attendu au tour suivant (soit parce qu'il
+    # manquait pour compléter la transaction, soit parce que l'utilisatrice a
+    # dit "non" et qu'on lui redemande ce champ-là) : voir
+    # _combler_champ_en_attente et _demarrer_correction.
+    champ_en_attente: str | None = None
+    # Compte les "non" d'affilée, séparément de Session.tentatives_reformulation
+    # (qui compte les énoncés non compris). Nécessaire car un champ libre
+    # (article, nom de client) est "rempli avec succès" par n'importe quel mot
+    # restant, même du bruit (pas de chiffre à vérifier comme pour un
+    # montant) : sans ce compteur dédié, dire "non" en boucle sur un article
+    # mal comblé ne faisait jamais progresser aucun compteur d'échec et ne
+    # pouvait donc jamais escalader (bug réel, 2026-10-09).
+    refus_consecutifs: int = 0
 
 
 class AgentVocal:
@@ -91,6 +113,9 @@ class AgentVocal:
                                 utilisatrice_id: int, texte: str) -> dict:
         s = etat.session_moteur
 
+        if etat.champ_en_attente:
+            return self._combler_champ_en_attente(bd, etat, session_id, texte)
+
         if etat.en_attente_confirmation:
             reponse = reconnaitre_confirmation(texte)
             if reponse is True:
@@ -99,14 +124,7 @@ class AgentVocal:
                 etat.en_attente_confirmation = False
                 return self._repondre(bd, session_id, contrat, message)
             if reponse is False:
-                champ = etat.champ_en_correction or (list(s.champs_confirmes)[-1] if s.champs_confirmes else None)
-                if champ is None:
-                    contrat = {"intention": s.intention, "champs": {}, "confiance": "echec", "action": "reformuler"}
-                    return self._repondre(bd, session_id, contrat, msg.demander_precision_montant())
-                contrat = s.corriger(champ, "")  # vide : on redemandera la valeur au tour suivant
-                etat.en_attente_confirmation = False
-                etat.champ_en_correction = champ
-                return self._repondre(bd, session_id, contrat, msg.reformulation(1))
+                return self._demarrer_correction(bd, etat, session_id)
             # Ni oui ni non. Cas 9 (redire un nombre directement, sans dire
             # "non" d'abord) : seulement si un VRAI nombre est prononcé,
             # jamais sur un mot isolé seul. Régression réelle trouvée en test
@@ -119,18 +137,7 @@ class AgentVocal:
             if extraire_nombres(texte):
                 etat.en_attente_confirmation = False
             else:
-                s.tentatives_reformulation += 1
-                if s.tentatives_reformulation > s.MAX_REFORMULATIONS:
-                    s.escaladee = True
-                    contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
-                               "confiance": "echec", "action": "escalade_humaine"}
-                    self._cloturer_session(bd, session_id, statut="incomplete")
-                    return self._repondre(bd, session_id, contrat, msg.escalade())
-                contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
-                           "confiance": "a_confirmer", "action": "demander_confirmation"}
-                construire = CONSTRUCTEURS_CONFIRMATION.get(s.intention)
-                message = construire(s.champs_confirmes) if construire else msg.demander_precision_montant()
-                return self._repondre(bd, session_id, contrat, message)
+                return self._repeter_confirmation_ou_escalader(bd, etat, session_id)
 
         contrat = s.recevoir(texte)
 
@@ -153,9 +160,100 @@ class AgentVocal:
             etat.en_attente_confirmation = True
             construire = CONSTRUCTEURS_CONFIRMATION.get(contrat["intention"])
             message = construire(contrat["champs"]) if construire else msg.demander_precision_montant()
-        else:
-            message = msg.demander_precision_montant()
+            return self._repondre(bd, session_id, contrat, message)
+
+        # confiance == "a_confirmer" : un champ précis manque encore. Cible la
+        # question sur CE champ (pas un "redonne le montant" générique, qui ne
+        # voulait rien dire quand c'était l'article ou la quantité qui
+        # manquait - bug réel, 2026-10-09).
+        manquant = s.premier_champ_manquant()
+        etat.champ_en_attente = manquant
+        construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
+        return self._repondre(bd, session_id, contrat, construire())
+
+    def _demarrer_correction(self, bd, etat: "_EtatSession", session_id: int) -> dict:
+        """L'utilisatrice dit "non" à la confirmation : cible un champ précis à
+
+        corriger plutôt qu'un "je n'ai pas compris" générique, qui poussait à
+        tout répéter depuis le début et relançait un cycle complet sans
+        jamais faire progresser aucun compteur d'échec (bug réel, 2026-10-09).
+        """
+        s = etat.session_moteur
+        etat.refus_consecutifs += 1
+        if etat.refus_consecutifs > s.MAX_REFORMULATIONS:
+            s.escaladee = True
+            etat.en_attente_confirmation = False
+            etat.champ_en_attente = None
+            contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                       "confiance": "echec", "action": "escalade_humaine"}
+            self._cloturer_session(bd, session_id, statut="incomplete")
+            return self._repondre(bd, session_id, contrat, msg.escalade())
+
+        champ = etat.champ_en_attente or (list(s.champs_confirmes)[-1] if s.champs_confirmes else None)
+        etat.en_attente_confirmation = False
+        if champ is None:
+            contrat = {"intention": s.intention, "champs": {}, "confiance": "echec", "action": "reformuler"}
+            return self._repondre(bd, session_id, contrat, msg.demander_precision_montant())
+        s.champs_confirmes.pop(champ, None)
+        etat.champ_en_attente = champ
+        contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                   "confiance": "a_confirmer", "action": "demander_confirmation"}
+        construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+        return self._repondre(bd, session_id, contrat, construire())
+
+    def _repeter_confirmation_ou_escalader(self, bd, etat: "_EtatSession", session_id: int) -> dict:
+        s = etat.session_moteur
+        s.tentatives_reformulation += 1
+        if s.tentatives_reformulation > s.MAX_REFORMULATIONS:
+            s.escaladee = True
+            etat.en_attente_confirmation = False
+            contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                       "confiance": "echec", "action": "escalade_humaine"}
+            self._cloturer_session(bd, session_id, statut="incomplete")
+            return self._repondre(bd, session_id, contrat, msg.escalade())
+        contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                   "confiance": "a_confirmer", "action": "demander_confirmation"}
+        construire = CONSTRUCTEURS_CONFIRMATION.get(s.intention)
+        message = construire(s.champs_confirmes) if construire else msg.demander_precision_montant()
         return self._repondre(bd, session_id, contrat, message)
+
+    def _combler_champ_en_attente(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+        """Traite une réponse à une question ciblée sur un seul champ
+
+        (Session.combler_champ) : un chiffre isolé remplit directement CE
+        champ précis, sans réappliquer l'heuristique générale qui suppose à
+        tort qu'un seul nombre est toujours le montant (bug réel, 2026-10-09 :
+        redonner uniquement le montant demandé n'aboutissait jamais si la
+        quantité restait aussi manquante).
+        """
+        s = etat.session_moteur
+        champ = etat.champ_en_attente
+        contrat = s.combler_champ(champ, texte)
+
+        if contrat["action"] == "reformuler":
+            s.tentatives_reformulation += 1
+            if s.tentatives_reformulation > s.MAX_REFORMULATIONS:
+                s.escaladee = True
+                etat.champ_en_attente = None
+                contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                           "confiance": "echec", "action": "escalade_humaine"}
+                self._cloturer_session(bd, session_id, statut="incomplete")
+                return self._repondre(bd, session_id, contrat, msg.escalade())
+            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+            return self._repondre(bd, session_id, contrat, construire())
+
+        s.tentatives_reformulation = 0
+        if contrat["confiance"] == "haute":
+            etat.champ_en_attente = None
+            etat.en_attente_confirmation = True
+            construire = CONSTRUCTEURS_CONFIRMATION.get(contrat["intention"])
+            message = construire(contrat["champs"]) if construire else msg.demander_precision_montant()
+            return self._repondre(bd, session_id, contrat, message)
+
+        manquant = s.premier_champ_manquant()
+        etat.champ_en_attente = manquant
+        construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
+        return self._repondre(bd, session_id, contrat, construire())
 
     def _repondre_lecture(self, bd, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]

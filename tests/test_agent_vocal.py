@@ -125,6 +125,96 @@ def test_rien_n_est_ecrit_si_lutilisatrice_dit_non(agent):
     assert bd.query(db.Transaction).count() == 0
 
 
+def test_dire_non_puis_redonner_la_valeur_corrige_et_enregistre(agent):
+    """Régression réelle (2026-10-09) : dire "non" faisait répéter la même
+
+    question de confirmation en boucle (perçue comme sans fin, jamais
+    d'escalade) parce que le message après "non" était un "je n'ai pas
+    compris" générique, poussant à tout répéter depuis le début plutôt qu'à
+    corriger juste le champ visé. Maintenant, "non" cible un champ précis
+    (ici l'article, dernier champ confirmé) et attend UNIQUEMENT sa
+    correction, pas une phrase entière.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non"
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert "article" not in r["contrat"]["champs"]  # retiré, en attente d'être redonné
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "misi")  # juste le nouvel article, rien d'autre
+    assert r["contrat"]["champs"]["article"] == "misi"
+    assert r["contrat"]["champs"]["montant_fcfa"] == 250_000  # inchangé
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["contrat"]["action"] == "enregistrer"
+    bd = agent._session_factory()
+    transactions = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id).all()
+    assert len(transactions) == 1
+    assert transactions[0].article == "misi"
+
+
+def test_champ_numerique_jamais_rempli_finit_par_escalader(agent):
+    # Sans ça, un champ attendu (ici la quantité) jamais correctement rempli
+    # pouvait rester en attente indéfiniment. Un mot sans chiffre ne doit
+    # jamais combler un champ numérique (voir Session.combler_champ) ; au
+    # bout de MAX_REFORMULATIONS échecs, on escalade plutôt que de boucler.
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere")  # quantite manquante
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["confiance"] == "a_confirmer"
+
+    for _ in range(2):
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "bruit")  # aucun chiffre : ne comble pas
+        assert r["contrat"]["action"] == "reformuler"
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "bruit")
+    assert r["contrat"]["action"] == "escalade_humaine"
+
+
+def test_non_repete_sur_un_article_mal_rempli_finit_par_escalader(agent):
+    """Un champ libre (article) est rempli par N'IMPORTE quel mot restant,
+
+    même du bruit (rien à vérifier comme un chiffre pour un montant) : dire
+    "non" en boucle sur un article jamais correctement compris ne faisait
+    donc jamais progresser Session.tentatives_reformulation (chaque
+    remplissage "réussissait" mécaniquement), et ne pouvait jamais escalader
+    (bug réel, 2026-10-09). Compteur dédié (refus_consecutifs) indépendant.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+
+    for _ in range(2):
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non" -> cible l'article
+        assert r["contrat"]["action"] == "demander_confirmation"
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "bruit")  # "remplit" l'article avec du bruit
+        assert r["contrat"]["action"] == "demander_confirmation"
+        assert r["contrat"]["confiance"] == "haute"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # 3e "non" : doit escalader
+    assert r["contrat"]["action"] == "escalade_humaine"
+
+
+def test_montant_seul_manquant_est_cible_sans_redire_toute_la_phrase(agent):
+    """Régression réelle (2026-10-09) : le système redemandait toujours "le
+
+    montant" même quand c'était la quantité qui manquait, et redonner
+    uniquement le montant ne suffisait jamais sans aussi redonner l'article
+    et la quantité dans la même phrase.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    # Un seul nombre dans la phrase ("saba"=3) : pris comme montant par
+    # l'heuristique generale, donc "quantite" manque reellement.
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["confiance"] == "a_confirmer"
+    assert "quantite" not in r["contrat"]["champs"]
+
+    # Redonner UNIQUEMENT un nombre, sans repeter l'article ni le mot-cle "feere".
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "saba")
+    assert r["contrat"]["champs"]["quantite"] == 3
+    assert r["contrat"]["confiance"] == "haute"  # plus rien ne manque
+
+
 def test_consultation_capital_ne_demande_pas_de_confirmation(agent):
     """Cas 4 : une consultation pure répond directement, pas de 'c'est bien ça ?'."""
     sid = agent.demarrer_session(agent.utilisatrice_id)

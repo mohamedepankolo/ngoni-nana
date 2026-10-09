@@ -80,3 +80,25 @@ def escalade() -> str:
 
 def demander_precision_montant() -> str:
     return "Wari hakɛ fɔ tuguni."
+
+
+# Les trois messages suivants ciblent précisément UN champ manquant (voir
+# Session.premier_champ_manquant / combler_champ, moteur_decision.py).
+# Avant, le système redemandait toujours "le montant" par défaut, même
+# quand c'était la quantité ou l'article qui manquait réellement : constaté
+# en test réel (2026-10-09), ça rendait toute correction impossible à
+# comprendre (redonner juste le montant ne suffisait jamais si la quantité
+# restait aussi manquante, sans que personne sache qu'il fallait la redire
+# aussi). Constructions par analogie avec demander_precision_montant,
+# jusqu'ici seul message de ce type ; à valider par une personne
+# bambaraphone comme le reste de ce fichier.
+def demander_quantite() -> str:
+    return "Hakɛ fɔ tuguni."
+
+
+def demander_article() -> str:
+    return "A tɔgɔ fɔ tuguni."
+
+
+def demander_client() -> str:
+    return "Mɔgɔ tɔgɔ fɔ tuguni."

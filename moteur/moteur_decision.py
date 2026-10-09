@@ -219,3 +219,42 @@ class Session:
             self.champs_confirmes[champ] = nouveaux[champ]
         return {"intention": self.intention, "champs": dict(self.champs_confirmes),
                  "confiance": "a_confirmer", "action": "demander_confirmation"}
+
+    def premier_champ_manquant(self) -> str | None:
+        """Le premier champ encore manquant pour l'intention en cours, ou None si complet."""
+        for champ in CHAMPS_ATTENDUS.get(self.intention, []):
+            if champ not in self.champs_confirmes:
+                return champ
+        return None
+
+    def combler_champ(self, champ: str, texte: str) -> dict:
+        """Renseigne précisément UN champ déjà identifié comme manquant ou à corriger.
+
+        Différent de `corriger` : n'applique pas l'heuristique générale
+        "un seul nombre = forcément le montant" (extraire_entites), qui ne
+        peut jamais remplir "quantite" à partir d'un énoncé bref ne
+        contenant qu'un chiffre. Ici, le champ visé est déjà connu (on l'a
+        explicitement demandé à l'utilisatrice), donc un chiffre isolé peut
+        directement remplir CE champ-là, quel qu'il soit. Corrige le bug
+        réel (2026-10-09) : redonner uniquement le montant demandé
+        n'aboutissait jamais si la quantité restait aussi manquante, sans
+        que l'utilisatrice sache qu'il fallait aussi la redire.
+        """
+        nombres = extraire_nombres(texte)
+        mots = _mots_restants(texte)
+
+        if champ == "montant_fcfa" and nombres:
+            self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
+            self.champs_confirmes["unite_dite"] = "dorome"
+        elif champ == "quantite" and nombres:
+            self.champs_confirmes["quantite"] = max(nombres)
+        elif champ in ("article", "client") and mots:
+            self.champs_confirmes[champ] = " ".join(mots) if champ == "article" else mots[0]
+        else:
+            return {"intention": self.intention, "champs": dict(self.champs_confirmes),
+                     "confiance": "echec", "action": "reformuler"}
+
+        manquant = self.premier_champ_manquant()
+        return {"intention": self.intention, "champs": dict(self.champs_confirmes),
+                 "confiance": "haute" if manquant is None else "a_confirmer",
+                 "action": "demander_confirmation"}
