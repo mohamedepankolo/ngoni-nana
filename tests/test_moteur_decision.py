@@ -117,12 +117,18 @@ def test_variante_ne_pour_n_ne_pollue_pas_larticle():
 
 @pytest.mark.parametrize("texte, attendu", [
     ("owo", True), ("awo", True), ("aawo", True), ("oui", True),
+    ("n sɔnna", True), ("awo ne sɔnna", True), ("awa", True),
     ("ayi", False), ("non", False),
     ("n ye saga saba feere", None),
 ])
 def test_reconnaitre_confirmation(texte, attendu):
     # "aawo" : graphie observée en test réel (ASR RobotsMali, 2026-10-05) pour
     # le "oui" bambara, a fait planter une vraie session avant d'être ajoutée.
+    # "n sɔnna" : la question posée se termine par "I sɔnna wa ?" ; une
+    # locutrice répond naturellement en reprenant ce verbe plutôt que par un
+    # "owo" isolé (test réel, 2026-10-09). "awa" : transcription exacte et
+    # répétée (3/3) d'un vrai "oui" prononcé par une vraie locutrice, obtenue
+    # en rejouant ses enregistrements captés (NGONI_DEBUG_AUDIO, même date).
     assert reconnaitre_confirmation(texte) == attendu
 
 

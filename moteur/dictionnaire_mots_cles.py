@@ -94,7 +94,25 @@ def reconnaitre_intention(texte: str) -> str | None:
 # graphie observée en test réel (ASR RobotsMali sur une vraie locutrice,
 # 2026-10-05) pour le même mot. Les formes françaises sont gardées en repli,
 # les documents du projet n'étant pas tous cohérents sur ce point.
-MOTS_OUI = ["owo", "awo", "aawo", "oui"]
+# "sonna" : la question posée par le système se termine toujours par "I
+# sɔnna wa ?" ("es-tu d'accord ?", littéralement "tu es d'accord ?") ; une
+# locutrice répond naturellement en reprenant ce même verbe ("Awo, ne
+# sɔnna" ou juste "N sɔnna" = "je suis d'accord"), pas forcément par un
+# "owo"/"oui" isolé. Construction déjà citée comme réelle dans le corpus
+# (P02c, voir messages_bambara.py) mais absente de cette liste jusqu'ici :
+# un test réel (2026-10-09) a confirmé qu'une confirmation de ce type
+# n'était pas reconnue, faisant croire à tort à une boucle sans fin.
+# "awa" : particule d'accord/acquiescement ("bon", "d'accord", "alors") très
+# courante en bambara. Ajoutée après un test réel (2026-10-09) où une vraie
+# locutrice a dit "oui" trois fois de suite sans jamais être reconnue ;
+# analyse directe des enregistrements captés (NGONI_DEBUG_AUDIO) : l'ASR a
+# transcrit exactement "awa" les 3 fois, de façon parfaitement cohérente
+# (donc pas un bruit aléatoire, un vrai mot). Risque connu : "Awa" est aussi
+# un prénom malien très courant (déjà utilisé comme tel dans les tests,
+# voir test_agent_vocal.py) ; la collision ne joue que pendant une fenêtre
+# de confirmation déjà ouverte (le système vient de poser une question
+# oui/non), ce qui limite le risque réel de faux positif.
+MOTS_OUI = ["owo", "awo", "aawo", "oui", "sonna", "awa"]
 MOTS_NON = ["ayi", "non"]
 
 
