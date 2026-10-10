@@ -67,6 +67,11 @@ MOTS_GRAMMATICAUX = {
     # reconnaitre_confirmation). Ajouté après un test réel (2026-10-09) où
     # il se retrouvait dans l'article extrait.
     "ma",
+    # "kan" : postposition ("sur"/"à", ex. "... jagokun kan" = "... sur le
+    # capital"), jamais un nom de marchandise. Ajouté après un test réel
+    # (2026-10-10) où il polluait l'article extrait ("kan" pris pour le
+    # nom de l'article d'une dépense).
+    "kan",
 }
 
 _TOUS_MOTS_CLES: set[str] = set()

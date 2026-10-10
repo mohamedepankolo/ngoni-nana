@@ -121,7 +121,7 @@ class AgentVocal:
         s = etat.session_moteur
 
         if etat.attente_continuer:
-            return self._traiter_reponse_continuer(bd, etat, session_id, texte)
+            return self._traiter_reponse_continuer(bd, etat, session_id, utilisatrice_id, texte)
 
         if etat.champ_en_attente:
             return self._combler_champ_en_attente(bd, etat, session_id, texte)
@@ -159,6 +159,18 @@ class AgentVocal:
             else:
                 return self._repeter_confirmation_ou_escalader(bd, etat, session_id)
 
+        return self._traiter_nouvelle_action(bd, etat, session_id, utilisatrice_id, texte)
+
+    def _traiter_nouvelle_action(self, bd, etat: "_EtatSession", session_id: int,
+                                  utilisatrice_id: int, texte: str) -> dict:
+        """Passe un énoncé par le moteur de décision (Session.recevoir) et
+
+        enchaîne sur la bonne étape (reformulation, escalade, lecture seule,
+        confirmation ou champ manquant). Factorisé pour être appelé aussi
+        bien dans le flux normal qu'en réponse directe à "veux-tu faire
+        autre chose ?" (voir _traiter_reponse_continuer).
+        """
+        s = etat.session_moteur
         contrat = s.recevoir(texte)
 
         if contrat["action"] == "reformuler":
@@ -191,7 +203,8 @@ class AgentVocal:
         construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
         return self._repondre(bd, session_id, contrat, construire())
 
-    def _traiter_reponse_continuer(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+    def _traiter_reponse_continuer(self, bd, etat: "_EtatSession", session_id: int,
+                                    utilisatrice_id: int, texte: str) -> dict:
         """Répond à "veux-tu faire autre chose ?" (posée après un enregistrement).
 
         "oui" : la session continue, prête pour une nouvelle action (sans
@@ -200,7 +213,19 @@ class AgentVocal:
         comme une tentative d'action ratée (bug réel, test téléphone
         2026-10-09 : répondre à cette question finissait par redemander des
         informations de vente sans aucun sens).
+
+        Enchaîner directement sur une nouvelle action (sans dire "oui"
+        d'abord) est aussi accepté : une utilisatrice réelle fait très
+        naturellement ça plutôt que de répondre "oui" puis répéter sa
+        phrase (constaté en test réel, 2026-10-10 : enchaîner directement
+        faisait redemander "oui ou non ?" en boucle jusqu'à l'échec).
         """
+        if reconnaitre_intention(texte) is not None:
+            etat.attente_continuer = False
+            etat.tentatives_continuer = 0
+            etat.session_moteur = Session()
+            return self._traiter_nouvelle_action(bd, etat, session_id, utilisatrice_id, texte)
+
         reponse = reconnaitre_confirmation(texte)
         if reponse is True:
             etat.attente_continuer = False
@@ -339,7 +364,12 @@ class AgentVocal:
                 return f"An ma {article} sɔrɔ."
             seuil_bas = ligne.quantite_actuelle <= (ligne.seuil_alerte or 0)
             return msg.reponse_stock(article, ligne.quantite_actuelle, seuil_bas)
-        return msg.continuer()
+        # "consultation" (ex. "combien ai-je vendu ce mois-ci ?") n'a pas
+        # encore de vraie réponse construite (pas de requête par période) :
+        # message honnête plutôt que de réutiliser continuer() à tort, qui
+        # laissait croire qu'une action venait d'être enregistrée (bug réel,
+        # test téléphone 2026-10-10).
+        return msg.consultation_non_disponible()
 
     def _conclure(self, bd, session_id: int, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]

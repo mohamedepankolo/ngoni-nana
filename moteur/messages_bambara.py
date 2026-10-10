@@ -133,3 +133,16 @@ def demander_article() -> str:
 
 def demander_client() -> str:
     return "Mɔgɔ tɔgɔ fɔ tuguni."
+
+
+def consultation_non_disponible() -> str:
+    """"Combien ai-je vendu ce mois-ci ?" (intention "consultation") n'a
+
+    jamais eu de vraie réponse construite (pas de requête sur les
+    transactions par période) : avant, ce cas réutilisait par erreur
+    continuer() ("veux-tu faire autre chose ?"), qui laissait croire à tort
+    qu'une action venait d'être enregistrée (trouvé en test réel,
+    2026-10-10). Un message honnête, même générique, vaut mieux qu'un
+    message trompeur en attendant une vraie implémentation.
+    """
+    return "Ne tɛ se k'o fɔ fɔlɔ."

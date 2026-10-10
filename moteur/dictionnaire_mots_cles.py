@@ -113,7 +113,11 @@ def reconnaitre_intention(texte: str) -> str | None:
 # de confirmation déjà ouverte (le système vient de poser une question
 # oui/non), ce qui limite le risque réel de faux positif.
 MOTS_OUI = ["owo", "awo", "aawo", "oui", "sonna", "awa"]
-MOTS_NON = ["ayi", "non"]
+# "ayiwa" : variante de "ayi" observée deux fois en test réel (2026-10-09 et
+# 2026-10-10), jamais reconnue jusqu'ici ("ayi" exige une correspondance
+# exacte, "ayiwa" ne matche pas). Ajoutée en toutes lettres plutôt que de
+# changer la règle générale (éviter un faux positif plus large sur "ayi").
+MOTS_NON = ["ayi", "ayiwa", "non"]
 
 
 def reconnaitre_confirmation(texte: str) -> bool | None:

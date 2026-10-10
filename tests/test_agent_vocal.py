@@ -84,6 +84,23 @@ def test_oui_apres_enregistrement_relance_sans_redemander_un_montant(agent):
     assert r["contrat"]["champs"]["article"] == "misi"
 
 
+def test_enchainer_directement_sur_une_nouvelle_action_sans_dire_oui(agent):
+    """Régression réelle (2026-10-10) : après "veux-tu faire autre chose ?",
+
+    enchaîner directement sur une nouvelle phrase d'action (sans dire "oui"
+    d'abord) était rejeté comme ni oui ni non et redemandait la même
+    question - une utilisatrice réelle fait pourtant très naturellement ça
+    plutôt que de répondre "oui" puis répéter sa phrase.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi feere wa bi duuru")
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert r["contrat"]["champs"]["article"] == "misi"
+
+
 def test_non_apres_enregistrement_dit_au_revoir(agent):
     sid = agent.demarrer_session(agent.utilisatrice_id)
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
@@ -307,6 +324,19 @@ def test_consultation_capital_ne_demande_pas_de_confirmation(agent):
     assert "jagokun" in r["message"]  # "capital", en bambara (messages_bambara.reponse_capital)
     bd = agent._session_factory()
     assert bd.get(db.SessionAppel, sid).statut == "complete"
+
+
+def test_consultation_pure_donne_un_message_honnete_pas_continuer(agent):
+    """Régression réelle (2026-10-10) : "consultation" (ex. "combien ai-je
+
+    vendu ce mois-ci ?") n'a pas de vraie réponse construite, mais réutilisait
+    par erreur le message "veux-tu faire autre chose ?", laissant croire à
+    tort qu'une action venait d'être enregistrée.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye joli feere nin kalo in na")  # P17
+    assert r["contrat"]["intention"] == "consultation"
+    assert "wɛrɛ kɛ wa" not in r["message"]  # pas "veux-tu faire autre chose ?"
 
 
 def test_declarer_le_capital_initial_demande_confirmation_puis_ecrit(agent):

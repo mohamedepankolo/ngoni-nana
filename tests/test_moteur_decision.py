@@ -115,10 +115,17 @@ def test_variante_ne_pour_n_ne_pollue_pas_larticle():
     assert champs["article"] == "saga"
 
 
+def test_postposition_kan_ne_pollue_pas_larticle():
+    # Test réel (2026-10-10) : "kan" (postposition "sur"/"à", ex. "...
+    # jagokun kan") se retrouvait dans l'article d'une dépense mal orientée.
+    champs = extraire_entites("ne ye n ka pase sara kemɛ kan", "depense")
+    assert champs["article"] == "pase"
+
+
 @pytest.mark.parametrize("texte, attendu", [
     ("owo", True), ("awo", True), ("aawo", True), ("oui", True),
     ("n sɔnna", True), ("awo ne sɔnna", True), ("awa", True),
-    ("ayi", False), ("non", False), ("a ye ne ma sɔn", False), ("ne ma son", False),
+    ("ayi", False), ("ayiwa", False), ("non", False), ("a ye ne ma sɔn", False), ("ne ma son", False),
     ("n ye saga saba feere", None),
 ])
 def test_reconnaitre_confirmation(texte, attendu):
