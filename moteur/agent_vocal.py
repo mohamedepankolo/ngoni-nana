@@ -31,6 +31,8 @@ CONSTRUCTEURS_CONFIRMATION = {
     "vente": msg.confirmation_vente,
     "depense": msg.confirmation_depense,
     "client": msg.confirmation_client,
+    "capital_declaration": msg.confirmation_capital_declaration,
+    "capital_ajout": msg.confirmation_capital_ajout,
 }
 
 # Une question ciblée par champ manquant, plutôt qu'un "redonne le montant"
@@ -350,6 +352,12 @@ class AgentVocal:
                                              nom_client=champs.get("client", "inconnu"),
                                              montant_fcfa=champs["montant_fcfa"],
                                              est_un_paiement=champs.get("est_un_paiement", False))
+        elif intention == "capital_declaration":
+            db.declarer_capital_initial(bd, utilisatrice_id=utilisatrice_id,
+                                         montant_fcfa=champs.get("montant_fcfa", 0))
+        elif intention == "capital_ajout":
+            db.ajouter_au_capital(bd, utilisatrice_id=utilisatrice_id,
+                                   montant_fcfa=champs.get("montant_fcfa", 0), session_id=session_id)
         self._cloturer_session(bd, session_id, statut="complete")
         return msg.enregistrement_confirme()
 

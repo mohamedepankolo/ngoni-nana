@@ -40,6 +40,13 @@ CHAMPS_ATTENDUS: dict[str, list[str]] = {
     "depense": ["article", "montant_fcfa"],
     "client": ["client"],
     "capital": [],
+    # "capital" (jagokun) seul = consultation, jamais d'écriture (voir
+    # INTENTIONS_LECTURE_SEULE, agent_vocal.py). Pour déclarer ou ajuster le
+    # capital, voir _affiner_intention_capital plus bas : deux intentions
+    # séparées, chacune avec un vrai montant requis et une confirmation
+    # avant écriture, contrairement à "capital" qui répond tout de suite.
+    "capital_declaration": ["montant_fcfa"],
+    "capital_ajout": ["montant_fcfa"],
     "stock": ["article"],
     "consultation": [],
 }
@@ -110,13 +117,36 @@ def est_une_redite_numerique_fiable(texte: str) -> bool:
     return bool(extraire_nombres(texte)) and not _mots_restants(texte)
 
 
+def _affiner_intention_capital(texte: str, intention: str | None) -> str | None:
+    """"jagokun" (capital) peut vouloir dire trois choses différentes : juste
+
+    consulter, déclarer un capital de départ, ou en ajouter. Un simple
+    mot-clé ne suffit pas à les distinguer (même mot dans les trois cas) :
+    affiné après coup, via un marqueur spécifique ("fara" = ajouter) ou la
+    présence d'un chiffre (probablement une déclaration plutôt qu'une
+    question). Avant cet ajout, "capital" ne faisait QUE consulter : tout
+    chiffre prononcé à côté ("mon capital est de 50 000") était
+    silencieusement ignoré (constaté en test réel, 2026-10-09), alors que le
+    corpus de référence (phrases_reelles.csv, P15/P16) prévoyait bien ces
+    deux cas depuis le début.
+    """
+    if intention != "capital":
+        return intention
+    tokens = normaliser(texte).split()
+    if "fara" in tokens:
+        return "capital_ajout"
+    if extraire_nombres(texte):
+        return "capital_declaration"
+    return "capital"
+
+
 def extraire_entites(texte: str, intention: str | None) -> dict:
     """Couche 2 + 3 : isole article/quantité/montant/client selon l'intention reconnue."""
     champs: dict = {}
     nombres = extraire_nombres(texte)
     mots = _mots_restants(texte)
 
-    if intention in ("vente", "depense", "capital", "client"):
+    if intention in ("vente", "depense", "capital", "capital_declaration", "capital_ajout", "client"):
         if nombres:
             montant_brut = max(nombres)
             champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
@@ -153,6 +183,7 @@ def analyser(texte: str) -> dict:
     intention = reconnaitre_intention(texte)
     if intention is None:
         return {"intention": None, "champs": {}, "confiance": "echec", "action": "reformuler"}
+    intention = _affiner_intention_capital(texte, intention)
 
     champs = extraire_entites(texte, intention)
     attendus = CHAMPS_ATTENDUS[intention]
@@ -208,9 +239,18 @@ class Session:
                      "confiance": "echec", "action": "escalade_humaine"}
 
         intention = reconnaitre_intention(texte) or self.intention
+        intention = _affiner_intention_capital(texte, intention)
         nouveaux_champs = extraire_entites(texte, intention) if intention else {}
 
-        if intention is None or not nouveaux_champs:
+        # "Rien d'extrait" ne veut dire "pas compris" que si l'intention
+        # attend au moins un champ (vente, dépense...). Pour une intention
+        # qui n'en attend aucun (capital en pure consultation, consultation
+        # elle-même), ne rien extraire est normal, pas un échec - bug réel
+        # trouvé en test (2026-10-09) : "n ka jagokun" seul (consulter le
+        # capital, sans aucun chiffre) était rejeté comme incompris alors que
+        # l'intention était correctement reconnue.
+        champ_requis = bool(CHAMPS_ATTENDUS.get(intention)) if intention else False
+        if intention is None or (not nouveaux_champs and champ_requis):
             self.tentatives_reformulation += 1
             if self.tentatives_reformulation > self.MAX_REFORMULATIONS:
                 self.escaladee = True

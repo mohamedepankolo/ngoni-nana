@@ -50,6 +50,16 @@ def reponse_capital(montant_fcfa: int) -> str:
     return f"I ka jagokun ye wari {_montant_bambara(montant_fcfa)} ye."
 
 
+def confirmation_capital_declaration(champs: dict) -> str:
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
+    return f"I ka jagokun bɛna kɛ wari {montant} ye. I sɔnna wa?"
+
+
+def confirmation_capital_ajout(champs: dict) -> str:
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
+    return f"Wari {montant} bɛna fara i ka jagokun kan. I sɔnna wa?"
+
+
 def reponse_stock(article: str, quantite: int, seuil_bas: bool) -> str:
     base = f"{article} {nombre_en_bambara(quantite)} de bɛ i bolo."
     if seuil_bas:

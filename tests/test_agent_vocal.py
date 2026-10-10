@@ -299,14 +299,59 @@ def test_montant_seul_manquant_est_cible_sans_redire_toute_la_phrase(agent):
 
 
 def test_consultation_capital_ne_demande_pas_de_confirmation(agent):
-    """Cas 4 : une consultation pure répond directement, pas de 'c'est bien ça ?'."""
+    """Cas 4 : une consultation pure (sans chiffre) répond directement, pas de 'c'est bien ça ?'."""
     sid = agent.demarrer_session(agent.utilisatrice_id)
-    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ka jagokun ye waa tan ye")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ka jagokun")
 
     assert r["contrat"]["intention"] == "capital"
     assert "jagokun" in r["message"]  # "capital", en bambara (messages_bambara.reponse_capital)
     bd = agent._session_factory()
     assert bd.get(db.SessionAppel, sid).statut == "complete"
+
+
+def test_declarer_le_capital_initial_demande_confirmation_puis_ecrit(agent):
+    """Régression réelle (2026-10-09) : "mon capital de départ est de X"
+
+    (phrase du corpus de référence, P15) était jusqu'ici traitée comme une
+    simple consultation - le chiffre donné était silencieusement ignoré, le
+    capital affiché ne changeait jamais. Doit maintenant demander
+    confirmation puis écrire la valeur.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ka jagokun ye waa tan ye")  # P15 : 50 000
+    assert r["contrat"]["intention"] == "capital_declaration"
+    assert r["contrat"]["action"] == "demander_confirmation"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["contrat"]["action"] == "enregistrer"
+
+    bd = agent._session_factory()
+    assert db.calculer_capital(bd, agent.utilisatrice_id) == 50_000
+
+    # Redéclarer écrase (pas un ajout) : le capital doit valoir exactement
+    # la nouvelle valeur, pas la somme des deux.
+    sid2 = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "n ka jagokun ye wa duuru ye")  # 5000 dorome = 25 000 FCFA
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "owo")
+    assert db.calculer_capital(bd, agent.utilisatrice_id) == 25_000
+
+
+def test_ajouter_au_capital_est_cumulatif(agent):
+    """"J'ajoute X à mon capital" (corpus P16) doit s'additionner aux ajouts
+
+    précédents, à la différence d'une déclaration qui écrase.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye wa naani fara n ka jagokun kan")  # +20 000
+    assert r["contrat"]["intention"] == "capital_ajout"
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+
+    sid2 = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "n ye wa naani fara n ka jagokun kan")  # +20 000 encore
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "owo")
+
+    bd = agent._session_factory()
+    assert db.calculer_capital(bd, agent.utilisatrice_id) == 40_000
 
 
 def test_escalade_apres_trois_incomprehensions(agent):

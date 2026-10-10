@@ -40,6 +40,10 @@ class Utilisatrice(Base):
     cooperative_id = Column(Integer, ForeignKey("cooperatives.id"))
     langue = Column(String, default="bambara")
     date_creation = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Capital de départ, déclaré une fois par la voix ("mon capital est de
+    # X") : remplacé (pas additionné) à chaque nouvelle déclaration, à la
+    # différence des ajouts (voir ajouter_au_capital), qui s'accumulent.
+    capital_initial = Column(Integer, default=0)
 
 
 class Transaction(Base):
@@ -172,19 +176,46 @@ def enregistrer_mouvement_client(db: SessionSQLAlchemy, *, utilisatrice_id: int,
 
 
 def calculer_capital(db: SessionSQLAlchemy, utilisatrice_id: int) -> int:
-    """Recettes - dépenses - dettes clients + dettes fournisseurs (formule de l'architecture).
+    """Capital initial + ajouts + recettes - dépenses - dettes clients
+
+    (+ dettes fournisseurs, formule de l'architecture).
 
     "Dettes fournisseurs" n'a pas encore de table dédiée dans ce premier jet
     (non observée dans phrases_reelles.csv ni dans le parcours utilisateur
     actuel) : traitée comme 0 pour l'instant, à corriger si Fadima confirme
     ce cas d'usage.
     """
+    utilisatrice = db.get(Utilisatrice, utilisatrice_id)
+    capital_initial = (utilisatrice.capital_initial or 0) if utilisatrice else 0
     transactions = db.query(Transaction).filter_by(utilisatrice_id=utilisatrice_id).all()
     recettes = sum(t.montant_fcfa for t in transactions if t.type == "vente")
     depenses = sum(t.montant_fcfa for t in transactions if t.type == "depense")
+    ajouts_capital = sum(t.montant_fcfa for t in transactions if t.type == "capital_ajout")
     dettes_clients = sum(c.montant_du or 0 for c in
                           db.query(Client).filter_by(utilisatrice_id=utilisatrice_id).all())
-    return recettes - depenses - dettes_clients
+    return capital_initial + ajouts_capital + recettes - depenses - dettes_clients
+
+
+def declarer_capital_initial(db: SessionSQLAlchemy, *, utilisatrice_id: int, montant_fcfa: int) -> None:
+    """"Mon capital de départ est de X" : remplace la valeur (pas un ajout),
+
+    redéclarer écrase la précédente. Voir ajouter_au_capital pour un vrai
+    ajout cumulatif ("j'ajoute X à mon capital").
+    """
+    utilisatrice = db.get(Utilisatrice, utilisatrice_id)
+    utilisatrice.capital_initial = montant_fcfa
+    db.commit()
+
+
+def ajouter_au_capital(db: SessionSQLAlchemy, *, utilisatrice_id: int,
+                        montant_fcfa: int, session_id: int | None = None) -> Transaction:
+    """"J'ajoute X à mon capital" : cumulatif, chaque ajout s'additionne aux précédents."""
+    t = Transaction(utilisatrice_id=utilisatrice_id, type="capital_ajout",
+                     montant_fcfa=montant_fcfa, session_id=session_id)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
 
 
 def consulter_client(db: SessionSQLAlchemy, utilisatrice_id: int, nom_client: str) -> Client | None:

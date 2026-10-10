@@ -135,6 +135,27 @@ def test_reconnaitre_confirmation(texte, attendu):
     assert reconnaitre_confirmation(texte) == attendu
 
 
+def test_consultation_capital_pure_nest_pas_prise_pour_un_echec():
+    """Régression réelle (2026-10-09) : une intention qui n'attend AUCUN
+
+    champ (capital en pure consultation, sans chiffre ; consultation) était
+    rejetée comme "pas compris" dès que rien n'était extrait - alors que ne
+    rien extraire est normal pour ces intentions-là, pas un échec. Le bug
+    venait de Session.recevoir : "rien d'extrait" ne doit vouloir dire
+    "pas compris" que si l'intention attend réellement au moins un champ.
+    """
+    session = Session()
+    resultat = session.recevoir("n ka jagokun")  # consulter, sans aucun chiffre
+    assert resultat["intention"] == "capital"
+    assert resultat["action"] == "demander_confirmation"
+    assert resultat["confiance"] == "haute"
+
+    session2 = Session()
+    resultat2 = session2.recevoir("n ye joli feere nin kalo in na")  # P17, consultation pure
+    assert resultat2["intention"] == "consultation"
+    assert resultat2["action"] == "demander_confirmation"
+
+
 def test_session_rien_enregistre_avant_confirmation_finale():
     """Cas 10 du parcours : aucune écriture tant que confirmer() n'a pas été appelé."""
     session = Session()
