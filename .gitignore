@@ -13,3 +13,4 @@ server.log
 asr_test/audio/*
 !asr_test/audio/.gitkeep
 .venv_slu_eval/
+.vscode/
