@@ -12,3 +12,4 @@ server.log
 # Enregistrements : voix des participantes -> stockés hors dépôt (Drive), jamais sur GitHub
 asr_test/audio/*
 !asr_test/audio/.gitkeep
+.venv_slu_eval/

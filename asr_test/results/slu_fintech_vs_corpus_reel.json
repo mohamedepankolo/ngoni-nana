@@ -1,0 +1,422 @@
+[
+  {
+    "id": "P01",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka kɛmɛ duuru bɛ Mariam na",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P02",
+    "categorie": "vente",
+    "texte_bambara": "n ye saga saba feere wa bi duuru",
+    "montant_fcfa_attendu": "250000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P03",
+    "categorie": "vente",
+    "texte_bambara": "n ye tiga bɔrɛ fila feere waa saba",
+    "montant_fcfa_attendu": "15000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P04",
+    "categorie": "vente",
+    "texte_bambara": "n ye safunɛ feere kɛmɛ",
+    "montant_fcfa_attendu": "500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P05",
+    "categorie": "vente",
+    "texte_bambara": "n ye gban tan feere kɛmɛ duuru",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P06",
+    "categorie": "vente",
+    "texte_bambara": "n ye fini kelen feere wa kelen ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "7500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P07",
+    "categorie": "achat",
+    "texte_bambara": "n ye bɔrɛ kelen san wa duuru",
+    "montant_fcfa_attendu": "25000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P08",
+    "categorie": "achat",
+    "texte_bambara": "n ye si tulu san kɛmɛ fila ni bi duuru",
+    "montant_fcfa_attendu": "1250",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P09",
+    "categorie": "achat",
+    "texte_bambara": "n ye sɛ duuru san waa fila ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "12500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P10",
+    "categorie": "depense",
+    "texte_bambara": "n ye n ka paser sara kɛmɛ ni bi duuru",
+    "montant_fcfa_attendu": "750",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P11",
+    "categorie": "depense",
+    "texte_bambara": "n ye n ka sugu sigiyɔrɔ sara dɔrɔmɛ mugan",
+    "montant_fcfa_attendu": "100",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P12",
+    "categorie": "depense",
+    "texte_bambara": "n ye waa kelen kɛ ka mana foroko san",
+    "montant_fcfa_attendu": "5000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P13",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka waa fila juru bɛ Awa la",
+    "montant_fcfa_attendu": "10000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P14",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka kɛmɛ wolonwula jurumu bɛ Fanta la, a y'o sara",
+    "montant_fcfa_attendu": "3500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P15",
+    "categorie": "capital",
+    "texte_bambara": "n ka jagokun ye waa tan ye",
+    "montant_fcfa_attendu": "50000",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P16",
+    "categorie": "capital",
+    "texte_bambara": "n ye wa naani fara n ka jagokun kan",
+    "montant_fcfa_attendu": "20000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_momo', 'entities': []}"
+  },
+  {
+    "id": "P17",
+    "categorie": "consultation",
+    "texte_bambara": "n ye joli feere nin kalo in na",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P18",
+    "categorie": "consultation",
+    "texte_bambara": "n ka juru bɛ mɔgɔ jɔn na",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P19",
+    "categorie": "stock",
+    "texte_bambara": "sanɲɔgɔn bɔrɔ naani de bɛ ne bolo",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P20",
+    "categorie": "vente",
+    "texte_bambara": "n ye saga saba feere wa mugan ni duuru",
+    "montant_fcfa_attendu": "125000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P01b",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka kɛmɛ duuru bɛ Mariam min na",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P02b",
+    "categorie": "vente",
+    "texte_bambara": "n ye saga saba feere waa bi duuru",
+    "montant_fcfa_attendu": "250000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P03b",
+    "categorie": "vente",
+    "texte_bambara": "n ye tiga bɔrɛ fila feere waa saba",
+    "montant_fcfa_attendu": "15000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P04b",
+    "categorie": "vente",
+    "texte_bambara": "n ye safunɛ feere kɛmɛ",
+    "montant_fcfa_attendu": "500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P05b",
+    "categorie": "vente",
+    "texte_bambara": "n ye gban feere kɛmɛ duuru",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P06b",
+    "categorie": "vente",
+    "texte_bambara": "n ye fini feere wa kelen ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "7500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P07b",
+    "categorie": "achat",
+    "texte_bambara": "n ye bɔrɛ san waa duuru",
+    "montant_fcfa_attendu": "25000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P08b",
+    "categorie": "achat",
+    "texte_bambara": "n ye si tulu feere kɛmɛ fila ni bi duuru",
+    "montant_fcfa_attendu": "1250",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P09b",
+    "categorie": "achat",
+    "texte_bambara": "n ye sɛ duuru feere waa fila ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "12500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P10b",
+    "categorie": "depense",
+    "texte_bambara": "n ye pase sara kɛmɛ ni bi duuru",
+    "montant_fcfa_attendu": "750",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P11b",
+    "categorie": "depense",
+    "texte_bambara": "n ye n ka sugu sigiyɔrɔ sara mugan",
+    "montant_fcfa_attendu": "100",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Profile', 'type': 'page'}]}"
+  },
+  {
+    "id": "P12b",
+    "categorie": "depense",
+    "texte_bambara": "n ye waa kelen kɛ ka mana foroko ni bɔrɛw san",
+    "montant_fcfa_attendu": "5000",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Profile', 'type': 'page'}]}"
+  },
+  {
+    "id": "P13b",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka wa fila juru bɛ Awa la",
+    "montant_fcfa_attendu": "10000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P14b",
+    "categorie": "dette_client",
+    "texte_bambara": "Fanta ye kɛmɛ wolonwula sara, n ka juru la",
+    "montant_fcfa_attendu": "3500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_momo', 'entities': []}"
+  },
+  {
+    "id": "P15b",
+    "categorie": "capital",
+    "texte_bambara": "n ka jagokun bɛɛ ye waa tan",
+    "montant_fcfa_attendu": "50000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P16b",
+    "categorie": "capital",
+    "texte_bambara": "n ye wa naani fara n ka jagokun kan",
+    "montant_fcfa_attendu": "20000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P17b",
+    "categorie": "consultation",
+    "texte_bambara": "n yɛrɛ ka minɛn tɔ tora joli nin kalo in na",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P18b",
+    "categorie": "consultation",
+    "texte_bambara": "mɔgɔ jɔn ni jɔn de ka n ka juru b'olu la",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P19b",
+    "categorie": "stock",
+    "texte_bambara": "ɲɔ bɔrɛ naani de tora an bolo",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Profile', 'type': 'page'}]}"
+  },
+  {
+    "id": "P20b",
+    "categorie": "vente",
+    "texte_bambara": "n ye saga saba feere waa mugan ni duuru",
+    "montant_fcfa_attendu": "125000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P01c",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka kɛmɛ duuru bɛ Mariama fɛ",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P02c",
+    "categorie": "vente",
+    "texte_bambara": "saga saba feerelen bɛ na waa bi duuru ma, i sɔnna",
+    "montant_fcfa_attendu": "250000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P03c",
+    "categorie": "vente",
+    "texte_bambara": "n ye tiga bɔrɔ feere waa saba",
+    "montant_fcfa_attendu": "15000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P04c",
+    "categorie": "vente",
+    "texte_bambara": "n ye safunɛ feere kɛmɛ",
+    "montant_fcfa_attendu": "500",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Home', 'type': 'page'}]}"
+  },
+  {
+    "id": "P05c",
+    "categorie": "vente",
+    "texte_bambara": "n ye gban sara tan, kɛmɛ duuru",
+    "montant_fcfa_attendu": "2500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P06c",
+    "categorie": "vente",
+    "texte_bambara": "n ye fini san waa kelen ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "7500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P07c",
+    "categorie": "achat",
+    "texte_bambara": "n ye ɲɔ bɔrɛ kelen san waa duuru",
+    "montant_fcfa_attendu": "25000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P08c",
+    "categorie": "achat",
+    "texte_bambara": "n ye si tulu san kɛmɛ fila ni bi duuru la",
+    "montant_fcfa_attendu": "1250",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P09c",
+    "categorie": "achat",
+    "texte_bambara": "n ye sɛ san waa fila ni kɛmɛ duuru",
+    "montant_fcfa_attendu": "12500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P10c",
+    "categorie": "depense",
+    "texte_bambara": "n ye pase sara kɛmɛ ni bi duuru",
+    "montant_fcfa_attendu": "750",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P11c",
+    "categorie": "depense",
+    "texte_bambara": "n ye n sigiyɔrɔ sara dɔrɔmɛ mugan",
+    "montant_fcfa_attendu": "100",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P12c",
+    "categorie": "depense",
+    "texte_bambara": "n ye waa kelen don bɔrɛw la",
+    "montant_fcfa_attendu": "5000",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P13c",
+    "categorie": "dette_client",
+    "texte_bambara": "n ka waa fila de bɛ Awa la",
+    "montant_fcfa_attendu": "10000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_momo', 'entities': []}"
+  },
+  {
+    "id": "P14c",
+    "categorie": "dette_client",
+    "texte_bambara": "Fanta ye n ka kɛmɛ wolonwula sara",
+    "montant_fcfa_attendu": "3500",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P15c",
+    "categorie": "capital",
+    "texte_bambara": "n ka jagokun tun ye waa tan ye",
+    "montant_fcfa_attendu": "50000",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Operations', 'type': 'page'}]}"
+  },
+  {
+    "id": "P16c",
+    "categorie": "capital",
+    "texte_bambara": "n ye wa naani fara'o kan",
+    "montant_fcfa_attendu": "20000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  },
+  {
+    "id": "P17c",
+    "categorie": "consultation",
+    "texte_bambara": "n ye joli feere nin kalo in na",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P18c",
+    "categorie": "consultation",
+    "texte_bambara": "n ka wari bɛ jɔn na",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'get_balance', 'entities': []}"
+  },
+  {
+    "id": "P19c",
+    "categorie": "stock",
+    "texte_bambara": "n ka ɲɔ tun ye bɔrɔ naani ye",
+    "montant_fcfa_attendu": "",
+    "sortie_slu": "{'scenario': 'Navigate', 'action': 'Maps_to', 'entities': [{'filler': 'Profile', 'type': 'page'}]}"
+  },
+  {
+    "id": "P20c",
+    "categorie": "vente",
+    "texte_bambara": "n ye saga saba feere wa mugan ni duuru",
+    "montant_fcfa_attendu": "125000",
+    "sortie_slu": "{'scenario': 'Operation', 'action': 'transfer_to_account', 'entities': []}"
+  }
+]
