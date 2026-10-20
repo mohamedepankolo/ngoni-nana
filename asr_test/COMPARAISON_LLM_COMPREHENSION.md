@@ -2,7 +2,7 @@
 
 Contexte : suite à `Communications/instructions.docx`, qui recommandait de
 tester un LLM sur le bambara écrit avant toute décision d'architecture et
-avant d'ajouter la complexité de l'audio. Trois protocoles testés sur les 53
+avant d'ajouter la complexité de l'audio. Quatre protocoles testés sur les 53
 phrases bambara réelles distinctes du corpus (`asr_test/corpus/phrases_reelles.csv`),
 chacun avec un agent isolé n'ayant jamais vu les réponses attendues (test en
 aveugle, pas une relecture de données déjà mémorisées dans cette session).
@@ -85,38 +85,84 @@ ces 53 phrases répétées — mais que la convention dɔrɔmɛ=5 F CFA n'en fai
 clairement pas partie : c'est un usage commercial local, culturellement
 spécifique, absent de toute ressource générale sur le bambara.
 
-## Synthèse des trois protocoles
+## Protocole 4 — petit modèle réellement déployable (Qwen2.5-1.5B-Instruct, local, gratuit)
 
-| | Protocole 1 (glossaire complet) | Protocole 2 (glossaire + lecture stricte) | Protocole 3 (sans glossaire) |
-|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré précisément |
-| Montants | **100 %** | 96 % | **7 %** |
+Les modèles 7B+ (Qwen2.5-7B, Llama-3.1-8B, Qwen3-8B) accessibles via le
+routeur d'inférence Hugging Face demandent des crédits payants que ce compte
+n'a pas (`"You have no remaining credits"`) — une donnée réelle sur le coût
+d'exploitation, pas un simple obstacle technique. Testé à la place un modèle
+assez petit pour tourner localement sans frais : Qwen2.5-1.5B-Instruct, avec
+exactement le même glossaire complet que le protocole 1.
+
+Avant de lancer les 53 phrases (chaque inférence prenant ~100-115 s sur le
+CPU de cette machine, soit ~1h30 pour l'ensemble), un essai sur 2 phrases a
+suffi à conclure :
+
+- *"n ye saga saba feere wa bi duuru"* (vendu 3 moutons pour 250 000 F CFA)
+  → réponse : produit **"bananes"** (inventé, aucun rapport avec la phrase),
+  quantité 30 (au lieu de 3), montant 750 F CFA (au lieu de 250 000).
+- *"n ka jagokun ye waa tan ye"* (mon capital est de 50 000) → intention
+  correcte, mais montant jamais extrait (null), et le modèle a listé des
+  particules grammaticales ("n", "ka") comme des "informations manquantes"
+  - signe qu'il ne suit pas la structure de la tâche, pas seulement qu'il
+  se trompe sur les chiffres.
+
+Décision prise avec l'utilisateur : ne pas lancer les 53 phrases. Deux échecs
+aussi nets (un produit inventé de toutes pièces) suffisent à conclure qu'un
+modèle de cette taille (1,5 milliard de paramètres) n'est pas assez capable
+pour cette tâche, glossaire ou pas - continuer aurait coûté ~1h30 de calcul
+pour confirmer l'évident. Fichier de test conservé
+(`asr_test/scripts/tester_llm_deploye.py`) pour un modèle de taille
+intermédiaire si cette piste est reprise plus tard.
+
+**C'est le résultat le plus préoccupant des quatre protocoles**, pas
+seulement le plus mauvais : inventer un produit absent de la phrase est
+exactement le risque que les critères de qualité proposés interdisent ("0
+transaction inventée"). Un modèle "petit et gratuit" n'est, à ce stade,
+clairement pas une option : soit un modèle intermédiaire reste à tester
+(7B via une API payante, ou un 3B local, non essayé faute de preuve que ça
+changerait la conclusion), soit la voie "petit modèle local" est à écarter
+au profit d'un LLM nettement plus capable, avec le coût que cela implique.
+
+## Synthèse des quatre protocoles
+
+| | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local) |
+|---|---|---|---|---|
+| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
-**Conclusion directe** : un LLM généraliste a une vraie connaissance
-préalable du vocabulaire et de la grammaire bambara de ce domaine (confirmé
-par le protocole 3 pour l'identification des opérations), mais **aucune**
-connaissance de la convention monétaire locale (dɔrɔmɛ) — celle-ci doit être
-fournie explicitement, par un glossaire en contexte (ce qui fonctionne : 100 %
-et 96 % dans les protocoles 1-2) et/ou par un analyseur déterministe dédié,
+**Conclusion directe** : un LLM généraliste **puissant** a une vraie
+connaissance préalable du vocabulaire et de la grammaire bambara de ce
+domaine (confirmé par le protocole 3), mais **aucune** connaissance de la
+convention monétaire locale (dɔrɔmɛ) — celle-ci doit être fournie
+explicitement, par un glossaire en contexte (ce qui fonctionne : 100 % et
+96 % dans les protocoles 1-2) et/ou par un analyseur déterministe dédié,
 comme le fait déjà `montants.py` pour le moteur actuel. Combiner les deux
 (LLM guidé pour l'intention/les entités, analyseur déterministe pour la
 conversion monétaire finale) reste l'architecture la plus sûre — exactement
 ce que proposait `Communications/instructions.docx` dès le premier document.
 
-## Ce que ces trois protocoles ne mesurent toujours pas
+Mais le protocole 4 ajoute une réserve de taille : cette conclusion ne vaut
+que pour un modèle **puissant**. Un modèle réellement gratuit et déployable
+localement (1,5 milliard de paramètres) échoue totalement à la même tâche,
+glossaire fourni ou non, et invente du contenu plutôt que de signaler une
+incertitude. La décision d'architecture ne peut donc pas encore être prise :
+il manque la preuve qu'un modèle à la fois capable ET réellement abordable
+existe entre ces deux extrêmes.
+
+## Ce que ces quatre protocoles ne mesurent toujours pas
 
 - La compréhension de **phrases réellement inédites** (ces 53 phrases, même
   en aveugle pour le modèle, restent celles du corpus existant).
 - Les **conversations à plusieurs tours** (mémoire, corrections, changement
   d'avis en cours de phrase).
 - La **compréhension de l'audio réel** (ASR + bruit + hésitations), ces
-  trois protocoles ne testant que du texte déjà transcrit sans erreur.
-- Un modèle **réellement déployable à coût maîtrisé** : les trois protocoles
-  ci-dessus utilisent un LLM généraliste puissant, pas un candidat pour la
-  production. Voir `asr_test/results/llm_deploye_vs_corpus_reel.json` (test
-  séparé, en cours) pour la comparaison avec un modèle local de petite taille.
+  quatre protocoles ne testant que du texte déjà transcrit sans erreur.
+- Un modèle **de taille intermédiaire** entre un LLM généraliste puissant
+  (protocoles 1-3) et un modèle local de 1,5 milliard de paramètres
+  (protocole 4, qui échoue totalement) : ni testé, ni écarté à ce jour.
 
 ## Désaccords à faire trancher par une personne bambaraphone
 
