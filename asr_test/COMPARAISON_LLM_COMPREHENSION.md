@@ -196,21 +196,62 @@ pas de comptage d'articles séparé) — pas une erreur de calcul. L'intention
 reste parfois fausse elle aussi (phrase 2 classée "consultation" au lieu de
 "capital"), un problème indépendant du montant.
 
-**Conclusion du protocole 6** : séparer "comprendre/extraire le texte" (tâche
-où même un petit modèle est globalement fiable) de "calculer" (tâche où
-aucun modèle testé n'est fiable, protocoles 2-5) transforme un échec total en
-succès partiel net, avec le modèle le moins capable testé jusqu'ici. C'est la
-confirmation la plus concrète à ce jour de l'architecture hybride proposée
-dès `Communications/instructions.docx` : LLM pour l'intention/les entités,
-analyseur déterministe pour les montants — et elle fonctionne même avec un
-petit modèle local gratuit, pas seulement avec un LLM puissant payant.
+**Ce résultat à 4 phrases ne s'est PAS généralisé — voir la correction
+ci-dessous.**
+
+### Correction : évaluation sur les 53 phrases du corpus (script `evaluer_hybride.py`)
+
+Script reçu, vérifié (mode `--smoke` : reproduit bien exactement 3/4 à partir
+des réponses déjà enregistrées, avant toute nouvelle inférence), puis exécuté
+pour de vrai sur les 53 phrases distinctes avec `mistral:7b`.
+
+| Mesure | Résultat |
+|---|---|
+| Montants FCFA exacts | **6 / 45 — 13 %** |
+
+**Le 3/4 (75 %) du test à 4 phrases ne tenait pas à l'échelle : c'était un
+échantillon chanceux, pas une vraie amélioration.** En creusant le détail des
+échecs, trois bugs systématiques, distincts de l'arithmétique :
+
+1. **Régurgitation littérale de l'exemple du prompt système.** Pour 4
+   phrases différentes (P03, P06, P12, P15), le modèle a répondu exactement
+   `"waa kelen ni kɛmɛ duuru"` — l'exemple donné dans la consigne elle-même
+   (*"«waa kelen ni kɛmɛ duuru» est un seul montant"*) — alors qu'aucune de
+   ces phrases ne contient ce texte. Un essai en retirant cet exemple du
+   prompt système n'a cependant pas résolu le problème dans l'ensemble (voir
+   point 4).
+2. **Troncature au dernier mot.** Pour au moins 6 phrases, le modèle a
+   répondu seulement "duuru" (dernier mot d'un groupe numéral) au lieu de
+   l'expression complète ("wa bi duuru"), produisant un montant 10 000 fois
+   trop petit.
+3. **Mauvais token sélectionné.** Pour les phrases de dette (P13, P13b,
+   *"n ka waa fila juru bɛ Awa la"*), le modèle a recopié le mot "juru"
+   (= dette) lui-même comme si c'était le montant, au lieu du nombre qui le
+   précède.
+4. **Un nouvel essai ciblé** sur les 10 phrases en échec, avec le prompt
+   système débarrassé de l'exemple littéral, n'a corrigé qu'1 cas sur 10 —
+   confirmant que le problème n'est pas la formulation du prompt mais une
+   limite réelle de `mistral:7b` à isoler des groupes numéraux multi-mots de
+   façon fiable sur des phrases variées.
+
+**Conclusion révisée du protocole 6** : l'idée de séparer "extraire le texte"
+(LLM) de "calculer" (`montants.py`, déjà validé) reste architecturalement la
+bonne direction — le seul échec de calcul observé sur l'ensemble du corpus
+vient d'une mauvaise extraction en amont, jamais d'une erreur de
+`montants.py` lui-même. Mais `mistral:7b` n'est, à ce stade, pas assez fiable
+pour cette étape d'extraction à l'échelle d'un corpus varié (13 %, pas
+75 %). La leçon méthodologique à retenir : **ne jamais juger un protocole sur
+un échantillon de 2-4 phrases** — exactement l'erreur commise ici avant
+cette correction. Reste à tester si un modèle plus capable (payant, ou un
+modèle local plus gros type `gemma2:9b` si sa lenteur peut être réglée) fait
+mieux sur cette même étape d'extraction, désormais isolée du calcul.
 
 ## Synthèse des six protocoles
 
 | | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local 1,5B) | P5 (modèles locaux 7-9B, calcul demandé au LLM) | P6 (modèle local 7B, calcul délégué à `montants.py`) |
 |---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais | correcte sur 3/4 |
-| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** | **75 % (3/4), échec restant = segmentation pas calcul** |
+| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais | non chiffrée sur l'ensemble (à faire) |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** | **13 % sur 45 phrases (6/45) — le 75 % sur 4 phrases ne généralisait pas** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
@@ -228,23 +269,22 @@ ce que proposait `Communications/instructions.docx` dès le premier document.
 Les protocoles 4 et 5 ont d'abord ajouté une réserve de taille : aucun modèle
 gratuit et déployable localement (1,5B au protocole 4, trois modèles 7-9B au
 protocole 5, few-shot et règle précise inclus) ne réussissait à calculer un
-montant correctement. Le protocole 6 résout cette réserve, mais pas en
-rendant les modèles locaux meilleurs en calcul — en leur retirant cette tâche.
-Dès qu'on ne demande plus au LLM (même un petit modèle local gratuit) que
-d'**extraire** l'expression chiffrée prononcée, et qu'on laisse
-`montants.py` faire le calcul réel, le taux de montants exacts passe de 0 %
-à 75 % avec le même modèle. Le cas le plus difficile de toute cette série
-(la portée de "waa" sur "mugan ni duuru") devient trivial une fois que le
-calcul est confié au bon composant.
+montant correctement. Le protocole 6 confirme la bonne direction architecturale
+(séparer extraction et calcul) mais, une fois testé sur les 53 phrases et pas
+seulement 4, montre que `mistral:7b` reste insuffisant même pour la seule
+tâche d'extraction (13 %, voir correction ci-dessus) : un gain existe (6/45
+contre 0 dans les protocoles précédents), mais il est loin de suffire pour un
+déploiement.
 
-**Conclusion définitive** : l'architecture hybride proposée dès
+**Conclusion actuelle** : l'architecture hybride proposée dès
 `Communications/instructions.docx` (LLM pour l'intention/les entités,
-analyseur déterministe pour les montants) n'est pas qu'une option prudente —
-c'est la seule qui fonctionne de façon fiable avec un modèle réellement
-gratuit et local. Reste à corriger la segmentation quantité/montant quand il
-n'y a pas de comptage d'articles explicite (le seul échec du protocole 6),
-et l'intention sur certains cas (ex. jagokun/capital mal classé parfois) —
-deux problèmes bien plus abordables qu'une refonte de l'arithmétique.
+analyseur déterministe pour les montants) reste la bonne direction — le
+moteur déterministe `montants.py` n'a produit aucune erreur de calcul sur
+tout le corpus, chaque échec venant d'une mauvaise extraction en amont par
+le LLM. Mais aucun modèle gratuit et local testé à ce jour n'est assez
+fiable pour cette étape d'extraction à l'échelle d'un corpus varié. Reste à
+tester si un modèle plus capable change ce résultat, et à ne plus jamais
+tirer de conclusion d'un échantillon de 2-4 phrases.
 
 ## Ce que ces six protocoles ne mesurent toujours pas
 
