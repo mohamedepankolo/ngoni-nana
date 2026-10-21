@@ -320,7 +320,27 @@ grave qu'un montant faux pour un assistant comptable.
 **Test ciblé** : un prompt dédié, uniquement à la classification d'intention
 (sans les groupes numériques ni l'attribution de rôle), testé séparément sur
 les 53 phrases — hypothèse qu'isoler cette tâche (comme suggéré) corrige les
-deux échecs systématiques ci-dessus. Résultat détaillé plus bas.
+deux échecs systématiques ci-dessus.
+
+| Mesure | Combiné (groupes + rôles + intention) | Intention seule (prompt dédié) |
+|---|---|---|
+| Intention exacte | 49 % (26/53) | **66 % (35/53)** |
+
+**Séparer la tâche aide réellement** (+17 points) : le problème
+"capital → vente à chaque fois" est quasiment résolu (4/5 corrigés — seul
+*"n ye wa naani fara'o kan"* reste faux). Mais "consultation" reste fragile
+(encore 3/5 faux, avec des réponses différentes à chaque fois plutôt que le
+même "inconnu" systématique d'avant). Les erreurs restantes recoupent
+largement une ambiguïté **déjà documentée aux protocoles 1-2** : confusion
+achat/vente par substitution du verbe littéralement prononcé (ex. "feere"
+lu comme vente quand le corpus attend achat) et confusion achat/dépense
+(frontière déjà floue dans l'annotation de référence elle-même, voir
+`DESACCORDS_LLM_A_VALIDER.md`) — pas un problème entièrement nouveau.
+
+**Conclusion sur l'intention** : séparer les tâches est la bonne direction,
+mais 66 % reste loin des 85-94 % obtenus avec le grand LLM payant aux
+protocoles 1-2. `mistral:7b` a une limite réelle de compréhension du
+bambara sur ce point, indépendante de la segmentation numérique.
 
 **Conclusion générale du protocole 7, révisée** : l'architecture
 "segmentation déterministe + LLM pour les rôles" résout bien le problème des
