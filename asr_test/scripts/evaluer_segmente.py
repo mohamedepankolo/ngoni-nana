@@ -56,17 +56,25 @@ def call_ollama(model, phrase, groupes, url, timeout):
 
 def evaluate(groupes, gt_fcfa, data):
     roles = dict(data.get("roles") or {})
-    # Repli deterministe : sur 30 phrases a un seul groupe numerique testees,
-    # le LLM dit deja "montant" a chaque fois sauf pour des phrases de dette/
-    # depense sans comptage d'articles (4 cas), ou il dit a tort "quantite" ;
-    # sur les 3 vraies phrases de stock (intention "stock"), il dit "quantite"
-    # a chaque fois, correctement. Un seul groupe + intention != stock =>
-    # forcer "montant" ne degrade jamais un cas deja correct et corrige les 4
-    # echecs observes (asr_test/COMPARAISON_LLM_COMPREHENSION.md, protocole 7).
-    if len(groupes) == 1 and data.get("intention") != "stock":
-        roles = {"N1": "montant"}
+    # ATTENTION (retire apres relecture) : une premiere version de ce code
+    # forcait automatiquement "montant" des qu'un seul groupe numerique
+    # existait et que l'intention n'etait pas "stock". Corrige sur les 4 cas
+    # du corpus actuel (dette/depense sans comptage d'articles), mais c'est
+    # un surajustement dangereux : une phrase comme "j'ai vendu trois sacs
+    # de riz" (quantite seule, prix absent, absente de ce corpus) aurait ete
+    # lue comme un montant de 15 F CFA invente. Remplace par un signalement
+    # d'ambiguite plutot qu'une decision automatique, conformement a
+    # l'exigence « 0 transaction inventee » : le systeme doit demander une
+    # precision, pas deviner silencieusement.
     ids_montant = [gid for gid, role in roles.items() if role == "montant"]
     expected = int(gt_fcfa) if gt_fcfa else None
+    if len(groupes) == 1 and data.get("intention") not in ("stock", "consultation") and not ids_montant:
+        # Un seul groupe, pas deja marque "montant" par le LLM, intention
+        # financiere : ambigu (quantite seule, SANS prix ? ou montant mal
+        # etiquete ?) - a signaler, pas a trancher ici.
+        return {"roles": roles, "montant_fcfa_calcule": None, "montant_fcfa_attendu": expected,
+                "montant_exact": False, "role_ambigu": True,
+                "clarification_necessaire": "un seul nombre present : est-ce la quantite ou le montant ?"}
     if len(ids_montant) != 1:
         # Zero ou plusieurs groupes marques "montant" : pas de reponse exploitable.
         return {"roles": roles, "montant_fcfa_calcule": None, "montant_fcfa_attendu": expected,

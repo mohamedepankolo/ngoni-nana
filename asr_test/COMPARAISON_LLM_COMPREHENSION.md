@@ -274,33 +274,68 @@ que 13 % au protocole 6** :
 Les 4 échecs restants partageaient un point commun exact : une seule phrase
 à un seul groupe numérique (dette ou dépense sans comptage d'articles,
 ex. *"Fanta ye kɛmɛ wolonwula sara, n ka juru la"*), que le modèle étiquette
-à tort "quantité" au lieu de "montant". Vérification avant toute correction :
-sur les 26 autres phrases à un seul groupe où l'intention n'est pas "stock",
-le modèle dit déjà "montant" **à chaque fois** ; sur les 3 vraies phrases de
-stock (ex. *"j'ai 4 sacs de mil en stock"*), il dit "quantité" **à chaque
-fois**, correctement. Règle de repli ajoutée en conséquence, codée dans
-`evaluer_segmente.py` : un seul groupe numérique + intention ≠ "stock" ⇒
-forcer le rôle "montant" — ne dégrade aucun des 26 cas déjà corrects,
-corrige les 4 échecs restants.
+à tort "quantité" au lieu de "montant".
 
-**Conclusion du protocole 7** : en retirant au LLM la seule tâche où il
-échouait réellement (délimiter les frontières d'un nombre multi-mots), et en
-ne lui laissant que des décisions qu'il sait déjà bien prendre (quel groupe
-joue quel rôle), le même petit modèle local gratuit passe de 13 % à 100 %
-sur l'ensemble du corpus. C'est la première fois dans cette série de 7
-protocoles qu'un modèle réellement gratuit et local atteint une fiabilité
-comparable à celle du grand LLM payant des protocoles 1-2. L'architecture à
-retenir pour N'GONI NANA V2 : segmentation numérique déterministe → LLM pour
-l'intention/les entités/les rôles → calcul déterministe (`montants.py`) →
-dialogue/confirmation.
+**Correction importante (après relecture) : la règle de repli initiale était
+un surajustement dangereux, retirée.** Une première version forçait
+automatiquement le rôle "montant" dès qu'un seul groupe numérique existait
+et que l'intention n'était pas "stock" — corrige les 4 cas ci-dessus, mais
+une phrase absente de ce corpus comme *"j'ai vendu trois sacs de riz"*
+(quantité seule, prix non mentionné) aurait été lue comme un montant de
+15 F CFA inventé. Remplacée par un **signalement d'ambiguïté** plutôt qu'une
+décision automatique, conformément à l'exigence "0 transaction inventée" :
+le système doit demander une précision, pas deviner silencieusement quand un
+seul nombre est présent et qu'aucun rôle n'a été donné explicitement par le
+LLM.
+
+| Mesure (règle sûre, sans forçage automatique) | Résultat |
+|---|---|
+| Montants FCFA exacts | **41 / 45 — 91 %** |
+| Signalés "ambigu, à clarifier" (pas une erreur silencieuse) | 4 / 45 |
+
+**Conclusion du protocole 7 sur les montants** : en retirant au LLM la seule
+tâche où il échouait réellement (délimiter les frontières d'un nombre
+multi-mots), et en ne lui laissant que des décisions qu'il sait déjà bien
+prendre (quel groupe joue quel rôle), le même petit modèle local gratuit
+passe de 13 % à 91 % sur l'ensemble du corpus, le reste étant signalé pour
+clarification plutôt que faux.
+
+### Mais l'intention reste un problème non résolu — 49 % seulement
+
+Le focus sur les montants a masqué un problème aussi important : sur les
+mêmes 53 phrases, l'intention retournée par le LLM ne correspond à la
+catégorie du corpus que **26/53 fois (49 %)** — bien pire que les
+protocoles 1-2 (94 %/85 %). Deux échecs systématiques, pas aléatoires :
+
+- **"capital" → "vente" à chaque fois (5/5)**, y compris pour
+  *"n ka jagokun ye waa tan ye"* (mon capital est de...), malgré "jagokun=capital"
+  explicitement donné dans la consigne.
+- **"consultation" → "inconnu" à chaque fois (5/5)**, pour toutes les
+  phrases avec "joli"/"jɔn" (combien/qui).
+
+Un enregistrement avec le bon montant mais la mauvaise catégorie comptable
+(ex. une dette de Mariam enregistrée comme une vente) est une erreur aussi
+grave qu'un montant faux pour un assistant comptable.
+
+**Test ciblé** : un prompt dédié, uniquement à la classification d'intention
+(sans les groupes numériques ni l'attribution de rôle), testé séparément sur
+les 53 phrases — hypothèse qu'isoler cette tâche (comme suggéré) corrige les
+deux échecs systématiques ci-dessus. Résultat détaillé plus bas.
+
+**Conclusion générale du protocole 7, révisée** : l'architecture
+"segmentation déterministe + LLM pour les rôles" résout bien le problème des
+montants (13 %→91 %, sans invention grâce au signalement d'ambiguïté). Mais
+la compréhension de l'opération comptable elle-même (quelle catégorie)
+reste, à ce stade, le problème non résolu le plus important — un système qui
+calcule juste mais classe mal n'est pas encore fiable.
 
 **Réserves à garder en tête avant de généraliser** : corpus de 53 phrases
-existantes (pas encore de phrases inédites) ; la règle de repli est motivée
-par des données mais reste un correctif ad hoc découvert après coup, pas une
-propriété garantie du modèle sur toute formulation possible ; les cas à
-plusieurs groupes numériques plus complexes (prix unitaire + total + quantité
-dans une même phrase, évoqués comme risque par l'avisor) n'ont pas encore
-été rencontrés dans ce corpus et restent à tester.
+existantes (pas encore de phrases inédites, pas de conversations à plusieurs
+tours) ; les cas à plusieurs groupes numériques plus complexes (prix
+unitaire + total + quantité dans une même phrase) n'ont pas encore été
+rencontrés dans ce corpus et restent à tester ; ne pas réévaluer la règle de
+repli sur ce même corpus comme preuve de généralisation — c'est lui qui l'a
+fait naître.
 
 ## Synthèse des sept protocoles
 
@@ -308,8 +343,8 @@ dans une même phrase, évoqués comme risque par l'avisor) n'ont pas encore
 |---|---|---|---|---|---|---|
 | | P1 | P2 | P3 | P4 | P5 | P6 | P7 (segmentation + rôle) |
 |---|---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | non chiffrée sur l'ensemble (à faire) |
-| Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **100 % (45/45) avec règle de repli, 91 % sans** |
+| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | **49 % (26/53) — problème non résolu** |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **91 % (41/45), 4 signalées ambiguës plutôt que devinées** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
