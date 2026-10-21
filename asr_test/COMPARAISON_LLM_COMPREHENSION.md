@@ -124,12 +124,53 @@ clairement pas une option : soit un modèle intermédiaire reste à tester
 changerait la conclusion), soit la voie "petit modèle local" est à écarter
 au profit d'un LLM nettement plus capable, avec le coût que cela implique.
 
-## Synthèse des quatre protocoles
+## Protocole 5 — modèles 7-9B déjà présents localement (Ollama, gratuit, zéro téléchargement)
 
-| | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local) |
-|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie |
-| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** |
+Suite au protocole 4 (petit modèle 1,5 milliard de paramètres, échec total), question
+restée ouverte : un modèle local **de taille intermédiaire** (7-9B, toujours gratuit
+et déployable sans API payante) ferait-il mieux ? Trois modèles déjà présents sur la
+machine de développement via Ollama ont été testés sur les 2 mêmes phrases de contrôle
+que le protocole 4, avec le glossaire complet du protocole 1 :
+
+| Modèle | Phrase 1 (3 moutons, 250 000 F CFA attendu) | Phrase 2 (capital 50 000 F CFA attendu) |
+|---|---|---|
+| `llama3:8b` | quantité 30 (faux), montant 750 F CFA (faux) | intention correcte, montant 5 000 (faux) |
+| `mistral:7b` | quantité 3 (correct), montant 75 F CFA (faux) | intention **fausse** ("consultation") |
+| `gemma2:9b` | **timeout à 180 s, aucune réponse** | non testé |
+
+Aucun des trois ne calcule le montant correctement. Un second essai avec un prompt
+**few-shot** (3 exemples entièrement résolus ajoutés à la consigne, montrant
+explicitement le calcul doromee→F CFA et la multiplication par "waa") a été fait sur
+`mistral:7b` et `llama3:8b` :
+
+| Modèle | Phrase 1 | Phrase 2 |
+|---|---|---|
+| `mistral:7b` | produit et quantité désormais corrects, montant toujours faux (250 F CFA au lieu de 250 000 — facteur ×1000 manquant) | intention désormais correcte, montant faux (100 000 au lieu de 50 000, ×2) |
+| `llama3:8b` | produit et quantité corrects, montant toujours faux (750 F CFA au lieu de 250 000) | intention correcte, montant faux (25 000 au lieu de 50 000, ×2 — valeur qui correspond exactement à l'exemple fourni dans le prompt, signe d'un recopiage de l'exemple plutôt que d'un recalcul) |
+
+**Découverte notable en creusant l'échec de la phrase 1** : le corpus réel contient deux
+orthographes du même mot pour le même sens (confirmé dans
+`asr_test/corpus/phrases_reelles.csv`) — "n ye saga saba feere **wa** bi duuru" (P02) et
+"n ye saga saba feere **waa** bi duuru" (P02b), prononcées par des locutrices
+différentes mais toutes deux annotées pour le même montant (250 000 F CFA). Le grand
+LLM des protocoles 1-3 a géré cette variance orthographique sans erreur (100 %/96 % de
+montants exacts, toutes variantes confondues) ; les modèles locaux 7-9B échouent
+spécifiquement sur la forme courte "wa", qu'ils ne relient pas de façon fiable à la
+règle "waa=1000" du glossaire.
+
+**Conclusion du protocole 5** : le few-shot améliore l'extraction du produit, de la
+quantité et de l'intention, mais ne corrige pas l'arithmétique — les erreurs
+restantes sont idiosyncratiques (facteur manquant, valeur recopiée d'un exemple,
+sensibilité à l'orthographe) plutôt qu'un bug unique et corrigeable comme celui trouvé
+au protocole 2. Les modèles 7-9B génériques gratuits testés ici ne sont, à ce stade,
+pas fiables pour cette tâche précise, few-shot ou non.
+
+## Synthèse des cinq protocoles
+
+| | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local 1,5B) | P5 (modèles locaux 7-9B) |
+|---|---|---|---|---|---|
+| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais, améliorée par le few-shot |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
@@ -144,25 +185,32 @@ comme le fait déjà `montants.py` pour le moteur actuel. Combiner les deux
 conversion monétaire finale) reste l'architecture la plus sûre — exactement
 ce que proposait `Communications/instructions.docx` dès le premier document.
 
-Mais le protocole 4 ajoute une réserve de taille : cette conclusion ne vaut
-que pour un modèle **puissant**. Un modèle réellement gratuit et déployable
-localement (1,5 milliard de paramètres) échoue totalement à la même tâche,
-glossaire fourni ou non, et invente du contenu plutôt que de signaler une
-incertitude. La décision d'architecture ne peut donc pas encore être prise :
-il manque la preuve qu'un modèle à la fois capable ET réellement abordable
-existe entre ces deux extrêmes.
+Mais les protocoles 4 et 5 ajoutent une réserve de taille : cette conclusion ne
+vaut que pour un modèle **puissant**. Aucun modèle réellement gratuit et
+déployable localement testé à ce jour — ni un petit modèle (1,5 milliard de
+paramètres, protocole 4), ni trois modèles de taille intermédiaire (7-9
+milliards, protocole 5, few-shot inclus) — ne réussit la même tâche de façon
+fiable. Le petit modèle invente du contenu ; les modèles 7-9B se trompent sur
+les montants de façon différente à chaque essai. La décision d'architecture
+ne peut donc pas encore être prise : il manque la preuve qu'un modèle à la
+fois capable ET réellement abordable existe entre ces deux extrêmes — les
+options restantes sont soit un LLM nettement plus capable (coût d'API
+payante), soit déléguer le calcul des montants à un analyseur déterministe
+(ce que fait déjà `montants.py` pour le moteur actuel) en ne confiant au LLM
+que l'intention et les entités.
 
-## Ce que ces quatre protocoles ne mesurent toujours pas
+## Ce que ces cinq protocoles ne mesurent toujours pas
 
 - La compréhension de **phrases réellement inédites** (ces 53 phrases, même
   en aveugle pour le modèle, restent celles du corpus existant).
 - Les **conversations à plusieurs tours** (mémoire, corrections, changement
   d'avis en cours de phrase).
 - La **compréhension de l'audio réel** (ASR + bruit + hésitations), ces
-  quatre protocoles ne testant que du texte déjà transcrit sans erreur.
-- Un modèle **de taille intermédiaire** entre un LLM généraliste puissant
-  (protocoles 1-3) et un modèle local de 1,5 milliard de paramètres
-  (protocole 4, qui échoue totalement) : ni testé, ni écarté à ce jour.
+  cinq protocoles ne testant que du texte déjà transcrit sans erreur.
+- Un modèle **payant mais pas le plus cher** (ex. 7B-70B via une API
+  hébergée) : le protocole 5 montre que la taille seule (7-9B) ne suffit pas
+  en local ; reste à savoir si la même taille de modèle, via une API mieux
+  optimisée, ferait mieux — non testé faute de crédits disponibles.
 
 ## Désaccords à faire trancher par une personne bambaraphone
 
