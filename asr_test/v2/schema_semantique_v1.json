@@ -1,24 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "ngoni-nana://schema_semantique/1.0.0",
+  "$id": "ngoni-nana://schema_semantique/1.1.0",
   "title": "N'GONI NANA V2 — schéma sémantique d'une phrase comptable",
-  "description": "Sortie attendue du composant de compréhension sémantique (LLM), après segmentation numérique déterministe (montants.extraire_groupes) et avant validation métier/calcul. Aucun champ monétaire final n'est calculé par le LLM : montant_fcfa est renseigné par le système après validation, jamais déduit par le modèle. Voir asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md pour les combinaisons domaine/operation valides et leurs effets.",
+  "description": "Sortie attendue du composant de compréhension sémantique (LLM), après segmentation numérique déterministe (montants.extraire_groupes) et avant validation métier/calcul. Aucun champ monétaire final n'est calculé par le LLM : montant_fcfa est renseigné par le système après validation, jamais déduit par le modèle. Voir asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md pour les combinaisons domaine/operation valides et leurs effets. Certaines règles (référence de groupe numérique existante) ne sont pas exprimables en JSON Schema seul : voir asr_test/scripts/valider_semantique.py pour le validateur applicatif complémentaire.",
   "type": "object",
   "required": ["schema_version", "domaine", "operation", "groupes_numeriques", "informations_manquantes", "action_proposee", "confirmation_requise"],
   "properties": {
     "schema_version": {
-      "const": "1.0.0",
-      "description": "Toute modification de structure (ajout/retrait/renommage de champ, nouvelle valeur d'enum) doit incrémenter cette version, pas la modifier silencieusement."
+      "const": "1.1.0",
+      "description": "Toute modification de structure (ajout/retrait/renommage de champ, nouvelle valeur d'enum) doit incrémenter cette version, pas la modifier silencieusement. 1.1.0 : ajoute dette_client/dette_fournisseur (remplace l'ancien domaine générique 'dette', incohérent avec la catégorie 'dette_client' déjà utilisée dans asr_test/corpus/phrases_reelles.csv), ajoute l'effet definir_capital_initial, ajoute les règles de combinaison domaine/operation."
     },
     "domaine": {
       "type": "string",
-      "enum": ["vente", "achat", "dette", "stock", "capital", "depense", "consultation", "inconnu"],
-      "description": "Sujet métier de la phrase. 'consultation' ici signifie une question générique non rattachée à un domaine précis (ex. 'combien j'ai vendu ce mois ?') ; une question sur un domaine précis (ex. 'combien Mariam me doit ?') garde ce domaine (dette) avec operation='consultation'."
+      "enum": ["vente", "achat", "dette_client", "dette_fournisseur", "stock", "capital", "depense", "consultation", "inconnu"],
+      "description": "Sujet métier de la phrase. 'dette_client' = argent dû À la commerçante (créance) ; 'dette_fournisseur' = argent dû PAR la commerçante (dette) — distinction ajoutée suite à la relecture (scénario G3, remboursement par la commerçante elle-même à son fournisseur, direction inverse de G1/G2). 'dette_fournisseur' correspond à un cas d'usage non encore confirmé par une locutrice (voir moteur/base_donnees.py:183, 'Dettes fournisseurs' absent de phrases_reelles.csv à ce jour) : le schéma le prévoit, mais aucune donnée réelle ne le valide encore. 'consultation' ici signifie une question générique non rattachée à un domaine précis (ex. 'combien j'ai vendu ce mois ?') ; une question sur un domaine précis (ex. 'combien Mariam me doit ?') garde ce domaine (dette_client) avec operation='consultation'."
     },
     "operation": {
       "type": "string",
       "enum": ["creation", "remboursement", "augmentation", "diminution", "consultation", "correction", "inconnue"],
-      "description": "Action précise sur le domaine. Distingue notamment une dette nouvellement créée (creation) d'un remboursement (remboursement, qui diminue la créance) — voir le référentiel pour chaque combinaison domaine/operation valide."
+      "description": "Action précise sur le domaine. Combinaisons valides listées dans REFERENTIEL_OPERATIONS_COMPTABLES.md et contraintes ci-dessous (allOf) — une combinaison hors de cette liste doit être lue comme domaine='inconnu'/operation='inconnue', jamais déduite par analogie."
     },
     "personne": {
       "type": ["string", "null"],
@@ -30,10 +30,10 @@
     },
     "quantite": {
       "type": ["object", "null"],
-      "description": "Référence à un groupe numérique (voir groupes_numeriques) jouant le rôle de quantité, avec son unité si mentionnée.",
+      "description": "Référence à un groupe numérique (voir groupes_numeriques) jouant le rôle de quantité, avec son unité si mentionnée. ATTENTION : le JSON Schema seul ne vérifie pas que groupe_id existe réellement dans groupes_numeriques — voir valider_semantique.py.",
       "properties": {
         "groupe_id": {"type": "string", "description": "Identifiant du groupe dans groupes_numeriques, ex. 'N1'."},
-        "unite": {"type": ["string", "null"], "description": "Unité de la quantité si mentionnée (sac, mouton, pagne...), jamais déduite si absente."}
+        "unite": {"type": ["string", "null"], "description": "Unité de la quantité si mentionnée (sac, mouton, pagne, kg...), jamais déduite si absente. Pour le domaine 'stock' en particulier : cette unité doit être physique (sac, kg, pièce...), jamais une unité monétaire — voir §5 du référentiel."}
       },
       "required": ["groupe_id"]
     },
@@ -50,18 +50,31 @@
           "role": {
             "type": "string",
             "enum": ["quantite", "montant_total", "prix_unitaire", "autre", "ambigu"],
-            "description": "'ambigu' doit être utilisé plutôt que de deviner — voir confirmation_requise."
+            "description": "'ambigu' doit être utilisé plutôt que de deviner — voir confirmation_requise. Pour le domaine 'stock', un groupe de rôle 'montant_total' sans unité physique associée doit être traité comme suspect par le validateur applicatif (une déclaration de stock en sacs/kg ne doit jamais être enregistrée comme une somme d'argent)."
           }
         }
       }
     },
     "montant": {
       "type": ["object", "null"],
-      "description": "Résultat du calcul déterministe (fait par le système, jamais par le LLM), renseigné après validation du rôle 'montant_total' ou 'prix_unitaire'×'quantite'.",
+      "description": "Résultat du calcul déterministe (fait par le système, jamais par le LLM), renseigné après validation du rôle 'montant_total' ou 'prix_unitaire'×'quantite'. Peut contenir plusieurs montants distincts (prix unitaire ET total dans la même phrase) — voir montants_secondaires.",
       "properties": {
         "montant_brut_dorome": {"type": "integer", "description": "Valeur en dɔrɔmɛ avant conversion, ou en FCFA si unite_monetaire='fcfa_explicite'."},
         "unite_monetaire": {"type": "string", "enum": ["dorome_implicite", "fcfa_explicite"], "description": "'fcfa_explicite' uniquement si le mot FCFA/franc est prononcé ; sinon la convention ×5 s'applique (dorome_implicite)."},
-        "montant_fcfa": {"type": "integer", "description": "Calculé par le système : montant_brut_dorome × 5 si dorome_implicite, tel quel si fcfa_explicite. Jamais calculé par le LLM."}
+        "montant_fcfa": {"type": "integer", "description": "Calculé par le système : montant_brut_dorome × 5 si dorome_implicite, tel quel si fcfa_explicite. Jamais calculé par le LLM."},
+        "montants_secondaires": {
+          "type": "array",
+          "description": "Autres montants présents dans la phrase mais non retenus comme montant_fcfa principal (ex. un prix unitaire quand le total est le montant principal, ou l'inverse). Chaque entrée référence le groupe numérique d'origine.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupe_id": {"type": "string"},
+              "role": {"type": "string", "enum": ["prix_unitaire", "montant_total", "reste_du"]},
+              "montant_fcfa": {"type": "integer"}
+            },
+            "required": ["groupe_id", "role", "montant_fcfa"]
+          }
+        }
       },
       "required": ["montant_brut_dorome", "unite_monetaire", "montant_fcfa"]
     },
@@ -92,8 +105,8 @@
     },
     "effet_comptable_potentiel": {
       "type": ["string", "null"],
-      "enum": ["creer_transaction", "augmenter_creance", "diminuer_creance", "augmenter_capital", "ajuster_stock_plus", "ajuster_stock_moins", "corriger_transaction_existante", "aucun", null],
-      "description": "Effet proposé SI l'opération est confirmée — ne modifie jamais la base comptable directement. Voir REFERENTIEL_OPERATIONS_COMPTABLES.md pour la correspondance domaine/operation -> effet."
+      "enum": ["creer_transaction", "definir_capital_initial", "augmenter_capital", "augmenter_creance", "diminuer_creance", "augmenter_dette_fournisseur", "diminuer_dette_fournisseur", "ajuster_stock_plus", "ajuster_stock_moins", "corriger_transaction_existante", "aucun", null],
+      "description": "Effet proposé SI l'opération est confirmée — ne modifie jamais la base comptable directement. 'definir_capital_initial' REMPLACE la valeur existante (suit moteur/base_donnees.py:declarer_capital_initial) ; 'augmenter_capital' CUMULE (suit ajouter_au_capital) — ne jamais les confondre. Voir REFERENTIEL_OPERATIONS_COMPTABLES.md pour la correspondance domaine/operation -> effet."
     },
     "action_proposee": {
       "type": "string",
@@ -102,7 +115,36 @@
     },
     "confirmation_requise": {
       "type": "boolean",
-      "description": "true dès que informations_manquantes ou ambiguites n'est pas vide, ou que effet_comptable_potentiel modifierait un solde existant (créance, capital, stock)."
+      "description": "true dès que informations_manquantes ou ambiguites n'est pas vide, ou que effet_comptable_potentiel modifierait un solde existant (créance, dette, capital, stock)."
     }
-  }
+  },
+  "allOf": [
+    { "$comment": "operation='consultation' ne doit jamais proposer d'effet comptable (voir evaluer_metriques.py, metrique 8 'fausses confirmations').",
+      "if": {"properties": {"operation": {"const": "consultation"}}},
+      "then": {"properties": {"effet_comptable_potentiel": {"enum": ["aucun", null]}}}
+    },
+    { "if": {"properties": {"domaine": {"const": "vente"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "correction"]}}} },
+    { "if": {"properties": {"domaine": {"const": "achat"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "correction"]}}} },
+    { "if": {"properties": {"domaine": {"const": "depense"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "correction"]}}} },
+    { "if": {"properties": {"domaine": {"const": "dette_client"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "remboursement", "consultation", "correction"]}}} },
+    { "if": {"properties": {"domaine": {"const": "dette_fournisseur"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "remboursement", "consultation", "correction"]}}} },
+    { "if": {"properties": {"domaine": {"const": "capital"}}},
+      "then": {"properties": {"operation": {"enum": ["creation", "augmentation", "consultation"]}}} },
+    { "if": {"properties": {"domaine": {"const": "stock"}}},
+      "then": {"properties": {"operation": {"enum": ["augmentation", "diminution", "consultation"]}}} },
+    { "if": {"properties": {"domaine": {"const": "consultation"}}},
+      "then": {"properties": {"operation": {"const": "consultation"}}} },
+    { "if": {"properties": {"domaine": {"const": "inconnu"}}},
+      "then": {"properties": {"operation": {"const": "inconnue"}}} },
+    { "$comment": "capital/creation remplace (definir_capital_initial) ; capital/augmentation cumule (augmenter_capital) — ne jamais inverser (moteur/base_donnees.py).",
+      "if": {"properties": {"domaine": {"const": "capital"}, "operation": {"const": "creation"}}, "required": ["domaine", "operation"]},
+      "then": {"properties": {"effet_comptable_potentiel": {"enum": ["definir_capital_initial", "aucun", null]}}} },
+    { "if": {"properties": {"domaine": {"const": "capital"}, "operation": {"const": "augmentation"}}, "required": ["domaine", "operation"]},
+      "then": {"properties": {"effet_comptable_potentiel": {"enum": ["augmenter_capital", "aucun", null]}}} }
+  ]
 }

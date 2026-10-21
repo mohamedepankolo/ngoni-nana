@@ -55,13 +55,13 @@ généralisation réelle ; un score sur l'ancien corpus ne la mesure plus
 - **D1.** Une commerçante dit qu'elle a vendu des sacs à un prix unitaire,
   pour un total donné, à une cliente qui lui doit encore une partie de la
   somme (trois montants différents : prix unitaire, total, reste dû).
-- **D2.** Une commerçante dit le prix d'achat et le prix de revente du même
-  article dans la même phrase (ex. "j'ai acheté à X et revendu à Y").
+- **D2.** Une commerçante mentionne, dans la même phrase, à la fois le prix
+  auquel elle a acheté un article et le prix auquel elle l'a revendu.
 
 ## E. Corrections (la commerçante se reprend en cours de phrase ou après coup)
 
-- **E1.** Une commerçante commence à donner un montant puis se corrige pour
-  un montant différent, dans la même phrase ("en fait non, c'est plutôt...").
+- **E1.** Une commerçante commence à donner un montant puis se reprend
+  pour un montant différent, dans la même phrase.
 - **E2.** Une commerçante confirme d'abord une transaction, puis revient
   dessus dans l'échange suivant pour dire qu'elle s'est trompée de produit.
 - **E3.** Une commerçante dit qu'elle s'est trompée de personne (ce n'est
@@ -97,8 +97,8 @@ généralisation réelle ; un score sur l'ancien corpus ne la mesure plus
 ## I. Conversations à plusieurs tours (pas des phrases isolées)
 
 - **I1.** Le système demande le montant manquant (scénario A1) ; la
-  commerçante répond au tour suivant avec juste le chiffre, sans répéter le
-  contexte ("c'est 15 000" par exemple, sans redire "j'ai vendu...").
+  commerçante répond au tour suivant en donnant juste le chiffre, sans
+  répéter le contexte de la phrase précédente.
 - **I2.** Le système demande une confirmation ; la commerçante répond par
   une correction partielle plutôt que oui/non (ex. corrige juste le
   montant, confirme implicitement le reste).
@@ -121,12 +121,49 @@ pour rester cohérent dans tout le dépôt (`a_valider`/`validee`/`variante`/
 |---|---|
 | `id` | Identifiant unique de la ligne (ex. P8-A1-001) |
 | `scenario_id` | Renvoie à la section de ce document (ex. "A1") |
-| `locuteur_id` | Identifiant anonymisé de la locutrice (ex. L04, L05 — nouveaux identifiants, distincts de L01-L03 du corpus existant) |
+| `conversation_id` | Identifiant du dialogue complet (plusieurs lignes peuvent partager le même, voir `tour_id`) — nécessaire même pour un scénario à un seul tour, pour garder une clé stable |
+| `tour_id` | Numéro du tour dans la conversation (1, 2, 3...) — 1 pour tout scénario A-K à tour unique ; >1 uniquement pour les scénarios I (dialogues à plusieurs tours) |
+| `locuteur_id` | Identifiant anonymisé de la locutrice (ex. L04, L05 — nouveaux identifiants, distincts de L01-L03 du corpus existant). **Séparation requise à l'évaluation** : un même scénario reformulé par 2 locutrices ne doit jamais être réparti entre l'entraînement/l'ajustement de prompt d'un côté et l'évaluation de l'autre — garder toutes les variantes d'une même locutrice ensemble, pour éviter une fuite d'information entre variantes similaires (risque déjà identifié : les variantes a/b/c du corpus existant sont les mêmes 3 locutrices redites, voir `AUDIT_PROTOCOLES_1_A_7.md` §2). |
 | `texte_bambara` | La formulation telle que dite/écrite par la locutrice — jamais pré-remplie par l'équipe technique |
 | `sens_fr` | Reformulation française de ce qu'elle vient de dire, pour audit humain |
 | `domaine_attendu` / `operation_attendue` | Valeurs du schéma `schema_semantique_v1.json` que LA LOCUTRICE elle-même confirme, pas une déduction technique |
+| `sens_mouvement_financier` | Direction de l'effet si confirmé (ex. `augmente_creance`, `diminue_dette_fournisseur`, `definir_capital`, `aucun`...) — distinct de `effet_comptable_attendu` : ce champ dit la DIRECTION attendue par la locutrice elle-même, l'autre dit le nom technique exact de l'effet du schéma |
+| `montants_multiples_attendus` | JSON (liste) décrivant les montants secondaires si plusieurs sont mentionnés (ex. prix unitaire ET total) — `[]` si un seul montant, format : `[{"role": "prix_unitaire", "montant_fcfa": 2500}]` |
+| `effet_comptable_attendu` | Valeur exacte de `effet_comptable_potentiel` attendue (`schema_semantique_v1.json`) — `aucun` pour toute consultation |
 | `ambiguite_attendue` | "non", ou une description courte de l'ambiguïté volontaire du scénario (ex. "oui - montant manquant") |
 | `statut_validation` | `a_valider` par défaut ; passe à `validee` seulement après relecture explicite |
+| `notes_locutrice` | Remarques libres de la locutrice (ex. "cette formulation serait inhabituelle à l'oral", "je dirais plutôt...") — données de provenance, jamais supprimées même après validation |
+| `date_validation` | Quand `statut_validation` est passé à `validee` — traçabilité de la provenance et de la validation humaine (demandé en relecture) |
+
+## J. Dette fournisseur (ajouté après relecture — distinction client/fournisseur, voir REFERENTIEL_OPERATIONS_COMPTABLES.md §1)
+
+- **J1.** Une commerçante dit qu'elle doit de l'argent à son fournisseur
+  (nouvelle dette, pas un remboursement) — distinct de G3 qui ne couvrait
+  que le remboursement, pas la création de cette dette.
+- **J2.** Une commerçante demande combien elle doit au total à ses
+  fournisseurs.
+
+## K. Domaines combinés dans une même phrase
+
+- **K1.** Une commerçante dit qu'elle a vendu un article à crédit (la vente
+  et la dette du client naissent dans le même énoncé, pas en deux temps).
+- **K2.** Une commerçante dit qu'elle a payé un fournisseur en utilisant une
+  partie de son capital (dépense et capital mentionnés ensemble).
+
+## Bilan de couverture (après relecture)
+
+**25 scénarios au total** (A1-K2), répartis sur 10 familles de situations.
+C'est un socle de départ pour une première collecte, pas un corpus visé à
+l'avance comme "complet" — le nombre de scénarios doit croître si la
+collecte révèle des situations non anticipées, pas être gonflé
+artificiellement avant d'avoir recueilli de vraies formulations. Familles
+couvertes : montant manquant, quantité seule, prix unitaire vs total,
+montants multiples, corrections, négations, remboursements (créance et
+dette fournisseur), consultations, dialogues à plusieurs tours, domaines
+combinés. Familles identifiées mais volontairement non ajoutées sans
+données réelles : montants exprimés dans une devise ou unité non standard,
+erreurs de transcription ASR (hors scope du protocole 8, qui travaille sur
+texte déjà transcrit comme les protocoles 1-7).
 
 ## Ce que ce document ne couvre pas encore
 

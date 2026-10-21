@@ -16,15 +16,19 @@ sémantique — jamais déduite par analogie.
 | achat | correction | `corriger_transaction_existante` | idem vente/correction | — |
 | depense | creation | `creer_transaction` | montant | produit, personne (souvent absents, ex. "dépensé 1000 pour l'électricité") |
 | depense | correction | `corriger_transaction_existante` | idem | — |
-| dette | creation | `augmenter_creance` | montant, personne | produit |
-| dette | remboursement | `diminuer_creance` | montant, personne | produit |
-| dette | consultation | `aucun` | personne (ou absente si question générique "qui me doit de l'argent ?") | montant (c'est la question) |
-| dette | correction | `corriger_transaction_existante` | personne, référence à la transaction | — |
-| capital | creation | `aucun` — **nécessite une règle métier explicite, voir §2** | montant | — |
-| capital | augmentation | `augmenter_capital` | montant | — |
+| dette_client | creation | `augmenter_creance` | montant, personne | produit |
+| dette_client | remboursement | `diminuer_creance` | montant, personne | produit |
+| dette_client | consultation | `aucun` | personne (ou absente si question générique "qui me doit de l'argent ?") | montant (c'est la question) |
+| dette_client | correction | `corriger_transaction_existante` | personne, référence à la transaction | — |
+| dette_fournisseur | creation | `augmenter_dette_fournisseur` | montant, personne | produit |
+| dette_fournisseur | remboursement | `diminuer_dette_fournisseur` | montant, personne | produit |
+| dette_fournisseur | consultation | `aucun` | personne | montant |
+| dette_fournisseur | correction | `corriger_transaction_existante` | personne, référence à la transaction | — |
+| capital | creation | `definir_capital_initial` — **remplace**, voir §2 | montant | — |
+| capital | augmentation | `augmenter_capital` — **cumule**, voir §2 | montant | — |
 | capital | consultation | `aucun` | — | montant |
-| stock | augmentation | `ajuster_stock_plus` | montant ou quantité, produit | — |
-| stock | diminution | `ajuster_stock_moins` | montant ou quantité, produit | — |
+| stock | augmentation | `ajuster_stock_plus` | **quantité physique** (sac, kg, pièce...), produit | montant financier (voir §3 — une quantité de stock n'est jamais un montant) |
+| stock | diminution | `ajuster_stock_moins` | quantité physique, produit | montant financier |
 | stock | consultation | `aucun` | produit (ou absent si "qu'est-ce qu'il me reste en stock ?") | montant |
 | consultation | consultation | `aucun` | — (dépend de la question : montant total vendu, dette totale...) | — |
 
@@ -33,12 +37,29 @@ sémantique — jamais déduite par analogie.
 
 ## 1. Distinctions explicitement demandées par la mission
 
-- **Dette nouvellement créée vs remboursement** : `dette/creation` augmente
-  la créance (la cliente doit plus) ; `dette/remboursement` la diminue.
-  Le marqueur linguistique n'est pas toujours le verbe seul — "sara" peut
-  signifier payer (dépense) OU rembourser une dette selon le contexte
-  (déjà noté dans `DESACCORDS_LLM_A_VALIDER.md`, motif proche du cas 2).
-  Distinction à trancher par le contexte conversationnel (une dette
+- **Créance client vs dette fournisseur (ajouté après relecture)** : une
+  dette a une **direction**, pas seulement un montant. `dette_client` =
+  argent dû À la commerçante (une créance — son remboursement DIMINUE ce
+  qu'on lui doit). `dette_fournisseur` = argent dû PAR la commerçante (une
+  dette au sens courant — son remboursement DIMINUE ce qu'elle doit, mais
+  ce n'est PAS une créance). Scénario qui a révélé l'ambiguïté : **G3**
+  (`PROTOCOLE_8_SCENARIOS.md`) — une commerçante rembourse son propre
+  fournisseur, direction inverse de G1/G2 (une cliente la rembourse, elle).
+  Aucune opération ne doit diminuer `diminuer_creance` quand c'est en fait
+  `diminuer_dette_fournisseur`, et réciproquement. **Réserve importante** :
+  `dette_fournisseur` n'est pas un cas d'usage confirmé à ce jour — absent
+  de `phrases_reelles.csv`, déjà signalé comme tel dans
+  `moteur/base_donnees.py:calculer_capital` ("Dettes fournisseurs n'a pas
+  encore de table dédiée... à corriger si Fadima confirme ce cas d'usage").
+  Le schéma prévoit la distinction ; son utilité réelle reste à confirmer
+  par une locutrice avant toute implémentation du calcul de capital
+  correspondant.
+- **Dette nouvellement créée vs remboursement** : `dette_client/creation`
+  augmente la créance (la cliente doit plus) ; `dette_client/remboursement`
+  la diminue. Le marqueur linguistique n'est pas toujours le verbe seul —
+  "sara" peut signifier payer (dépense) OU rembourser une dette selon le
+  contexte (déjà noté dans `DESACCORDS_LLM_A_VALIDER.md`, motif proche du
+  cas 2). Distinction à trancher par le contexte conversationnel (une dette
   préexistante connue de ce client augmente la confiance qu'il s'agit d'un
   remboursement), pas par le seul verbe — raison pour laquelle ce
   référentiel ne mappe pas "sara" directement à une opération.
@@ -68,7 +89,20 @@ s'additionne). Le schéma V2 doit reprendre exactement cette distinction
 cohérent avec le moteur à règles déjà en production — pas une question
 ouverte, un précédent à respecter.
 
-## 3. Ce que ce référentiel ne couvre pas encore
+## 3. Stock : quantité physique vs montant financier (ajouté après relecture)
+
+Une phrase de stock (`stock/augmentation`, `stock/diminution`) porte sur une
+**quantité physique** (sacs, kilogrammes, pièces...), jamais sur un montant
+en F CFA — contrairement à `vente`/`achat`/`depense` où le nombre pertinent
+est presque toujours un montant. Le groupe numérique associé doit porter le
+rôle `quantite`, jamais `montant_total`. `valider_semantique.py`
+(`valider_stock_quantite_vs_montant`) signale toute sortie où un domaine
+`stock` n'a aucun groupe `quantite` alors qu'un groupe `montant_total` est
+présent — signe que le système a confondu "il me reste 4 sacs" avec "il me
+reste 4 francs". Testé explicitement dans
+`tests/test_validation_semantique.py`.
+
+## 4. Ce que ce référentiel ne couvre pas encore
 
 - Le mécanisme d'identification d'une transaction existante pour
   `operation: "correction"` (quelle transaction corriger ? par date ? par

@@ -342,8 +342,14 @@ lu comme vente quand le corpus attend achat) et confusion achat/dépense
 moteur à règles) et le flou achat/dépense du corpus (2 cas) — avant d'être
 traités comme des erreurs du LLM. Détail complet dans
 `DESACCORDS_LLM_A_VALIDER.md`. **10 des 18 désaccords ne sont pas de
-nouvelles erreurs.** Score ajusté : **45/53 = 85 %**, bien plus proche des
-94 %/85 % du grand LLM que le 66 % brut ne le suggérait.
+nouvelles erreurs.** Correction suite à relecture (`asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md`,
+§1.1) : ce n'est pas une "exclusion" (qui réduirait le dénominateur à 43)
+mais une **reclassification** à dénominateur inchangé (53) — les deux
+lectures possibles sont **45/53 = 84,9 %** (reclassification) ou
+**35/43 = 81,4 %** (exclusion stricte du corpus mesuré). Aucune des deux
+n'est une borne garantie tant que les 8 désaccords vraiment nouveaux ne sont
+pas arbitrés par une locutrice — la fourchette honnête est 66 %-85 %, pas un
+chiffre unique.
 
 Il reste 8 vrais nouveaux désaccords, regroupés en 3 motifs précis (détail et
 phrases exactes dans `DESACCORDS_LLM_A_VALIDER.md`) :
@@ -358,7 +364,7 @@ phrases exactes dans `DESACCORDS_LLM_A_VALIDER.md`) :
 
 **Conclusion sur l'intention** : séparer les tâches est la bonne direction,
 et l'écart réel avec le grand LLM est plus restreint que le 66 % brut ne le
-suggérait (85 % ajusté). Le problème le plus clairement attribuable à
+suggérait (66 %-85 % selon la lecture, voir audit). Le problème le plus clairement attribuable à
 `mistral:7b` lui-même, pas à une ambiguïté du corpus, est la gestion des
 questions (motif B) — une piste de correction plus ciblée que "le modèle ne
 comprend pas le bambara".
@@ -394,7 +400,7 @@ fait naître.
 |---|---|---|---|---|---|---|
 | | P1 | P2 | P3 | P4 | P5 | P6 | P7 (segmentation + rôle) |
 |---|---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | 66 % brut, **85 % ajusté** (après exclusion des désaccords déjà connus) |
+| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | 66 % brut, **81-85 % selon la lecture** (reclassification des désaccords déjà connus, pas une exclusion — voir `asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md` §1.1) |
 | Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **91 % (41/45), 4 signalées ambiguës plutôt que devinées** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).

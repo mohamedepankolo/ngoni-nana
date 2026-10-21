@@ -54,10 +54,18 @@ même appel) reste la meilleure sur un corpus **indépendant**.
 | Composant | Fichier | État |
 |---|---|---|
 | Segmentation numérique déterministe | `asr_test/scripts/montants.py` (`extraire_groupes`) | Validé contre `REFERENTIEL_NOMBRES_BAMBARA_A_VALIDER.md`, testé (`tests/test_montants.py`) |
-| Schéma de sortie sémantique versionné | `asr_test/v2/schema_semantique_v1.json` | V1.0.0, validé syntaxiquement (JSON Schema draft 2020-12) + 1 exemple concret |
-| Référentiel domaine/opération → effet | `asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md` | Cohérent avec le moteur V1 en production (capital creation/augmentation) |
-| Évaluateur à 9 métriques | `asr_test/scripts/evaluer_metriques.py` | Code vérifié (`--smoke`, 3 cas synthétiques) ; **pas encore exécuté sur de vraies données**, le corpus protocole 8 n'existe pas encore |
-| Scénarios pour un corpus indépendant | `asr_test/v2/PROTOCOLE_8_SCENARIOS.md` + gabarit CSV | Scénarios en français prêts, formulations bambara à recueillir aucune n'existe encore |
+| Schéma de sortie sémantique versionné | `asr_test/v2/schema_semantique_v1.json` | **V1.1.0** (voir historique de version dans le fichier), validé syntaxiquement (JSON Schema draft 2020-12), règles métier domaine/opération encodées (`allOf`/`if`/`then`), + exemples positifs/négatifs testés |
+| Référentiel domaine/opération → effet | `asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md` | Cohérent avec le moteur V1 en production (capital creation=remplace/augmentation=cumule) ; distingue désormais créance client et dette fournisseur (direction) ; distingue stock (quantité physique) de montant financier |
+| Validateur applicatif (complète le JSON Schema) | `asr_test/scripts/valider_semantique.py` | Vérifie les références de groupes numériques et la cohérence stock/quantité — non exprimables en JSON Schema seul. Testé (`tests/test_validation_semantique.py`, 6 cas de sécurité) |
+| Évaluateur à 9+ métriques | `asr_test/scripts/evaluer_metriques.py` | Inclut désormais la vérification de l'effet comptable, des montants multiples, et la conformité au schéma/référentiel via `valider_semantique`. Code vérifié (`--smoke`, 3 cas synthétiques, 6 assertions) ; **pas encore exécuté sur de vraies données**, le corpus protocole 8 n'existe pas encore |
+| Scénarios pour un corpus indépendant | `asr_test/v2/PROTOCOLE_8_SCENARIOS.md` + gabarit CSV | 25 scénarios en français (10 familles), gabarit enrichi (direction du mouvement financier, montants multiples, conversation/tour, provenance). Formulations bambara à recueillir, aucune n'existe encore |
+
+**Règle méthodologique pour toute évaluation future (ajoutée après relecture)** :
+séparer strictement par locutrice lors de l'évaluation — ne jamais répartir
+les variantes d'une même locutrice entre ajustement de prompt et mesure de
+performance, pour éviter une fuite d'information (risque déjà identifié sur
+le corpus existant, où les variantes a/b/c sont les 3 mêmes locutrices
+redites, voir `AUDIT_PROTOCOLES_1_A_7.md` §2).
 
 ## Ce qui n'est PAS encore construit
 

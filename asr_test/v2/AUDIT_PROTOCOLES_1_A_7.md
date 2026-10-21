@@ -16,12 +16,40 @@ clés se reproduisent à l'identique :
 | Protocole 6 (LLM calcule lui-même) : 6/45 — 13,3 % | `resultats_hybrides.jsonl` | 6/45 — 13,3 % | aucun |
 | Protocole 7 (segmentation + rôles, règle sûre) : 41/45 — 91,1 %, 4 ambiguës | `resultats_segmentes.jsonl` | 41/45 — 91,1 %, 4 ambiguës | aucun |
 | Intention isolée (`mistral:7b`) brut : 35/53 — 66,0 % | `resultats_intention_seule.jsonl` | 35/53 — 66,0 % | aucun |
-| Intention isolée ajusté : 45/53 — 84,9 % | idem, + exclusion des désaccords déjà connus | 45/53 — 84,9 % | aucun |
+| Intention isolée "ajusté" : 45/53 — 84,9 % | idem, **reclassification**, pas exclusion — voir correction ci-dessous | 45/53 — 84,9 % | **terminologie corrigée, voir §1.1** |
 | Intention isolée (`gemma2:9b`) brut/ajusté : 24/53 — 45,3 % / 34/53 — 64,2 % | `resultats_intention_gemma2.jsonl` | identique | aucun |
 
 **Aucun écart trouvé.** Script de vérification utilisé : recalcul direct en
 Python à partir des JSONL + du CSV de référence (pas de relecture du texte
 narratif). Reproductible par quiconque avec les fichiers du dépôt.
+
+### 1.1 Correction : le "score ajusté" de 85 % était mal nommé, pas mal calculé
+
+Relecture reçue, à juste titre : "une exclusion de dix exemples donnerait un
+dénominateur de 43, pas 53." Vérification faite — **le calcul n'excluait
+pas ces 10 cas, il les reclassait** de "nouvel échec" à "désaccord déjà
+connu", tout en gardant le dénominateur à 53. Le mot "exclusion" employé
+dans `COMPARAISON_LLM_COMPREHENSION.md` était donc trompeur : il suggérait
+un dénominateur réduit alors que le calcul réel en gardait un autre. Les
+deux lectures possibles, désormais présentées **toutes les deux** plutôt
+qu'une seule :
+
+| Lecture | Calcul | Résultat |
+|---|---|---|
+| **Reclassification** (dénominateur inchangé) : les 10 cas déjà connus ne comptent plus comme un nouvel échec, mais restent dans le corpus mesuré | (35 corrects + 10 reclassés) / 53 | **45/53 = 84,9 %** |
+| **Exclusion stricte** (dénominateur réduit) : les 10 cas déjà connus sont retirés du corpus mesuré | 35 corrects / (53 − 10) | **35/43 = 81,4 %** |
+
+Les deux nombres sont proches (81-85 %) et le choix entre les deux ne change
+pas la conclusion qualitative (l'écart réel avec le grand LLM est plus
+restreint que le 66 % brut ne le suggérait). **Ni l'un ni l'autre ne doit
+être présenté comme une performance générale validée ou une borne
+inférieure garantie** : les 8 désaccords "vraiment nouveaux" (motifs A/B/C,
+`DESACCORDS_LLM_A_VALIDER.md`) ne sont pas encore arbitrés par une
+locutrice native — ils pourraient confirmer que le LLM a tort (le score
+réel serait alors plus proche de 66 %) ou que le corpus est ambigu/mal
+annoté sur ces cas (le score réel serait alors plus proche de 85 %). Tant
+que l'arbitrage n'est pas fait, la fourchette honnête est **66 %-85 %**, pas
+un chiffre unique.
 
 ## 2. Qualité et limites du corpus de référence
 

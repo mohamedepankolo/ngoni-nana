@@ -29,6 +29,8 @@ import sys
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+sys.path.insert(0, str(BASE))
+from valider_semantique import valider as valider_contre_schema  # noqa: E402
 
 
 def _normalise(valeur):
@@ -102,6 +104,35 @@ def comparer(attendu: dict, obtenu: dict) -> dict:
         or (obtenu.get("action_proposee") == "repondre_directement" and obtenu.get("confirmation_requise"))
     )
 
+    # Effet comptable : compare au référentiel (asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md),
+    # pas seulement à une égalité de chaîne — passe par le même validateur
+    # applicatif que la production utiliserait, pour que ce fichier ne
+    # dérive jamais du schéma/référentiel sans le détecter.
+    effet_attendu = attendu.get("effet_comptable_attendu")
+    r["effet_comptable_correct"] = _champ_correct(effet_attendu, obtenu.get("effet_comptable_potentiel"))
+
+    # Montants multiples (prix unitaire + total, reste dû...) : verification
+    # legere du nombre de montants secondaires attendus vs obtenus (pas
+    # encore une comparaison champ a champ, le format du gabarit est recent).
+    multiples_attendus_brut = attendu.get("montants_multiples_attendus")
+    try:
+        multiples_attendus = json.loads(multiples_attendus_brut) if multiples_attendus_brut else []
+    except (json.JSONDecodeError, TypeError):
+        multiples_attendus = []
+    multiples_obtenus = (obtenu.get("montant") or {}).get("montants_secondaires") or []
+    if multiples_attendus:
+        r["montants_multiples_corrects"] = len(multiples_obtenus) == len(multiples_attendus)
+    else:
+        r["montants_multiples_corrects"] = len(multiples_obtenus) == 0
+
+    # Coherence schema/referentiel : la sortie modele elle-meme doit passer
+    # le validateur applicatif (schema_semantique_v1.json + regles metier).
+    # Une sortie qui echoue ici est un bug de coherence, pas une erreur de
+    # contenu — compte a part dans le bilan (8_taux_fausses_confirmations
+    # couvre deja une partie de ces cas, mais celui-ci est plus large).
+    r["erreurs_validation_schema"] = valider_contre_schema(obtenu)
+    r["conforme_au_schema"] = len(r["erreurs_validation_schema"]) == 0
+
     r["duree_s"] = obtenu.get("duree_s")
     return r
 
@@ -130,6 +161,9 @@ def agreger(resultats: list[dict]) -> dict:
         "8_taux_fausses_confirmations": taux("fausse_confirmation"),
         "9_duree_s_mediane": statistics.median(durees) if durees else None,
         "9_duree_s_moyenne": statistics.mean(durees) if durees else None,
+        "effet_comptable_correct": taux("effet_comptable_correct"),
+        "montants_multiples_corrects": taux("montants_multiples_corrects"),
+        "conforme_au_schema": taux("conforme_au_schema"),
     }
 
 
@@ -156,14 +190,16 @@ def _smoke():
     vérifier que comparer()/agreger() calculent ce qu'ils doivent).
     """
     cas = [
-        # Cas 1 : tout correct.
+        # Cas 1 : tout correct, y compris l'effet comptable et l'absence de montant secondaire.
         (
             {"domaine_attendu": "vente", "operation_attendue": "creation", "produit_attendu": "riz",
              "personne_attendu": "", "quantite_attendue": "3", "montant_fcfa_attendu": "15000",
+             "montants_multiples_attendus": "[]", "effet_comptable_attendu": "creer_transaction",
              "ambiguite_attendue": "non"},
-            {"domaine": "vente", "operation": "creation", "produit": "riz", "personne": None,
-             "groupes_numeriques": [{"id": "N1", "role": "quantite", "valeur_dorome": 3}],
-             "montant": {"montant_fcfa": 15000}, "confirmation_requise": True,
+            {"schema_version": "1.1.0", "domaine": "vente", "operation": "creation", "produit": "riz", "personne": None,
+             "groupes_numeriques": [{"id": "N1", "texte": "saba", "valeur_dorome": 3, "role": "quantite"}],
+             "montant": {"montant_brut_dorome": 3000, "unite_monetaire": "dorome_implicite", "montant_fcfa": 15000},
+             "confirmation_requise": True,
              "informations_manquantes": [], "ambiguites": [], "effet_comptable_potentiel": "creer_transaction",
              "action_proposee": "demander_confirmation"},
         ),
@@ -171,19 +207,22 @@ def _smoke():
         (
             {"domaine_attendu": "vente", "operation_attendue": "creation", "produit_attendu": "riz",
              "personne_attendu": "", "quantite_attendue": "3", "montant_fcfa_attendu": "",
+             "montants_multiples_attendus": "[]", "effet_comptable_attendu": "aucun",
              "ambiguite_attendue": "oui - montant manquant"},
-            {"domaine": "vente", "operation": "creation", "produit": "riz", "personne": None,
-             "groupes_numeriques": [{"id": "N1", "role": "quantite", "valeur_dorome": 3}],
+            {"schema_version": "1.1.0", "domaine": "vente", "operation": "creation", "produit": "riz", "personne": None,
+             "groupes_numeriques": [{"id": "N1", "texte": "saba", "valeur_dorome": 3, "role": "quantite"}],
              "montant": None, "confirmation_requise": True,
-             "informations_manquantes": ["montant"], "ambiguites": [], "effet_comptable_potentiel": None,
+             "informations_manquantes": ["montant"], "ambiguites": [], "effet_comptable_potentiel": "aucun",
              "action_proposee": "demander_montant"},
         ),
-        # Cas 3 : bug grave - effet propose sur une simple consultation.
+        # Cas 3 : bug grave - effet propose sur une simple consultation (doit etre rejete par le schema ET l'evaluateur).
         (
             {"domaine_attendu": "consultation", "operation_attendue": "consultation", "produit_attendu": "",
              "personne_attendu": "Mariam", "quantite_attendue": "", "montant_fcfa_attendu": "",
+             "montants_multiples_attendus": "[]", "effet_comptable_attendu": "aucun",
              "ambiguite_attendue": "non"},
-            {"domaine": "consultation", "operation": "consultation", "produit": None, "personne": "Mariam",
+            {"schema_version": "1.1.0", "domaine": "consultation", "operation": "consultation", "produit": None,
+             "personne": "Mariam",
              "groupes_numeriques": [], "montant": None, "confirmation_requise": False,
              "informations_manquantes": [], "ambiguites": [], "effet_comptable_potentiel": "augmenter_creance",
              "action_proposee": "repondre_directement"},
@@ -193,9 +232,12 @@ def _smoke():
     bilan = agreger(resultats)
     print(json.dumps(bilan, ensure_ascii=False, indent=2))
     assert resultats[0]["transaction_entierement_correcte"] is True
+    assert resultats[0]["effet_comptable_correct"] is True
+    assert resultats[0]["conforme_au_schema"] is True, resultats[0]["erreurs_validation_schema"]
     assert resultats[1]["ambiguite_bien_detectee"] is True and resultats[1]["faux_negatif_ambiguite"] is False
     assert resultats[2]["fausse_confirmation"] is True, "le cas 3 doit detecter l'effet propose sur une consultation"
-    print("Smoke test OK (3/3 assertions)")
+    assert resultats[2]["conforme_au_schema"] is False, "le cas 3 doit aussi echouer la validation schema (coherence)"
+    print("Smoke test OK (6/6 assertions)")
 
 
 def main():
