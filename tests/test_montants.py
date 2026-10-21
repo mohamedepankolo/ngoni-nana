@@ -22,6 +22,13 @@ from montants import extraire_nombres, nombre_principal, normaliser  # noqa: E40
     ("dɔrɔmɛ waa saba", [3000]),
     ("bi saba ni seegin", [38]),
     ("mugan", [20]),
+    # Portée de "waa" sur un groupe dizaine+unité relié par "ni" : validée
+    # dans asr_test/REFERENTIEL_NOMBRES_BAMBARA_A_VALIDER.md (waa porte sur
+    # tout le groupe, pas seulement sur la dizaine). Cas central qui a fait
+    # échouer tous les LLM testés (protocoles 2 et 5).
+    ("waa mugan ni duuru", [25000]),
+    ("waa kelen ni kɛmɛ duuru", [1500]),
+    ("waa tan", [10000]),
 ])
 def test_nombres(texte, attendu):
     assert extraire_nombres(texte) == attendu
