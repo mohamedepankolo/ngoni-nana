@@ -363,6 +363,16 @@ suggérait (85 % ajusté). Le problème le plus clairement attribuable à
 questions (motif B) — une piste de correction plus ciblée que "le modèle ne
 comprend pas le bambara".
 
+**Un modèle local plus gros ne fait pas mieux.** `mistral-tdr-biais:latest`
+(déjà présent sur la machine) écarté après vérification : c'est un
+fine-tune pour détecter des biais dans des appels d'offres publics
+burkinabè, sans rapport avec le bambara ou la comptabilité. `gemma2:9b`
+(9 milliards de paramètres, plus gros que `mistral:7b`) testé sur la même
+tâche d'intention seule : **45 % brut, 64 % ajusté — moins bien que
+`mistral:7b` sur les deux mesures**, malgré une taille supérieure. Confirme
+qu'il ne s'agit pas simplement d'une question de taille de modèle :
+`mistral:7b` reste le meilleur candidat local gratuit testé à ce jour.
+
 **Conclusion générale du protocole 7, révisée** : l'architecture
 "segmentation déterministe + LLM pour les rôles" résout bien le problème des
 montants (13 %→91 %, sans invention grâce au signalement d'ambiguïté). Mais
