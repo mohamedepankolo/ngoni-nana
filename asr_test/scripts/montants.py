@@ -163,28 +163,52 @@ def _detacher_pronom_colle(mot: str) -> list[str] | None:
     return [prefixe] + suite if suite else None
 
 
-def extraire_nombres(texte: str) -> list[int]:
-    """Tous les nombres prononcés (chiffres ou toutes lettres), sans conversion d'unité."""
+def extraire_groupes(texte: str) -> list[dict]:
+    """Groupes numériques complets (texte original, valeur, position), dans
+    l'ordre d'apparition. Un groupe correspond à un nombre entier reconnu par
+    `_nombre` (une suite de termes reliés par "ni"), jamais à un seul mot
+    isolé au milieu d'un groupe plus long — c'est précisément ce qui distingue
+    ce découpage de la troncature observée chez les LLM testés (protocole 6) :
+    "waa mugan ni duuru" est renvoyé comme un seul groupe de valeur 25000,
+    jamais comme "duuru" seul.
+
+    Pensé pour une architecture où un LLM ne fait plus que attribuer un rôle
+    (quantité, montant...) à des groupes déjà délimités de façon déterministe,
+    au lieu de devoir lui-même repérer les frontières du nombre dans le texte.
+    """
+    originaux = texte.split()
     tokens = normaliser(texte).split()
-    nombres = []
+    # Le découpage de mots collés (ex. "biwa") change le nombre de tokens :
+    # dans ce cas, pas de correspondance fiable avec les mots originaux, on
+    # retombe sur la graphie normalisée pour ce groupe plutôt que de planter.
+    alignes = len(originaux) == len(tokens)
+    groupes = []
     i = 0
     while i < len(tokens):
         if tokens[i].isdigit():
-            nombres.append(int(tokens[i]))
+            groupes.append({"texte": originaux[i] if alignes else tokens[i],
+                             "valeur": int(tokens[i]), "debut": i, "fin": i + 1})
             i += 1
             continue
         if tokens[i] not in NUMERAUX:
             morceaux = _detacher_pronom_colle(tokens[i]) or _decouper_mot_colle(tokens[i])
             if morceaux and len(morceaux) > 1:
                 tokens[i:i + 1] = morceaux
+                alignes = False
         if tokens[i] in NUMERAUX:
             valeur, j = _nombre(tokens, i)
             if valeur is not None:
-                nombres.append(valeur)
+                mots = originaux[i:j] if alignes else tokens[i:j]
+                groupes.append({"texte": " ".join(mots), "valeur": valeur, "debut": i, "fin": j})
                 i = j
                 continue
         i += 1
-    return nombres
+    return groupes
+
+
+def extraire_nombres(texte: str) -> list[int]:
+    """Tous les nombres prononcés (chiffres ou toutes lettres), sans conversion d'unité."""
+    return [g["valeur"] for g in extraire_groupes(texte)]
 
 
 def nombre_principal(texte: str) -> int | None:

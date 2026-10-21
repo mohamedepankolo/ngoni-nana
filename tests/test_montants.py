@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "asr_test" / "scripts"))
 
-from montants import extraire_nombres, nombre_principal, normaliser  # noqa: E402
+from montants import extraire_groupes, extraire_nombres, nombre_principal, normaliser  # noqa: E402
 
 
 @pytest.mark.parametrize("texte, attendu", [
@@ -32,6 +32,24 @@ from montants import extraire_nombres, nombre_principal, normaliser  # noqa: E40
 ])
 def test_nombres(texte, attendu):
     assert extraire_nombres(texte) == attendu
+
+
+def test_extraire_groupes_renvoie_le_texte_original_et_la_valeur():
+    # Le groupe du montant ne doit jamais etre tronque au dernier mot (bug
+    # observe chez les LLM testes au protocole 6 : "duuru" au lieu de
+    # "wa bi duuru").
+    groupes = extraire_groupes("n ye saga saba feere wa bi duuru")
+    assert groupes == [
+        {"texte": "saba", "valeur": 3, "debut": 3, "fin": 4},
+        {"texte": "wa bi duuru", "valeur": 50000, "debut": 5, "fin": 8},
+    ]
+
+
+def test_extraire_groupes_exclut_les_mots_non_numeraux():
+    # "juru" (dette) ne doit jamais apparaitre comme un groupe numerique
+    # (bug observe : le LLM recopiait "juru" comme s'il s'agissait du montant).
+    groupes = extraire_groupes("n ka waa fila juru bɛ Awa la")
+    assert groupes == [{"texte": "waa fila", "valeur": 2000, "debut": 2, "fin": 4}]
 
 
 def test_graphies_francisees():

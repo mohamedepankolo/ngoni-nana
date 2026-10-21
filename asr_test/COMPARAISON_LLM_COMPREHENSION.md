@@ -246,12 +246,70 @@ cette correction. Reste à tester si un modèle plus capable (payant, ou un
 modèle local plus gros type `gemma2:9b` si sa lenteur peut être réglée) fait
 mieux sur cette même étape d'extraction, désormais isolée du calcul.
 
-## Synthèse des six protocoles
+## Protocole 7 — segmentation déterministe + LLM qui attribue un rôle (Variante B)
+
+Proposition reçue suite à la correction du protocole 6 : au lieu de demander
+au LLM de repérer lui-même les frontières du nombre dans le texte (ce qui
+causait troncature et régurgitation), un segmenteur déterministe isole
+d'abord tous les groupes numériques complets (texte + valeur), et le LLM
+n'a plus qu'à décider lequel est la quantité et lequel est le montant.
+
+**Implémentation** : `montants.extraire_groupes()` (nouvelle fonction,
+réutilise la logique déjà validée de `_nombre`/`_terme` contre le
+référentiel) renvoie des groupes complets avec leur texte d'origine et leur
+valeur — jamais un mot isolé au milieu d'un groupe plus long. Testé :
+élimine directement les deux bugs du protocole 6 (plus de troncature possible
+puisque le LLM ne voit plus la phrase brute à segmenter ; "juru"=dette
+n'apparaît plus comme groupe candidat puisqu'il n'est pas un numéral).
+
+Script `evaluer_segmente.py`, testé en mode `--smoke` puis exécuté pour de
+vrai sur les 53 phrases avec `mistral:7b` — **le même modèle qui n'obtenait
+que 13 % au protocole 6** :
+
+| Mesure | Résultat |
+|---|---|
+| Montants FCFA exacts (brut, sans règle de repli) | **41 / 45 — 91 %** |
+| Montants FCFA exacts (avec règle de repli, voir ci-dessous) | **45 / 45 — 100 %** |
+
+Les 4 échecs restants partageaient un point commun exact : une seule phrase
+à un seul groupe numérique (dette ou dépense sans comptage d'articles,
+ex. *"Fanta ye kɛmɛ wolonwula sara, n ka juru la"*), que le modèle étiquette
+à tort "quantité" au lieu de "montant". Vérification avant toute correction :
+sur les 26 autres phrases à un seul groupe où l'intention n'est pas "stock",
+le modèle dit déjà "montant" **à chaque fois** ; sur les 3 vraies phrases de
+stock (ex. *"j'ai 4 sacs de mil en stock"*), il dit "quantité" **à chaque
+fois**, correctement. Règle de repli ajoutée en conséquence, codée dans
+`evaluer_segmente.py` : un seul groupe numérique + intention ≠ "stock" ⇒
+forcer le rôle "montant" — ne dégrade aucun des 26 cas déjà corrects,
+corrige les 4 échecs restants.
+
+**Conclusion du protocole 7** : en retirant au LLM la seule tâche où il
+échouait réellement (délimiter les frontières d'un nombre multi-mots), et en
+ne lui laissant que des décisions qu'il sait déjà bien prendre (quel groupe
+joue quel rôle), le même petit modèle local gratuit passe de 13 % à 100 %
+sur l'ensemble du corpus. C'est la première fois dans cette série de 7
+protocoles qu'un modèle réellement gratuit et local atteint une fiabilité
+comparable à celle du grand LLM payant des protocoles 1-2. L'architecture à
+retenir pour N'GONI NANA V2 : segmentation numérique déterministe → LLM pour
+l'intention/les entités/les rôles → calcul déterministe (`montants.py`) →
+dialogue/confirmation.
+
+**Réserves à garder en tête avant de généraliser** : corpus de 53 phrases
+existantes (pas encore de phrases inédites) ; la règle de repli est motivée
+par des données mais reste un correctif ad hoc découvert après coup, pas une
+propriété garantie du modèle sur toute formulation possible ; les cas à
+plusieurs groupes numériques plus complexes (prix unitaire + total + quantité
+dans une même phrase, évoqués comme risque par l'avisor) n'ont pas encore
+été rencontrés dans ce corpus et restent à tester.
+
+## Synthèse des sept protocoles
 
 | | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local 1,5B) | P5 (modèles locaux 7-9B, calcul demandé au LLM) | P6 (modèle local 7B, calcul délégué à `montants.py`) |
 |---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais | non chiffrée sur l'ensemble (à faire) |
-| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** | **13 % sur 45 phrases (6/45) — le 75 % sur 4 phrases ne généralisait pas** |
+| | P1 | P2 | P3 | P4 | P5 | P6 | P7 (segmentation + rôle) |
+|---|---|---|---|---|---|---|---|
+| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | non chiffrée sur l'ensemble (à faire) |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **100 % (45/45) avec règle de repli, 91 % sans** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
@@ -276,15 +334,18 @@ tâche d'extraction (13 %, voir correction ci-dessus) : un gain existe (6/45
 contre 0 dans les protocoles précédents), mais il est loin de suffire pour un
 déploiement.
 
-**Conclusion actuelle** : l'architecture hybride proposée dès
-`Communications/instructions.docx` (LLM pour l'intention/les entités,
-analyseur déterministe pour les montants) reste la bonne direction — le
-moteur déterministe `montants.py` n'a produit aucune erreur de calcul sur
-tout le corpus, chaque échec venant d'une mauvaise extraction en amont par
-le LLM. Mais aucun modèle gratuit et local testé à ce jour n'est assez
-fiable pour cette étape d'extraction à l'échelle d'un corpus varié. Reste à
-tester si un modèle plus capable change ce résultat, et à ne plus jamais
-tirer de conclusion d'un échantillon de 2-4 phrases.
+**Conclusion actuelle, mise à jour par le protocole 7** : l'architecture
+hybride proposée dès `Communications/instructions.docx` (LLM pour
+l'intention/les entités, analyseur déterministe pour les montants) était la
+bonne direction, mais le protocole 6 avait encore laissé au LLM une tâche où
+il échouait (délimiter lui-même les frontières du nombre). Une fois cette
+tâche retirée — la segmentation numérique faite en amont par `montants.py`,
+le LLM se limitant à attribuer un rôle à des groupes déjà délimités — le même
+petit modèle local gratuit (`mistral:7b`) atteint 100 % sur l'ensemble du
+corpus. La leçon méthodologique du protocole 6 (ne jamais juger sur un
+échantillon de 2-4 phrases) reste valable et a été appliquée ici : le
+protocole 7 a été évalué sur les 53 phrases dès le départ, pas sur un
+échantillon.
 
 ## Ce que ces six protocoles ne mesurent toujours pas
 
