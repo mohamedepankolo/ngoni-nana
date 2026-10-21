@@ -71,20 +71,58 @@ redites, voir `AUDIT_PROTOCOLES_1_A_7.md` §2).
 
 `prototype_semantique_v1.py` exécuté pour de vrai (Ollama, `mistral:7b`) sur
 3 phrases du corpus **existant** (pas le protocole 8 — juste une vérification
-que le pipeline segmentation→LLM→validation fonctionne de bout en bout) :
+que le pipeline segmentation→LLM→validation fonctionne de bout en bout).
+**Mesuré séparément (demandé après relecture), pas comme un seul score
+"2/3"** :
 
-| Phrase | Résultat |
-|---|---|
-| "n ye saga saba feere waa mugan ni duuru" | domaine=vente, operation=creation, montant=125 000 F CFA, effet=creer_transaction — **tout correct, 0 erreur de validation** |
-| "n ka jagokun ye waa tan ye" | domaine=capital, operation=creation, montant=50 000 F CFA **correct**, effet=aucun (plutôt que `definir_capital_initial` attendu — prudent mais imprécis, pas dangereux, 0 erreur de validation) |
-| "n ka waa fila juru bɛ Awa la" | montant=10 000 F CFA correct, mais **le validateur a rejeté la sortie** : `operation="augmentation"` invalide pour `dette_client` (devrait être `creation`), et un champ mal formé dans `informations_manquantes` |
+| Phrase | Compréhension (domaine/operation) | Montant | Effet comptable | Validation schéma | Action après résultat |
+|---|---|---|---|---|---|
+| "...feere waa mugan ni duuru" | correcte | correct (125 000 F CFA) | correct (`creer_transaction`) | valide | `demander_confirmation` |
+| "n ka jagokun ye waa tan ye" (capital) | correcte | correct (50 000 F CFA) | **faux avant correction** (`aucun` au lieu de `definir_capital_initial`) → **corrigé, voir ci-dessous** | valide | `demander_confirmation` |
+| "n ka waa fila juru bɛ Awa la" | **operation invalide** (`augmentation` hors combinaison autorisée pour `dette_client`) | correct (10 000 F CFA) | sans objet (rejeté) | **rejetée par le validateur** | `demander_confirmation`, effet forcé à `aucun` — jamais traité comme corrigé automatiquement |
 
-**C'est exactement le comportement voulu** : sur la phrase 3, une sortie LLM
-non conforme a été détectée par le validateur plutôt que silencieusement
-acceptée — la preuve concrète que le garde-fou "schéma + validateur
-applicatif" fonctionne en pratique, pas seulement sur des cas synthétiques.
-Pas une mesure du protocole 8 (ce sont des phrases déjà connues), seulement
-une vérification de câblage avant la vraie collecte.
+**2 des 5 colonnes contenaient une anomalie, pas "1 phrase sur 3 qui
+échoue".** Aucune des deux n'était une divergence entre le schéma et le
+référentiel : les deux causes sont documentées et corrigées ci-dessous.
+
+### Cause et correction des deux anomalies
+
+**A. Capital — `informations_manquantes` non filtré.** Le LLM a signalé
+`produit` et `personne` comme manquants pour "n ka jagokun ye waa tan ye",
+alors qu'aucun des deux n'est jamais requis pour `capital/creation` (une
+déclaration de capital n'a ni produit ni personne). `_construire_sortie`
+traitait n'importe quel champ signalé comme bloquant, sans le croiser avec
+ce qui est réellement requis. **Corrigé** : nouvelle table `CHAMPS_REQUIS`
+(`valider_semantique.py`, même principe que `EFFET_REFERENTIEL` — source
+unique de vérité, testée pour rester synchronisée avec elle) et
+`filtrer_informations_manquantes()`, appelée avant toute décision d'effet.
+Pas une contradiction entre schéma/référentiel/validateur : un bug
+d'assemblage dans le prototype lui-même.
+
+**B. Dette d'Awa — rejet correctement détecté, mais pas de garantie
+explicite sur l'état après rejet.** Le validateur a bien détecté
+`operation="augmentation"` invalide. Mais rien ne garantissait
+explicitement que ce rejet se traduise systématiquement par un effet nul et
+une demande de clarification plutôt que d'être traité comme "corrigé".
+**Corrigé** : `analyser()` renvoie maintenant un champ `statut`
+(`"valide"` ou `"rejete_par_validateur"`) ; en cas de rejet, une fonction
+dédiée (`_etat_securise_apres_rejet`) force `effet_comptable_potentiel`
+à `"aucun"`, `confirmation_requise` à `true` et `action_proposee` à
+`"demander_confirmation"`, tout en conservant la sortie brute et les
+erreurs dans le résultat pour l'audit/les journaux.
+
+**Tests ajoutés** (`tests/test_prototype_semantique.py`, 4 tests, aucun
+appel réseau — `_appeler_llm` simulé) : reproduit exactement le cas du
+capital (confirme le fix), vérifie qu'un champ réellement requis (montant
+pour une vente) continue de bloquer l'effet (le filtrage ne doit pas tout
+laisser passer), vérifie l'état sécurisé complet après un rejet simulé
+identique au cas réel de la dette d'Awa, et vérifie qu'une sortie valide
+porte bien `statut: "valide"`. Plus 1 test de cohérence
+(`test_validation_semantique.py`) garantissant que `CHAMPS_REQUIS` et
+`EFFET_REFERENTIEL` couvrent exactement les mêmes combinaisons — pour que
+les deux tables ne puissent plus diverger silencieusement.
+
+163 tests passent au total (158 + 5 nouveaux), aucune régression.
 
 ## Ce qui n'est PAS encore construit
 

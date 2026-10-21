@@ -31,7 +31,7 @@ from urllib import request
 BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
 from montants import extraire_groupes  # noqa: E402
-from valider_semantique import effet_attendu, valider  # noqa: E402
+from valider_semantique import effet_attendu, filtrer_informations_manquantes, valider  # noqa: E402
 
 SCHEMA_VERSION = "1.2.0"
 
@@ -88,7 +88,14 @@ def _construire_sortie(phrase: str, groupes: list[dict], reponse_llm: dict) -> d
         montant = {"montant_brut_dorome": g["valeur"], "unite_monetaire": "dorome_implicite",
                    "montant_fcfa": g["valeur"] * 5, "montants_secondaires": []}
 
-    informations_manquantes = list(reponse_llm.get("informations_manquantes") or [])
+    # Filtre ce qu'un composant (LLM) a signale comme manquant contre les
+    # champs REELLEMENT requis par le referentiel pour ce domaine/operation
+    # - evite par ex. de bloquer l'effet de capital/creation parce que le
+    # LLM a signale "produit"/"personne" comme manquants alors qu'aucun des
+    # deux n'est jamais requis pour une declaration de capital (bug trouve
+    # lors du premier test reel, voir RAPPORT_CORRECTIONS.md).
+    informations_manquantes = filtrer_informations_manquantes(
+        domaine, operation, list(reponse_llm.get("informations_manquantes") or []))
     ambiguites = [{"champ": a, "raison": "signalé par le composant sémantique"}
                   for a in (reponse_llm.get("ambiguites") or [])]
     if any(g["role"] == "ambigu" for g in groupes):
@@ -120,6 +127,20 @@ def _construire_sortie(phrase: str, groupes: list[dict], reponse_llm: dict) -> d
     }
 
 
+def _etat_securise_apres_rejet(sortie: dict) -> dict:
+    """Une sortie rejetée par le validateur ne doit JAMAIS être traitée comme
+    corrigée automatiquement : aucun effet ne doit pouvoir s'appliquer, et le
+    dialogue doit toujours redemander une clarification. Les champs de
+    diagnostic (domaine, operation, montant, groupes_numeriques...) restent
+    inchangés pour l'audit/les journaux, SEULS les champs qui déclenchent une
+    action sont écrasés ici."""
+    securisee = dict(sortie)
+    securisee["effet_comptable_potentiel"] = "aucun"
+    securisee["confirmation_requise"] = True
+    securisee["action_proposee"] = "demander_confirmation"
+    return securisee
+
+
 def analyser(phrase: str, modele: str = "mistral:7b", url: str = "http://localhost:11434",
              timeout: int = 240) -> dict:
     groupes = extraire_groupes(phrase)
@@ -128,7 +149,15 @@ def analyser(phrase: str, modele: str = "mistral:7b", url: str = "http://localho
     reponse_llm = _appeler_llm(phrase, groupes_pour_llm, modele, url, timeout)
     sortie = _construire_sortie(phrase, groupes, reponse_llm)
     erreurs = valider(sortie)
-    return {"sortie": sortie, "erreurs_validation": erreurs}
+
+    if erreurs:
+        # Rejet : jamais traité comme une correction automatique. La sortie
+        # brute (potentiellement incohérente) est conservée pour le journal
+        # d'évaluation, mais SEULE la version sécurisée doit être utilisée
+        # par un appelant (voir statut).
+        return {"statut": "rejete_par_validateur", "sortie_brute": sortie,
+                "sortie": _etat_securise_apres_rejet(sortie), "erreurs_validation": erreurs}
+    return {"statut": "valide", "sortie": sortie, "erreurs_validation": []}
 
 
 def _smoke():

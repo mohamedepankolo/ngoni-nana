@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "asr_test" / "scripts"))
 
-from valider_semantique import EFFET_REFERENTIEL, effet_attendu, valider  # noqa: E402
+from valider_semantique import CHAMPS_REQUIS, EFFET_REFERENTIEL, effet_attendu, valider  # noqa: E402
 
 BASE_VALIDE = {
     "schema_version": "1.2.0", "domaine": "vente", "operation": "creation",
@@ -122,6 +122,13 @@ def test_table_effet_referentiel_coherente_avec_le_schema():
                             informations_manquantes=[])
         erreurs = valider(sortie)
         assert not erreurs, f"{domaine}/{operation} -> {effet} contredit le schema : {erreurs}"
+
+
+def test_champs_requis_et_effet_referentiel_couvrent_les_memes_combinaisons():
+    # Deux tables, une seule verite : toute combinaison domaine/operation
+    # valide doit apparaitre dans les deux, sinon elles divergent en
+    # silence (une table mise a jour, pas l'autre).
+    assert set(CHAMPS_REQUIS) == set(EFFET_REFERENTIEL)
 
 
 def test_effet_attendu_renvoie_none_pour_combinaison_inconnue():

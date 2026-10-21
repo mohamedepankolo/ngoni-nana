@@ -61,6 +61,54 @@ def effet_attendu(domaine: str, operation: str) -> str | None:
     return EFFET_REFERENTIEL.get((domaine, operation))
 
 
+# Champs réellement requis par domaine/operation (colonne "Champs requis" de
+# REFERENTIEL_OPERATIONS_COMPTABLES.md, limité aux 5 valeurs que le schéma
+# autorise dans informations_manquantes). Source unique de vérité : évite
+# qu'un composant (LLM ou autre) signale comme "manquant" un champ qui n'est
+# en réalité jamais requis pour cette opération (ex. "produit" pour une
+# déclaration de capital) — bug trouvé lors du premier test réel du
+# prototype (voir RAPPORT_CORRECTIONS.md).
+CHAMPS_REQUIS = {
+    ("vente", "creation"): {"montant", "produit"},
+    ("vente", "correction"): {"montant"},
+    ("achat", "creation"): {"montant", "produit"},
+    ("achat", "correction"): {"montant"},
+    ("depense", "creation"): {"montant"},
+    ("depense", "correction"): {"montant"},
+    ("dette_client", "creation"): {"montant", "personne"},
+    ("dette_client", "remboursement"): {"montant", "personne"},
+    ("dette_client", "consultation"): set(),
+    ("dette_client", "correction"): {"personne"},
+    ("dette_fournisseur", "creation"): {"montant", "personne"},
+    ("dette_fournisseur", "remboursement"): {"montant", "personne"},
+    ("dette_fournisseur", "consultation"): set(),
+    ("dette_fournisseur", "correction"): {"personne"},
+    ("capital", "creation"): {"montant"},
+    ("capital", "augmentation"): {"montant"},
+    ("capital", "consultation"): set(),
+    ("stock", "augmentation"): {"quantite", "produit"},
+    ("stock", "diminution"): {"quantite", "produit"},
+    ("stock", "consultation"): set(),
+    ("consultation", "consultation"): set(),
+}
+
+
+def champs_requis(domaine: str, operation: str) -> set[str]:
+    """Champs réellement requis, ou ensemble vide si la combinaison est
+    inconnue (par prudence : ne rien exiger plutôt que d'halluciner une
+    exigence sur une combinaison non répertoriée)."""
+    return CHAMPS_REQUIS.get((domaine, operation), set())
+
+
+def filtrer_informations_manquantes(domaine: str, operation: str, informations_manquantes: list[str]) -> list[str]:
+    """Ne garde, parmi ce qu'un composant a signalé comme manquant, que les
+    champs réellement requis pour ce domaine/operation — évite de demander
+    un produit ou une personne qui n'a jamais de sens pour cette opération
+    (ex. capital/creation)."""
+    requis = champs_requis(domaine, operation)
+    return [c for c in informations_manquantes if c in requis]
+
+
 def _charger_schema():
     with open(SCHEMA_PATH, encoding="utf-8") as f:
         return json.load(f)
