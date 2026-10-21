@@ -124,6 +124,12 @@ les deux tables ne puissent plus diverger silencieusement.
 
 163 tests passent au total (158 + 5 nouveaux), aucune régression.
 
+**Confirmé en conditions réelles (pas seulement en test simulé)** : les deux
+phrases rejouées pour de vrai via Ollama après correction donnent
+`capital/creation → definir_capital_initial, statut=valide, 0 erreur` et
+`dette_client/augmentation (toujours produit par le LLM) →
+statut=rejete_par_validateur, effet=aucun` — les deux comportements attendus.
+
 ## Ce qui n'est PAS encore construit
 
 - Le composant de compréhension sémantique lui-même produisant une sortie
