@@ -67,6 +67,25 @@ performance, pour éviter une fuite d'information (risque déjà identifié sur
 le corpus existant, où les variantes a/b/c sont les 3 mêmes locutrices
 redites, voir `AUDIT_PROTOCOLES_1_A_7.md` §2).
 
+## Premier test de bout en bout (pipeline réel, pas encore le protocole 8)
+
+`prototype_semantique_v1.py` exécuté pour de vrai (Ollama, `mistral:7b`) sur
+3 phrases du corpus **existant** (pas le protocole 8 — juste une vérification
+que le pipeline segmentation→LLM→validation fonctionne de bout en bout) :
+
+| Phrase | Résultat |
+|---|---|
+| "n ye saga saba feere waa mugan ni duuru" | domaine=vente, operation=creation, montant=125 000 F CFA, effet=creer_transaction — **tout correct, 0 erreur de validation** |
+| "n ka jagokun ye waa tan ye" | domaine=capital, operation=creation, montant=50 000 F CFA **correct**, effet=aucun (plutôt que `definir_capital_initial` attendu — prudent mais imprécis, pas dangereux, 0 erreur de validation) |
+| "n ka waa fila juru bɛ Awa la" | montant=10 000 F CFA correct, mais **le validateur a rejeté la sortie** : `operation="augmentation"` invalide pour `dette_client` (devrait être `creation`), et un champ mal formé dans `informations_manquantes` |
+
+**C'est exactement le comportement voulu** : sur la phrase 3, une sortie LLM
+non conforme a été détectée par le validateur plutôt que silencieusement
+acceptée — la preuve concrète que le garde-fou "schéma + validateur
+applicatif" fonctionne en pratique, pas seulement sur des cas synthétiques.
+Pas une mesure du protocole 8 (ce sont des phrases déjà connues), seulement
+une vérification de câblage avant la vraie collecte.
+
 ## Ce qui n'est PAS encore construit
 
 - Le composant de compréhension sémantique lui-même produisant une sortie
