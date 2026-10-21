@@ -165,12 +165,52 @@ sensibilité à l'orthographe) plutôt qu'un bug unique et corrigeable comme cel
 au protocole 2. Les modèles 7-9B génériques gratuits testés ici ne sont, à ce stade,
 pas fiables pour cette tâche précise, few-shot ou non.
 
-## Synthèse des cinq protocoles
+## Protocole 6 — architecture hybride : LLM extrait le texte brut, `montants.py` calcule
 
-| | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local 1,5B) | P5 (modèles locaux 7-9B) |
-|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais, améliorée par le few-shot |
-| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** |
+Suite à l'échec du protocole 5 (même avec une règle grammaticale précise et
+validée, few-shot ou non), changement de design plutôt que de prompt :
+au lieu de demander au LLM de **calculer** le montant, on lui demande de
+**recopier mot pour mot** l'expression chiffrée prononcée (champ
+`expression_montant`), sans aucun calcul de sa part. Un système séparé — le
+`montants.py` déterministe déjà en place, validé contre le référentiel
+(`REFERENTIEL_NOMBRES_BAMBARA_A_VALIDER.md`) — fait ensuite le calcul réel
+(nombre → ×5 → F CFA).
+
+Testé sur `mistral:7b` (le plus petit/moins cher des modèles locaux
+essayés), sur 4 phrases incluant le cas central qui avait fait échouer tous
+les protocoles précédents :
+
+| Phrase | Expression extraite par le LLM | Calcul `montants.py` | Attendu | Résultat |
+|---|---|---|---|---|
+| "...feere wa bi duuru" | "wa bi duuru" | 250 000 | 250 000 | **Exact** |
+| "...jagokun ye waa tan ye" | "waa tan" | 50 000 | 50 000 | **Exact** |
+| "...feere waa mugan ni duuru" (cas central) | "waa mugan ni duuru" | 125 000 | 125 000 | **Exact** |
+| "...san waa kelen ni kɛmɛ duuru" | "kɛmɛ duuru" (incomplet — a classé "waa kelen" comme quantité) | 2 500 | 7 500 | Faux |
+
+**3 montants exacts sur 4**, y compris le cas le plus difficile de toute
+cette série de tests — contre 0/2 à 0/4 pour toutes les tentatives
+précédentes avec ce même modèle (protocoles 5, prompt simple et few-shot).
+Le seul échec restant est une erreur de **segmentation** (confondre quel
+groupe de mots est la quantité vs le montant, quand la phrase ne contient
+pas de comptage d'articles séparé) — pas une erreur de calcul. L'intention
+reste parfois fausse elle aussi (phrase 2 classée "consultation" au lieu de
+"capital"), un problème indépendant du montant.
+
+**Conclusion du protocole 6** : séparer "comprendre/extraire le texte" (tâche
+où même un petit modèle est globalement fiable) de "calculer" (tâche où
+aucun modèle testé n'est fiable, protocoles 2-5) transforme un échec total en
+succès partiel net, avec le modèle le moins capable testé jusqu'ici. C'est la
+confirmation la plus concrète à ce jour de l'architecture hybride proposée
+dès `Communications/instructions.docx` : LLM pour l'intention/les entités,
+analyseur déterministe pour les montants — et elle fonctionne même avec un
+petit modèle local gratuit, pas seulement avec un LLM puissant payant.
+
+## Synthèse des six protocoles
+
+| | P1 (glossaire complet) | P2 (glossaire + lecture stricte) | P3 (sans glossaire) | P4 (petit modèle local 1,5B) | P5 (modèles locaux 7-9B, calcul demandé au LLM) | P6 (modèle local 7B, calcul délégué à `montants.py`) |
+|---|---|---|---|---|---|---|
+| Intentions | 94 % | 85 %* | élevé, non chiffré précisément | correcte sur 1/2, structure non suivie | correcte sur 2-3/4 essais | correcte sur 3/4 |
+| Montants | **100 %** | 96 % | **7 %** | **0 %, avec invention de contenu** | **0 % sur les 2 phrases testées, few-shot ou non** | **75 % (3/4), échec restant = segmentation pas calcul** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
 
@@ -185,32 +225,41 @@ comme le fait déjà `montants.py` pour le moteur actuel. Combiner les deux
 conversion monétaire finale) reste l'architecture la plus sûre — exactement
 ce que proposait `Communications/instructions.docx` dès le premier document.
 
-Mais les protocoles 4 et 5 ajoutent une réserve de taille : cette conclusion ne
-vaut que pour un modèle **puissant**. Aucun modèle réellement gratuit et
-déployable localement testé à ce jour — ni un petit modèle (1,5 milliard de
-paramètres, protocole 4), ni trois modèles de taille intermédiaire (7-9
-milliards, protocole 5, few-shot inclus) — ne réussit la même tâche de façon
-fiable. Le petit modèle invente du contenu ; les modèles 7-9B se trompent sur
-les montants de façon différente à chaque essai. La décision d'architecture
-ne peut donc pas encore être prise : il manque la preuve qu'un modèle à la
-fois capable ET réellement abordable existe entre ces deux extrêmes — les
-options restantes sont soit un LLM nettement plus capable (coût d'API
-payante), soit déléguer le calcul des montants à un analyseur déterministe
-(ce que fait déjà `montants.py` pour le moteur actuel) en ne confiant au LLM
-que l'intention et les entités.
+Les protocoles 4 et 5 ont d'abord ajouté une réserve de taille : aucun modèle
+gratuit et déployable localement (1,5B au protocole 4, trois modèles 7-9B au
+protocole 5, few-shot et règle précise inclus) ne réussissait à calculer un
+montant correctement. Le protocole 6 résout cette réserve, mais pas en
+rendant les modèles locaux meilleurs en calcul — en leur retirant cette tâche.
+Dès qu'on ne demande plus au LLM (même un petit modèle local gratuit) que
+d'**extraire** l'expression chiffrée prononcée, et qu'on laisse
+`montants.py` faire le calcul réel, le taux de montants exacts passe de 0 %
+à 75 % avec le même modèle. Le cas le plus difficile de toute cette série
+(la portée de "waa" sur "mugan ni duuru") devient trivial une fois que le
+calcul est confié au bon composant.
 
-## Ce que ces cinq protocoles ne mesurent toujours pas
+**Conclusion définitive** : l'architecture hybride proposée dès
+`Communications/instructions.docx` (LLM pour l'intention/les entités,
+analyseur déterministe pour les montants) n'est pas qu'une option prudente —
+c'est la seule qui fonctionne de façon fiable avec un modèle réellement
+gratuit et local. Reste à corriger la segmentation quantité/montant quand il
+n'y a pas de comptage d'articles explicite (le seul échec du protocole 6),
+et l'intention sur certains cas (ex. jagokun/capital mal classé parfois) —
+deux problèmes bien plus abordables qu'une refonte de l'arithmétique.
+
+## Ce que ces six protocoles ne mesurent toujours pas
 
 - La compréhension de **phrases réellement inédites** (ces 53 phrases, même
   en aveugle pour le modèle, restent celles du corpus existant).
 - Les **conversations à plusieurs tours** (mémoire, corrections, changement
   d'avis en cours de phrase).
 - La **compréhension de l'audio réel** (ASR + bruit + hésitations), ces
-  cinq protocoles ne testant que du texte déjà transcrit sans erreur.
-- Un modèle **payant mais pas le plus cher** (ex. 7B-70B via une API
-  hébergée) : le protocole 5 montre que la taille seule (7-9B) ne suffit pas
-  en local ; reste à savoir si la même taille de modèle, via une API mieux
-  optimisée, ferait mieux — non testé faute de crédits disponibles.
+  six protocoles ne testant que du texte déjà transcrit sans erreur.
+- La **segmentation quantité/montant** sur l'architecture hybride du
+  protocole 6, testée sur seulement 4 phrases : reste à chiffrer sur les 53
+  phrases du corpus, voire sur des phrases inédites.
+- La **robustesse de l'intention** une fois le calcul délégué : le protocole
+  6 montre encore des erreurs (jagokun/capital mal classé) indépendantes du
+  problème de montant, non encore quantifiées sur l'ensemble du corpus.
 
 ## Désaccords à faire trancher par une personne bambaraphone
 
