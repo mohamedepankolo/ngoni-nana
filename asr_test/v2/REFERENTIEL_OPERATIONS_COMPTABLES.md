@@ -20,10 +20,10 @@ sémantique — jamais déduite par analogie.
 | dette_client | remboursement | `diminuer_creance` | montant, personne | produit |
 | dette_client | consultation | `aucun` | personne (ou absente si question générique "qui me doit de l'argent ?") | montant (c'est la question) |
 | dette_client | correction | `corriger_transaction_existante` | personne, référence à la transaction | — |
-| dette_fournisseur | creation | `augmenter_dette_fournisseur` | montant, personne | produit |
-| dette_fournisseur | remboursement | `diminuer_dette_fournisseur` | montant, personne | produit |
+| dette_fournisseur | creation | **`aucun` — DÉSACTIVÉ, voir §1** (`augmenter_dette_fournisseur` réservé, non actif) | montant, personne | produit |
+| dette_fournisseur | remboursement | **`aucun` — DÉSACTIVÉ, voir §1** (`diminuer_dette_fournisseur` réservé, non actif) | montant, personne | produit |
 | dette_fournisseur | consultation | `aucun` | personne | montant |
-| dette_fournisseur | correction | `corriger_transaction_existante` | personne, référence à la transaction | — |
+| dette_fournisseur | correction | **`aucun` — DÉSACTIVÉ, voir §1** | personne, référence à la transaction | — |
 | capital | creation | `definir_capital_initial` — **remplace**, voir §2 | montant | — |
 | capital | augmentation | `augmenter_capital` — **cumule**, voir §2 | montant | — |
 | capital | consultation | `aucun` | — | montant |
@@ -46,14 +46,19 @@ sémantique — jamais déduite par analogie.
   (`PROTOCOLE_8_SCENARIOS.md`) — une commerçante rembourse son propre
   fournisseur, direction inverse de G1/G2 (une cliente la rembourse, elle).
   Aucune opération ne doit diminuer `diminuer_creance` quand c'est en fait
-  `diminuer_dette_fournisseur`, et réciproquement. **Réserve importante** :
-  `dette_fournisseur` n'est pas un cas d'usage confirmé à ce jour — absent
-  de `phrases_reelles.csv`, déjà signalé comme tel dans
-  `moteur/base_donnees.py:calculer_capital` ("Dettes fournisseurs n'a pas
-  encore de table dédiée... à corriger si Fadima confirme ce cas d'usage").
-  Le schéma prévoit la distinction ; son utilité réelle reste à confirmer
-  par une locutrice avant toute implémentation du calcul de capital
-  correspondant.
+  `diminuer_dette_fournisseur`, et réciproquement. **Réserve importante,
+  renforcée après relecture** : `dette_fournisseur` n'est pas un cas d'usage
+  confirmé à ce jour — absent de `phrases_reelles.csv`, déjà signalé comme
+  tel dans `moteur/base_donnees.py:calculer_capital` ("Dettes fournisseurs
+  n'a pas encore de table dédiée... à corriger si Fadima confirme ce cas
+  d'usage"). **Le schéma reconnaît le domaine linguistiquement, mais son
+  effet comptable reste désactivé (forcé à `aucun`) tant que ce besoin et
+  sa logique comptable ne sont pas validés sur le terrain** — pas une
+  simple réserve documentaire, une contrainte appliquée dans le schéma
+  lui-même (`schema_semantique_v1.json`, règle `allOf` dédiée) et testée
+  (`tests/test_validation_semantique.py`). Activer ces effets plus tard
+  nécessitera de retirer cette règle explicitement, jamais un contournement
+  silencieux.
 - **Dette nouvellement créée vs remboursement** : `dette_client/creation`
   augmente la créance (la cliente doit plus) ; `dette_client/remboursement`
   la diminue. Le marqueur linguistique n'est pas toujours le verbe seul —

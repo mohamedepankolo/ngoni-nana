@@ -342,14 +342,16 @@ lu comme vente quand le corpus attend achat) et confusion achat/dépense
 moteur à règles) et le flou achat/dépense du corpus (2 cas) — avant d'être
 traités comme des erreurs du LLM. Détail complet dans
 `DESACCORDS_LLM_A_VALIDER.md`. **10 des 18 désaccords ne sont pas de
-nouvelles erreurs.** Correction suite à relecture (`asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md`,
+nouvelles erreurs.** **Le score brut principal reste 35/53 = 66,0 %.**
+Correction suite à relecture (`asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md`,
 §1.1) : ce n'est pas une "exclusion" (qui réduirait le dénominateur à 43)
 mais une **reclassification** à dénominateur inchangé (53) — les deux
-lectures possibles sont **45/53 = 84,9 %** (reclassification) ou
-**35/43 = 81,4 %** (exclusion stricte du corpus mesuré). Aucune des deux
-n'est une borne garantie tant que les 8 désaccords vraiment nouveaux ne sont
-pas arbitrés par une locutrice — la fourchette honnête est 66 %-85 %, pas un
-chiffre unique.
+lectures conditionnelles possibles sont **45/53 = 84,9 %** (reclassification)
+ou **35/43 = 81,4 %** (exclusion stricte du corpus mesuré). Ce sont des
+**analyses conditionnelles sur le même corpus de 53 phrases déjà utilisé
+pour affiner les prompts**, pas des performances démontrées sur des phrases
+nouvelles, et aucune des deux n'est une borne garantie tant que les 8
+désaccords vraiment nouveaux ne sont pas arbitrés par une locutrice.
 
 Il reste 8 vrais nouveaux désaccords, regroupés en 3 motifs précis (détail et
 phrases exactes dans `DESACCORDS_LLM_A_VALIDER.md`) :
@@ -400,7 +402,7 @@ fait naître.
 |---|---|---|---|---|---|---|
 | | P1 | P2 | P3 | P4 | P5 | P6 | P7 (segmentation + rôle) |
 |---|---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | 66 % brut, **81-85 % selon la lecture** (reclassification des désaccords déjà connus, pas une exclusion — voir `asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md` §1.1) |
+| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | **66 % brut (score principal)** ; 81-85 % en analyse conditionnelle seulement (reclassification des désaccords déjà connus, même corpus — voir `asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md` §1.1) |
 | Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **91 % (41/45), 4 signalées ambiguës plutôt que devinées** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).

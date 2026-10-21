@@ -120,17 +120,17 @@ vérification systématique contre ce qui est déjà documenté :
 | Déjà documenté ci-dessus (flou achat/dépense du corpus lui-même) | 2 | P12, P12b (même famille que P12c) |
 | **Vraiment nouveaux** | **8** | voir ci-dessous |
 
-**Reclassification des 10 désaccords déjà connus** (sans supposer que le
-LLM a raison sur eux — juste qu'ils ne sont pas de nouvelles erreurs) :
-**45/53 = 85 %** si le dénominateur reste 53 (reclassification), ou
-**35/43 = 81 %** si ces 10 cas sont strictement retirés du corpus mesuré
-(exclusion). Correction terminologique après relecture — voir
-`asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md` §1.1 : ce n'était pas présenté
-clairement comme une reclassification au départ. Dans les deux lectures,
-l'écart réel de compréhension entre `mistral:7b` et un LLM puissant
-(94 %/85 % aux protocoles 1-2) est plus restreint que le 66 % brut ne le
-suggérait — mais ni 85 % ni 81 % ne doivent être lus comme une borne
-garantie tant que les 8 désaccords vraiment nouveaux ne sont pas arbitrés.
+**Le score brut principal reste 35/53 = 66,0 %.** Reclassification des 10
+désaccords déjà connus (sans supposer que le LLM a raison sur eux — juste
+qu'ils ne sont pas de nouvelles erreurs), présentée comme **analyse
+conditionnelle, pas comme une performance démontrée** : **45/53 = 85 %** si
+le dénominateur reste 53 (reclassification), ou **35/43 = 81 %** si ces 10
+cas sont strictement retirés du corpus mesuré (exclusion) — toujours le
+même corpus de 53 phrases, déjà utilisé pour affiner les prompts, pas des
+phrases nouvelles. Correction terminologique après relecture — voir
+`asr_test/v2/AUDIT_PROTOCOLES_1_A_7.md` §1.1. Ni 85 % ni 81 % ne doivent
+être lus comme une borne garantie tant que les 8 désaccords vraiment
+nouveaux ne sont pas arbitrés.
 
 Les 8 désaccords vraiment nouveaux se regroupent en 3 motifs distincts :
 

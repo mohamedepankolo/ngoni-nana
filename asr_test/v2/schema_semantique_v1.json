@@ -1,19 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "ngoni-nana://schema_semantique/1.1.0",
+  "$id": "ngoni-nana://schema_semantique/1.2.0",
   "title": "N'GONI NANA V2 — schéma sémantique d'une phrase comptable",
   "description": "Sortie attendue du composant de compréhension sémantique (LLM), après segmentation numérique déterministe (montants.extraire_groupes) et avant validation métier/calcul. Aucun champ monétaire final n'est calculé par le LLM : montant_fcfa est renseigné par le système après validation, jamais déduit par le modèle. Voir asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md pour les combinaisons domaine/operation valides et leurs effets. Certaines règles (référence de groupe numérique existante) ne sont pas exprimables en JSON Schema seul : voir asr_test/scripts/valider_semantique.py pour le validateur applicatif complémentaire.",
   "type": "object",
   "required": ["schema_version", "domaine", "operation", "groupes_numeriques", "informations_manquantes", "action_proposee", "confirmation_requise"],
   "properties": {
     "schema_version": {
-      "const": "1.1.0",
-      "description": "Toute modification de structure (ajout/retrait/renommage de champ, nouvelle valeur d'enum) doit incrémenter cette version, pas la modifier silencieusement. 1.1.0 : ajoute dette_client/dette_fournisseur (remplace l'ancien domaine générique 'dette', incohérent avec la catégorie 'dette_client' déjà utilisée dans asr_test/corpus/phrases_reelles.csv), ajoute l'effet definir_capital_initial, ajoute les règles de combinaison domaine/operation."
+      "const": "1.2.0",
+      "description": "Toute modification de structure (ajout/retrait/renommage de champ, nouvelle valeur d'enum) doit incrémenter cette version, pas la modifier silencieusement. 1.1.0 : ajoute dette_client/dette_fournisseur (remplace l'ancien domaine générique 'dette', incohérent avec la catégorie 'dette_client' déjà utilisée dans asr_test/corpus/phrases_reelles.csv), ajoute l'effet definir_capital_initial, ajoute les règles de combinaison domaine/operation. 1.2.0 : dette_fournisseur désactivée en écriture réelle (effet forcé à 'aucun') tant que ce cas d'usage n'est pas confirmé par une locutrice — voir REFERENTIEL_OPERATIONS_COMPTABLES.md §1."
     },
     "domaine": {
       "type": "string",
       "enum": ["vente", "achat", "dette_client", "dette_fournisseur", "stock", "capital", "depense", "consultation", "inconnu"],
-      "description": "Sujet métier de la phrase. 'dette_client' = argent dû À la commerçante (créance) ; 'dette_fournisseur' = argent dû PAR la commerçante (dette) — distinction ajoutée suite à la relecture (scénario G3, remboursement par la commerçante elle-même à son fournisseur, direction inverse de G1/G2). 'dette_fournisseur' correspond à un cas d'usage non encore confirmé par une locutrice (voir moteur/base_donnees.py:183, 'Dettes fournisseurs' absent de phrases_reelles.csv à ce jour) : le schéma le prévoit, mais aucune donnée réelle ne le valide encore. 'consultation' ici signifie une question générique non rattachée à un domaine précis (ex. 'combien j'ai vendu ce mois ?') ; une question sur un domaine précis (ex. 'combien Mariam me doit ?') garde ce domaine (dette_client) avec operation='consultation'."
+      "description": "Sujet métier de la phrase. 'dette_client' = argent dû À la commerçante (créance) ; 'dette_fournisseur' = argent dû PAR la commerçante (dette) — distinction ajoutée suite à la relecture (scénario G3, remboursement par la commerçante elle-même à son fournisseur, direction inverse de G1/G2). 'dette_fournisseur' correspond à un cas d'usage NON ENCORE CONFIRMÉ par une locutrice (voir moteur/base_donnees.py:183, 'Dettes fournisseurs' absent de phrases_reelles.csv à ce jour) : le domaine peut être reconnu linguistiquement, mais toute écriture réelle reste désactivée (effet_comptable_potentiel forcé à 'aucun', voir règle allOf ci-dessous) jusqu'à validation explicite du besoin et de sa logique comptable. 'consultation' ici signifie une question générique non rattachée à un domaine précis (ex. 'combien j'ai vendu ce mois ?') ; une question sur un domaine précis (ex. 'combien Mariam me doit ?') garde ce domaine (dette_client) avec operation='consultation'."
     },
     "operation": {
       "type": "string",
@@ -106,7 +106,7 @@
     "effet_comptable_potentiel": {
       "type": ["string", "null"],
       "enum": ["creer_transaction", "definir_capital_initial", "augmenter_capital", "augmenter_creance", "diminuer_creance", "augmenter_dette_fournisseur", "diminuer_dette_fournisseur", "ajuster_stock_plus", "ajuster_stock_moins", "corriger_transaction_existante", "aucun", null],
-      "description": "Effet proposé SI l'opération est confirmée — ne modifie jamais la base comptable directement. 'definir_capital_initial' REMPLACE la valeur existante (suit moteur/base_donnees.py:declarer_capital_initial) ; 'augmenter_capital' CUMULE (suit ajouter_au_capital) — ne jamais les confondre. Voir REFERENTIEL_OPERATIONS_COMPTABLES.md pour la correspondance domaine/operation -> effet."
+      "description": "Effet proposé SI l'opération est confirmée — ne modifie jamais la base comptable directement. 'definir_capital_initial' REMPLACE la valeur existante (suit moteur/base_donnees.py:declarer_capital_initial) ; 'augmenter_capital' CUMULE (suit ajouter_au_capital) — ne jamais les confondre. 'augmenter_dette_fournisseur'/'diminuer_dette_fournisseur' sont RÉSERVÉS, DÉSACTIVÉS en pratique (voir règle allOf 'dette_fournisseur' ci-dessous et REFERENTIEL_OPERATIONS_COMPTABLES.md §1) : présents dans l'énumération pour que le schéma documente l'intention future, mais aucune sortie valide ne peut les produire tant que le cas d'usage n'est pas confirmé. Voir REFERENTIEL_OPERATIONS_COMPTABLES.md pour la correspondance domaine/operation -> effet."
     },
     "action_proposee": {
       "type": "string",
@@ -133,6 +133,9 @@
       "then": {"properties": {"operation": {"enum": ["creation", "remboursement", "consultation", "correction"]}}} },
     { "if": {"properties": {"domaine": {"const": "dette_fournisseur"}}},
       "then": {"properties": {"operation": {"enum": ["creation", "remboursement", "consultation", "correction"]}}} },
+    { "$comment": "DÉSACTIVÉ (relecture) : dette_fournisseur ne confirme pas encore d'écriture réelle, quelle que soit l'opération — voir REFERENTIEL_OPERATIONS_COMPTABLES.md §1. Le domaine peut être reconnu, jamais son effet.",
+      "if": {"properties": {"domaine": {"const": "dette_fournisseur"}}},
+      "then": {"properties": {"effet_comptable_potentiel": {"enum": ["aucun", null]}}} },
     { "if": {"properties": {"domaine": {"const": "capital"}}},
       "then": {"properties": {"operation": {"enum": ["creation", "augmentation", "consultation"]}}} },
     { "if": {"properties": {"domaine": {"const": "stock"}}},

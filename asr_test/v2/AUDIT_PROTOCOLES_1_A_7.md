@@ -15,8 +15,8 @@ clés se reproduisent à l'identique :
 |---|---|---|---|
 | Protocole 6 (LLM calcule lui-même) : 6/45 — 13,3 % | `resultats_hybrides.jsonl` | 6/45 — 13,3 % | aucun |
 | Protocole 7 (segmentation + rôles, règle sûre) : 41/45 — 91,1 %, 4 ambiguës | `resultats_segmentes.jsonl` | 41/45 — 91,1 %, 4 ambiguës | aucun |
-| Intention isolée (`mistral:7b`) brut : 35/53 — 66,0 % | `resultats_intention_seule.jsonl` | 35/53 — 66,0 % | aucun |
-| Intention isolée "ajusté" : 45/53 — 84,9 % | idem, **reclassification**, pas exclusion — voir correction ci-dessous | 45/53 — 84,9 % | **terminologie corrigée, voir §1.1** |
+| **Intention isolée (`mistral:7b`) — score brut principal : 35/53 — 66,0 %** | `resultats_intention_seule.jsonl` | 35/53 — 66,0 % | aucun |
+| Analyse conditionnelle (reclassification) : 45/53 — 84,9 % | idem, **reclassification**, pas exclusion — voir correction ci-dessous | 45/53 — 84,9 % | **terminologie corrigée, voir §1.1 ; n'est PAS un deuxième score, c'est une analyse de cas déjà connus sur le MÊME corpus** |
 | Intention isolée (`gemma2:9b`) brut/ajusté : 24/53 — 45,3 % / 34/53 — 64,2 % | `resultats_intention_gemma2.jsonl` | identique | aucun |
 
 **Aucun écart trouvé.** Script de vérification utilisé : recalcul direct en
@@ -39,17 +39,21 @@ qu'une seule :
 | **Reclassification** (dénominateur inchangé) : les 10 cas déjà connus ne comptent plus comme un nouvel échec, mais restent dans le corpus mesuré | (35 corrects + 10 reclassés) / 53 | **45/53 = 84,9 %** |
 | **Exclusion stricte** (dénominateur réduit) : les 10 cas déjà connus sont retirés du corpus mesuré | 35 corrects / (53 − 10) | **35/43 = 81,4 %** |
 
-Les deux nombres sont proches (81-85 %) et le choix entre les deux ne change
-pas la conclusion qualitative (l'écart réel avec le grand LLM est plus
-restreint que le 66 % brut ne le suggérait). **Ni l'un ni l'autre ne doit
-être présenté comme une performance générale validée ou une borne
-inférieure garantie** : les 8 désaccords "vraiment nouveaux" (motifs A/B/C,
-`DESACCORDS_LLM_A_VALIDER.md`) ne sont pas encore arbitrés par une
-locutrice native — ils pourraient confirmer que le LLM a tort (le score
-réel serait alors plus proche de 66 %) ou que le corpus est ambigu/mal
-annoté sur ces cas (le score réel serait alors plus proche de 85 %). Tant
-que l'arbitrage n'est pas fait, la fourchette honnête est **66 %-85 %**, pas
-un chiffre unique.
+**Le score brut à retenir et à citer en premier reste 35/53 = 66,0 %.** Les
+deux lectures à 81-85 % ne sont **pas des performances démontrées sur de
+nouvelles phrases** — elles sont calculées sur le même corpus de 53 phrases
+déjà utilisé pour affiner les prompts (protocoles 5-7), et reclassent des
+désaccords déjà connus plutôt que de mesurer une vraie généralisation.
+**Ni l'un ni l'autre ne doit être présenté comme une performance générale
+validée ou une borne inférieure garantie** : les 8 désaccords "vraiment
+nouveaux" (motifs A/B/C, `DESACCORDS_LLM_A_VALIDER.md`) ne sont pas encore
+arbitrés par une locutrice native — ils pourraient confirmer que le LLM a
+tort (le score réel resterait alors proche de 66 %) ou que le corpus est
+ambigu/mal annoté sur ces cas (le score réel serait alors plus proche de
+85 %). Les deux lectures à 81-85 % sont des **analyses conditionnelles**
+("si ces 10 cas ne sont pas imputables au LLM, alors..."), pas des mesures
+de performance indépendantes. La seule vraie mesure de généralisation
+viendra du protocole 8, sur un corpus distinct.
 
 ## 2. Qualité et limites du corpus de référence
 

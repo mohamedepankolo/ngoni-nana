@@ -24,6 +24,42 @@ except ImportError:  # pragma: no cover
 BASE = Path(__file__).resolve().parent
 SCHEMA_PATH = BASE.parent / "v2" / "schema_semantique_v1.json"
 
+# Table domaine/operation -> effet, derivee de REFERENTIEL_OPERATIONS_COMPTABLES.md.
+# Source unique de verite : l'effet ne doit JAMAIS etre invente librement par
+# le LLM, seulement derive de ce tableau une fois domaine/operation connus
+# (le LLM ne classe que domaine/operation, pas l'effet qui en decoule).
+# dette_fournisseur : effet force a "aucun" quelle que soit l'operation tant
+# que ce cas d'usage n'est pas confirme (voir schema_semantique_v1.json 1.2.0).
+EFFET_REFERENTIEL = {
+    ("vente", "creation"): "creer_transaction",
+    ("vente", "correction"): "corriger_transaction_existante",
+    ("achat", "creation"): "creer_transaction",
+    ("achat", "correction"): "corriger_transaction_existante",
+    ("depense", "creation"): "creer_transaction",
+    ("depense", "correction"): "corriger_transaction_existante",
+    ("dette_client", "creation"): "augmenter_creance",
+    ("dette_client", "remboursement"): "diminuer_creance",
+    ("dette_client", "consultation"): "aucun",
+    ("dette_client", "correction"): "corriger_transaction_existante",
+    ("dette_fournisseur", "creation"): "aucun",
+    ("dette_fournisseur", "remboursement"): "aucun",
+    ("dette_fournisseur", "consultation"): "aucun",
+    ("dette_fournisseur", "correction"): "aucun",
+    ("capital", "creation"): "definir_capital_initial",
+    ("capital", "augmentation"): "augmenter_capital",
+    ("capital", "consultation"): "aucun",
+    ("stock", "augmentation"): "ajuster_stock_plus",
+    ("stock", "diminution"): "ajuster_stock_moins",
+    ("stock", "consultation"): "aucun",
+    ("consultation", "consultation"): "aucun",
+}
+
+
+def effet_attendu(domaine: str, operation: str) -> str | None:
+    """Effet comptable dérivé du référentiel pour ce domaine/operation, ou
+    None si la combinaison n'est pas répertoriée (-> 'inconnue')."""
+    return EFFET_REFERENTIEL.get((domaine, operation))
+
 
 def _charger_schema():
     with open(SCHEMA_PATH, encoding="utf-8") as f:
@@ -69,6 +105,24 @@ def valider_stock_quantite_vs_montant(sortie: dict) -> list[str]:
     return []
 
 
+_EFFETS_AUGMENTATION = {"augmenter_creance", "augmenter_dette_fournisseur", "augmenter_capital",
+                        "ajuster_stock_plus", "definir_capital_initial"}
+_EFFETS_DIMINUTION = {"diminuer_creance", "diminuer_dette_fournisseur", "ajuster_stock_moins"}
+
+
+def valider_direction_effet(sortie: dict) -> list[str]:
+    """Un remboursement ne doit jamais AUGMENTER un solde, et une création/
+    augmentation ne doit jamais en DIMINUER un — aucune opération ne doit
+    diminuer le mauvais solde (correction demandée en relecture)."""
+    operation = sortie.get("operation")
+    effet = sortie.get("effet_comptable_potentiel")
+    if operation == "remboursement" and effet in _EFFETS_AUGMENTATION:
+        return [f"operation='remboursement' mais effet={effet!r} AUGMENTE un solde (devrait diminuer)"]
+    if operation in ("creation", "augmentation") and effet in _EFFETS_DIMINUTION:
+        return [f"operation={operation!r} mais effet={effet!r} DIMINUE un solde (devrait augmenter/créer)"]
+    return []
+
+
 def valider_consultation_sans_effet(sortie: dict) -> list[str]:
     """Filet de sécurité redondant avec la règle JSON Schema (allOf), gardé
     ici pour que ce module soit utilisable même sans jsonschema installé."""
@@ -90,6 +144,7 @@ def valider(sortie: dict) -> list[str]:
     erreurs.extend(valider_references_groupes(sortie))
     erreurs.extend(valider_stock_quantite_vs_montant(sortie))
     erreurs.extend(valider_consultation_sans_effet(sortie))
+    erreurs.extend(valider_direction_effet(sortie))
     return erreurs
 
 

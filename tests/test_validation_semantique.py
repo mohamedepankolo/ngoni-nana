@@ -11,10 +11,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "asr_test" / "scripts"))
 
-from valider_semantique import valider  # noqa: E402
+from valider_semantique import EFFET_REFERENTIEL, effet_attendu, valider  # noqa: E402
 
 BASE_VALIDE = {
-    "schema_version": "1.1.0", "domaine": "vente", "operation": "creation",
+    "schema_version": "1.2.0", "domaine": "vente", "operation": "creation",
     "personne": None, "produit": "riz",
     "quantite": {"groupe_id": "N1", "unite": "sac"},
     "groupes_numeriques": [
@@ -67,6 +67,65 @@ def test_operation_hors_combinaison_valide_est_rejetee():
     mauvais = _variante(domaine="stock", operation="remboursement")
     erreurs = valider(mauvais)
     assert erreurs
+
+
+def test_dette_fournisseur_avec_effet_actif_est_rejetee():
+    # Cas d'usage non confirme sur le terrain (relecture) : le domaine peut
+    # etre reconnu, mais son effet comptable doit rester desactive (force a
+    # "aucun") tant que Fadima ne confirme pas ce besoin.
+    mauvais = _variante(domaine="dette_fournisseur", operation="remboursement",
+                         personne="Fournisseur X", produit=None, quantite=None,
+                         effet_comptable_potentiel="diminuer_dette_fournisseur")
+    erreurs = valider(mauvais)
+    assert erreurs, "un effet actif sur dette_fournisseur doit etre rejete tant que non confirme"
+
+
+def test_dette_fournisseur_avec_effet_aucun_est_acceptee():
+    # Le domaine reste reconnaissable (consultation, par ex.), seul l'effet est bloque.
+    correct = _variante(domaine="dette_fournisseur", operation="consultation",
+                         personne="Fournisseur X", produit=None, quantite=None,
+                         montant=None, groupes_numeriques=[],
+                         effet_comptable_potentiel="aucun", confirmation_requise=False,
+                         action_proposee="repondre_directement")
+    assert valider(correct) == []
+
+
+def test_remboursement_dette_client_diminue_bien_la_creance():
+    # Un remboursement doit DIMINUER la creance, jamais l'augmenter ni
+    # declencher un effet de dette fournisseur (confusion de direction).
+    correct = _variante(domaine="dette_client", operation="remboursement", personne="Mariam",
+                         produit=None, quantite=None, effet_comptable_potentiel="diminuer_creance")
+    assert valider(correct) == []
+    mauvais_sens = _variante(domaine="dette_client", operation="remboursement", personne="Mariam",
+                              produit=None, quantite=None, effet_comptable_potentiel="augmenter_creance")
+    erreurs = valider(mauvais_sens)
+    assert erreurs, "un remboursement qui augmenterait la creance doit etre rejete (mauvais sens)"
+
+
+def test_operation_correction_requiert_une_confirmation():
+    # Une correction ne doit jamais s'appliquer silencieusement - toujours
+    # une transaction a identifier, jamais une supposition automatique.
+    correction = _variante(domaine="vente", operation="correction", produit=None, quantite=None,
+                            effet_comptable_potentiel="corriger_transaction_existante",
+                            confirmation_requise=True, informations_manquantes=["montant"])
+    assert valider(correction) == []
+
+
+def test_table_effet_referentiel_coherente_avec_le_schema():
+    # Garde-fou H (rapport de correction) : la table EFFET_REFERENTIEL ne
+    # doit jamais entrer en contradiction avec les regles du schema (allOf)
+    # - sinon le referentiel et le schema divergeraient silencieusement.
+    for (domaine, operation), effet in EFFET_REFERENTIEL.items():
+        sortie = _variante(domaine=domaine, operation=operation, effet_comptable_potentiel=effet,
+                            produit=None, personne=None, quantite=None, groupes_numeriques=[],
+                            montant=None, confirmation_requise=(effet not in (None, "aucun")),
+                            informations_manquantes=[])
+        erreurs = valider(sortie)
+        assert not erreurs, f"{domaine}/{operation} -> {effet} contredit le schema : {erreurs}"
+
+
+def test_effet_attendu_renvoie_none_pour_combinaison_inconnue():
+    assert effet_attendu("vente", "remboursement") is None  # "remboursement" n'existe pas pour vente
 
 
 def test_capital_creation_avec_effet_augmentation_est_rejete():
