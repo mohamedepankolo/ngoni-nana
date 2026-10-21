@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ngoni-nana://schema_semantique/1.0.0",
+  "title": "N'GONI NANA V2 — schéma sémantique d'une phrase comptable",
+  "description": "Sortie attendue du composant de compréhension sémantique (LLM), après segmentation numérique déterministe (montants.extraire_groupes) et avant validation métier/calcul. Aucun champ monétaire final n'est calculé par le LLM : montant_fcfa est renseigné par le système après validation, jamais déduit par le modèle. Voir asr_test/v2/REFERENTIEL_OPERATIONS_COMPTABLES.md pour les combinaisons domaine/operation valides et leurs effets.",
+  "type": "object",
+  "required": ["schema_version", "domaine", "operation", "groupes_numeriques", "informations_manquantes", "action_proposee", "confirmation_requise"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "description": "Toute modification de structure (ajout/retrait/renommage de champ, nouvelle valeur d'enum) doit incrémenter cette version, pas la modifier silencieusement."
+    },
+    "domaine": {
+      "type": "string",
+      "enum": ["vente", "achat", "dette", "stock", "capital", "depense", "consultation", "inconnu"],
+      "description": "Sujet métier de la phrase. 'consultation' ici signifie une question générique non rattachée à un domaine précis (ex. 'combien j'ai vendu ce mois ?') ; une question sur un domaine précis (ex. 'combien Mariam me doit ?') garde ce domaine (dette) avec operation='consultation'."
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["creation", "remboursement", "augmentation", "diminution", "consultation", "correction", "inconnue"],
+      "description": "Action précise sur le domaine. Distingue notamment une dette nouvellement créée (creation) d'un remboursement (remboursement, qui diminue la créance) — voir le référentiel pour chaque combinaison domaine/operation valide."
+    },
+    "personne": {
+      "type": ["string", "null"],
+      "description": "Nom de la personne impliquée (cliente, fournisseur...), recopié tel quel depuis la phrase, jamais déduit."
+    },
+    "produit": {
+      "type": ["string", "null"],
+      "description": "Article/produit mentionné, recopié tel quel depuis la phrase."
+    },
+    "quantite": {
+      "type": ["object", "null"],
+      "description": "Référence à un groupe numérique (voir groupes_numeriques) jouant le rôle de quantité, avec son unité si mentionnée.",
+      "properties": {
+        "groupe_id": {"type": "string", "description": "Identifiant du groupe dans groupes_numeriques, ex. 'N1'."},
+        "unite": {"type": ["string", "null"], "description": "Unité de la quantité si mentionnée (sac, mouton, pagne...), jamais déduite si absente."}
+      },
+      "required": ["groupe_id"]
+    },
+    "groupes_numeriques": {
+      "type": "array",
+      "description": "Recopié tel quel depuis la sortie de montants.extraire_groupes() — le LLM ne modifie ni le texte ni la valeur de ces groupes, il leur attribue seulement des rôles via les champs quantite/montant/prix_unitaire de ce schéma.",
+      "items": {
+        "type": "object",
+        "required": ["id", "texte", "valeur_dorome", "role"],
+        "properties": {
+          "id": {"type": "string"},
+          "texte": {"type": "string", "description": "Expression originale exacte (voir note sur expression_originale)."},
+          "valeur_dorome": {"type": "integer"},
+          "role": {
+            "type": "string",
+            "enum": ["quantite", "montant_total", "prix_unitaire", "autre", "ambigu"],
+            "description": "'ambigu' doit être utilisé plutôt que de deviner — voir confirmation_requise."
+          }
+        }
+      }
+    },
+    "montant": {
+      "type": ["object", "null"],
+      "description": "Résultat du calcul déterministe (fait par le système, jamais par le LLM), renseigné après validation du rôle 'montant_total' ou 'prix_unitaire'×'quantite'.",
+      "properties": {
+        "montant_brut_dorome": {"type": "integer", "description": "Valeur en dɔrɔmɛ avant conversion, ou en FCFA si unite_monetaire='fcfa_explicite'."},
+        "unite_monetaire": {"type": "string", "enum": ["dorome_implicite", "fcfa_explicite"], "description": "'fcfa_explicite' uniquement si le mot FCFA/franc est prononcé ; sinon la convention ×5 s'applique (dorome_implicite)."},
+        "montant_fcfa": {"type": "integer", "description": "Calculé par le système : montant_brut_dorome × 5 si dorome_implicite, tel quel si fcfa_explicite. Jamais calculé par le LLM."}
+      },
+      "required": ["montant_brut_dorome", "unite_monetaire", "montant_fcfa"]
+    },
+    "expression_originale": {
+      "type": "object",
+      "description": "Traçabilité : quelle partie de la phrase a motivé chaque extraction, pour permettre un audit humain sans deviner ce que le modèle a lu.",
+      "properties": {
+        "domaine_operation": {"type": "string", "description": "Mot(s) exact(s) ayant motivé domaine/operation, ex. 'juru' + 'a y'o sara'."},
+        "personne": {"type": ["string", "null"]},
+        "produit": {"type": ["string", "null"]}
+      }
+    },
+    "informations_manquantes": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["montant", "quantite", "produit", "personne", "operation"]},
+      "description": "Champs requis par le référentiel d'opérations pour ce domaine/operation mais absents de la phrase — jamais complétés par une supposition."
+    },
+    "ambiguites": {
+      "type": "array",
+      "description": "Toute incertitude réelle à faire trancher par le dialogue, pas par le modèle seul — ex. un groupe numérique de rôle 'ambigu', ou une opération dont le domaine est incertain.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "champ": {"type": "string"},
+          "raison": {"type": "string"}
+        }
+      }
+    },
+    "effet_comptable_potentiel": {
+      "type": ["string", "null"],
+      "enum": ["creer_transaction", "augmenter_creance", "diminuer_creance", "augmenter_capital", "ajuster_stock_plus", "ajuster_stock_moins", "corriger_transaction_existante", "aucun", null],
+      "description": "Effet proposé SI l'opération est confirmée — ne modifie jamais la base comptable directement. Voir REFERENTIEL_OPERATIONS_COMPTABLES.md pour la correspondance domaine/operation -> effet."
+    },
+    "action_proposee": {
+      "type": "string",
+      "enum": ["demander_montant", "demander_quantite", "demander_produit", "demander_personne", "demander_operation", "demander_confirmation", "repondre_directement"],
+      "description": "Prochaine étape du dialogue. 'repondre_directement' uniquement si aucune information manquante et aucune ambiguïté."
+    },
+    "confirmation_requise": {
+      "type": "boolean",
+      "description": "true dès que informations_manquantes ou ambiguites n'est pas vide, ou que effet_comptable_potentiel modifierait un solde existant (créance, capital, stock)."
+    }
+  }
+}

@@ -1,6 +1,7 @@
 # Évaluation (léger, suffit pour evaluer.py et les tests)
 jiwer>=3.0
 pytest>=8.0
+jsonschema>=4.0  # valide les sorties LLM contre asr_test/v2/schema_semantique_v1.json
 
 # Moteur de décision, API Gateway, base de données (moteur/) : légers, aucun
 # modèle à télécharger.

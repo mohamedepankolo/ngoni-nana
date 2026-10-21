@@ -1,0 +1,2 @@
+id,scenario_id,locuteur_id,texte_bambara,sens_fr,domaine_attendu,operation_attendue,personne_attendue,produit_attendu,quantite_attendue,unite_quantite,montant_fcfa_attendu,ambiguite_attendue,statut_validation,notes_locutrice,date_validation
+EXEMPLE01,A1,L04,"(à remplir par la locutrice)","Vente de trois sacs de riz, prix non précisé",vente,creation,,riz,3,sac,,oui - montant manquant,a_valider,,
