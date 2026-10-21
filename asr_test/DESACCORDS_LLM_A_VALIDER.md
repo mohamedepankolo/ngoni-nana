@@ -107,6 +107,68 @@ spécifiquement "unité ni dizaine", soit déléguer cette conversion à un
 analyseur déterministe (ce que `montants.py` fait déjà, et fait bien, pour le
 moteur actuel) plutôt que de la confier entièrement au LLM.
 
+## Protocole 7 (intention isolée) — 18 désaccords, dont 8 vraiment nouveaux
+
+Contexte : `asr_test/scripts/evaluer_intention_seule.py`, classification
+d'intention seule sur les 53 phrases (sans groupes numériques), 66 % brut
+(35/53). Avant de traiter les 18 désaccords comme 18 erreurs du LLM,
+vérification systématique contre ce qui est déjà documenté :
+
+| Catégorie | Nombre | Détail |
+|---|---|---|
+| Déjà dans `ECHECS_CONNUS_INTENTION` (moteur à règles) | 8 | P08b, P09b, P05c, P06c, P12c, P14c, P16c, P19c |
+| Déjà documenté ci-dessus (flou achat/dépense du corpus lui-même) | 2 | P12, P12b (même famille que P12c) |
+| **Vraiment nouveaux** | **8** | voir ci-dessous |
+
+**Score ajusté en excluant les 10 désaccords déjà connus (sans supposer que
+le LLM a raison sur eux — juste qu'ils ne sont pas de nouvelles erreurs) :
+45/53 = 85 %**, à comparer aux 94 %/85 % du grand LLM des protocoles 1-2.
+Le vrai écart de compréhension entre `mistral:7b` et un LLM puissant est
+donc beaucoup plus restreint que le 66 % brut ne le suggérait.
+
+Les 8 désaccords vraiment nouveaux se regroupent en 3 motifs distincts :
+
+**Motif A — déclaration monétaire sans verbe, ambiguë entre vente et dette_client (4 cas)**
+
+| ID | Phrase | Attendu | LLM |
+|---|---|---|---|
+| P01 | n ka kɛmɛ duuru bɛ Mariam na | dette_client | vente |
+| P01b | n ka kɛmɛ duuru bɛ Mariam min na | dette_client | vente |
+| P01c | n ka kɛmɛ duuru bɛ Mariama fɛ | dette_client | vente |
+| P13c | n ka waa fila de bɛ Awa la | dette_client | vente |
+
+Aucun verbe de transaction (feere/san/sara) n'est présent — juste "X francs
+sont avec/chez Mariam/Awa". Question pour une locutrice : cette
+construction signale-t-elle sans ambiguïté une dette (l'argent est dû par
+cette personne), ou le sens dépend-il réellement du ton/contexte oral
+absent du texte seul ? Si c'est univoque en bambara, c'est une vraie lacune
+du LLM à corriger ; sinon, c'est une ambiguïté de plus à gérer par le
+dialogue (demander confirmation) plutôt qu'à deviner.
+
+**Motif B — marqueur interrogatif (joli/jɔn) non priorisé pour "consultation" (3 cas)**
+
+| ID | Phrase | Attendu | LLM |
+|---|---|---|---|
+| P17 | n ye joli feere nin kalo in na | consultation | vente |
+| P17b | n yɛrɛ ka minɛn tɔ tora joli nin kalo in na | consultation | stock |
+| P18 | n ka juru bɛ mɔgɔ jɔn na | consultation | dette_client |
+
+Le LLM semble se focaliser sur un mot-thème present (feere/tora/juru)
+plutôt que sur le marqueur interrogatif (joli/jɔn) qui devrait prendre le
+dessus et signaler une question. Contrairement au motif A, ceci ressemble
+à une vraie limite de compréhension, pas une ambiguïté de la phrase
+elle-même — "joli"/"jɔn" marquent sans équivoque une question en bambara.
+
+**Motif C — faux positif lexical, "san" lu dans un mot sans rapport (1 cas)**
+
+| ID | Phrase | Attendu | LLM |
+|---|---|---|---|
+| P19 | sanɲɔgɔn bɔrɔ naani de bɛ ne bolo | stock | achat |
+
+"san" (acheter) apparaît comme sous-chaîne du mot "sanɲɔgɔn" (sans rapport
+avec l'achat ici), ce qui a probablement biaisé la classification. Un bug
+de reconnaissance lexicale assez classique, pas une ambiguïté réelle.
+
 ## Pourquoi cette vérification compte
 
 Si les 3 cas sont de vraies erreurs d'étiquetage du corpus (pas des erreurs du

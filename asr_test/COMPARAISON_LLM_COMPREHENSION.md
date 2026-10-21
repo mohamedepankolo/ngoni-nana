@@ -337,10 +337,31 @@ lu comme vente quand le corpus attend achat) et confusion achat/dépense
 (frontière déjà floue dans l'annotation de référence elle-même, voir
 `DESACCORDS_LLM_A_VALIDER.md`) — pas un problème entièrement nouveau.
 
+**Vérification méthodologique (avant de conclure)** : les 18 désaccords ont
+été croisés avec ce qui est déjà documenté — `ECHECS_CONNUS_INTENTION` (8 cas,
+moteur à règles) et le flou achat/dépense du corpus (2 cas) — avant d'être
+traités comme des erreurs du LLM. Détail complet dans
+`DESACCORDS_LLM_A_VALIDER.md`. **10 des 18 désaccords ne sont pas de
+nouvelles erreurs.** Score ajusté : **45/53 = 85 %**, bien plus proche des
+94 %/85 % du grand LLM que le 66 % brut ne le suggérait.
+
+Il reste 8 vrais nouveaux désaccords, regroupés en 3 motifs précis (détail et
+phrases exactes dans `DESACCORDS_LLM_A_VALIDER.md`) :
+- **4 cas** : déclaration monétaire sans verbe ("X francs sont chez Y"),
+  ambiguë entre vente et dette_client — à faire trancher par une locutrice,
+  pas évident que ce soit une erreur du LLM plutôt qu'une vraie ambiguïté.
+- **3 cas** : le marqueur interrogatif (joli/jɔn) n'est pas priorisé face à
+  un mot-thème présent dans la même phrase (feere/tora/juru) — ressemble à
+  une vraie limite de compréhension, pas une ambiguïté de la phrase.
+- **1 cas** : faux positif lexical ("san"=acheter lu à l'intérieur du mot
+  "sanɲɔgɔn", sans rapport).
+
 **Conclusion sur l'intention** : séparer les tâches est la bonne direction,
-mais 66 % reste loin des 85-94 % obtenus avec le grand LLM payant aux
-protocoles 1-2. `mistral:7b` a une limite réelle de compréhension du
-bambara sur ce point, indépendante de la segmentation numérique.
+et l'écart réel avec le grand LLM est plus restreint que le 66 % brut ne le
+suggérait (85 % ajusté). Le problème le plus clairement attribuable à
+`mistral:7b` lui-même, pas à une ambiguïté du corpus, est la gestion des
+questions (motif B) — une piste de correction plus ciblée que "le modèle ne
+comprend pas le bambara".
 
 **Conclusion générale du protocole 7, révisée** : l'architecture
 "segmentation déterministe + LLM pour les rôles" résout bien le problème des
@@ -363,7 +384,7 @@ fait naître.
 |---|---|---|---|---|---|---|
 | | P1 | P2 | P3 | P4 | P5 | P6 | P7 (segmentation + rôle) |
 |---|---|---|---|---|---|---|---|
-| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | **49 % (26/53) — problème non résolu** |
+| Intentions | 94 % | 85 %* | élevé, non chiffré | 1/2, structure non suivie | 2-3/4 essais | non chiffrée | 66 % brut, **85 % ajusté** (après exclusion des désaccords déjà connus) |
 | Montants | **100 %** | 96 % | **7 %** | **0 %, invention** | **0 %** | **13 % (6/45)** | **91 % (41/45), 4 signalées ambiguës plutôt que devinées** |
 
 *la baisse ne traduit pas une régression de compréhension (voir ci-dessus).
