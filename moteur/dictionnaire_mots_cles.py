@@ -17,7 +17,7 @@ annoté "depense"). Le parcours utilisateur ne propose de toute façon que 5
 actions au menu (vente, depense, capital, client, stock) : "achat" est donc
 traité ici comme un cas de "depense", pas comme une 6e action.
 """
-from montants import extraire_nombres, normaliser
+from montants import ET, NUMERAUX, extraire_nombres, normaliser
 
 # Ordre de priorité quand plusieurs intentions correspondent à la fois dans la
 # même phrase (ex. une question sur une dette contient aussi "juru").
@@ -84,6 +84,47 @@ def reconnaitre_intention(texte: str) -> str | None:
             return intention
     if _ressemble_a_une_dette(texte):
         return "client"
+    return None
+
+
+# Menu numérique (R2, intégration téléphonie/USSD) : une utilisatrice peut
+# choisir une action en disant ou en tapant un chiffre de 1 à 6 plutôt que le
+# mot-clé bambara correspondant - plus fiable sur un canal USSD/clavier, où un
+# chiffre isolé est quasi toujours bien reconnu, alors qu'un mot-clé parlé
+# dépend de la qualité de l'ASR. Ordre arbitraire mais à garder stable une
+# fois annoncé aux utilisatrices (voir messages_bambara.menu_principal) : le
+# changer casserait l'association déjà apprise par une utilisatrice régulière.
+MENU_NUMERIQUE: dict[int, str] = {
+    1: "vente", 2: "depense", 3: "capital",
+    4: "client", 5: "stock", 6: "consultation",
+}
+
+
+def reconnaitre_choix_menu(texte: str) -> str | None:
+    """Un chiffre isolé (1 à 6) -> l'intention correspondante du menu, sinon None.
+
+    Accepte aussi bien un chiffre arabe tapé tel quel ("1", canal USSD/clavier)
+    qu'un nombre dit en toutes lettres bambara ("kelen", canal vocal) - voir
+    MENU_NUMERIQUE. Volontairement strict : rejette tout énoncé contenant
+    autre chose qu'un seul nombre dans cette plage, pour ne jamais confondre
+    un choix de menu avec un nombre qui fait partie d'une vraie phrase (ex.
+    "n ye saga saba feere" contient "saba"=3, mais n'est pas un choix de menu
+    - "feere" prime, voir reconnaitre_intention).
+
+    À utiliser seulement quand aucune intention n'est déjà active dans la
+    session (voir Session.recevoir, moteur_decision.py) : une fois une
+    intention en cours, un chiffre isolé est la réponse à un champ demandé
+    (quantité, montant...), jamais un nouveau choix de menu.
+    """
+    brut = texte.strip()
+    if brut in {str(n) for n in MENU_NUMERIQUE}:
+        return MENU_NUMERIQUE[int(brut)]
+
+    tokens = normaliser(texte).split()
+    mots_restants = [t for t in tokens if not t.isdigit() and t not in NUMERAUX and t not in ET]
+    nombres = extraire_nombres(texte)
+    if len(nombres) == 1 and not mots_restants and nombres[0] in MENU_NUMERIQUE:
+        return MENU_NUMERIQUE[nombres[0]]
     return None
 
 

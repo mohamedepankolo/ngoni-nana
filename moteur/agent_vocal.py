@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from moteur import base_donnees as db
 from moteur import messages_bambara as msg
-from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention
+from moteur.dictionnaire_mots_cles import reconnaitre_choix_menu, reconnaitre_confirmation, reconnaitre_intention
 from moteur.moteur_decision import Session, est_une_redite_numerique_fiable
 
 # Intentions qui ne font que lire des données déjà en base : rien à écrire, et
@@ -220,7 +220,11 @@ class AgentVocal:
         phrase (constaté en test réel, 2026-10-10 : enchaîner directement
         faisait redemander "oui ou non ?" en boucle jusqu'à l'échec).
         """
-        if reconnaitre_intention(texte) is not None:
+        # Un choix de menu (chiffre 1-6) est aussi accepté ici, pas seulement un
+        # mot-clé parlé : à ce moment précis, la session repart de zéro juste
+        # en dessous (Session() fraîche), donc aucune intention active ne peut
+        # entrer en collision avec le chiffre (voir Session.recevoir).
+        if reconnaitre_intention(texte) is not None or reconnaitre_choix_menu(texte) is not None:
             etat.attente_continuer = False
             etat.tentatives_continuer = 0
             etat.session_moteur = Session()

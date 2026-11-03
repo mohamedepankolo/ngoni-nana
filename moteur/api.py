@@ -230,8 +230,27 @@ def modules():
 
 @app.post("/session", dependencies=[Depends(verifier_jeton)])
 def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obtenir_agent)):
+    """Démarre une session ET renvoie le message d'accueil + menu numérique
+
+    (menu_principal, messages_bambara.py), pour qu'une utilisatrice entende
+    tout de suite ce qu'elle peut faire plutôt que d'appuyer sur le bouton
+    sans savoir quoi dire (R2, menu numérique 1-6). L'audio est au mieux : si
+    le TTS échoue, le texte reste disponible (journal de test), pas d'erreur
+    - contrairement à /call_audio, pas de son de secours ici, un bip d'erreur
+    au tout premier contact donnerait l'impression à tort que quelque chose a
+    déjà mal tourné.
+    """
     session_id = agent.demarrer_session(requete.utilisatrice_id, canal=requete.canal)
-    return {"session_id": session_id}
+    message = msg.menu_principal()
+    audio_base64, type_audio = None, "wav"
+    try:
+        chemin_audio = _obtenir_syntheser()(message)
+        with open(chemin_audio, "rb") as f:
+            audio_base64 = base64.b64encode(f.read()).decode()
+        type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
+    except Exception:
+        logger.exception("Échec TTS pour le message d'accueil (session %s)", session_id)
+    return {"session_id": session_id, "message": message, "audio_base64": audio_base64, "type_audio": type_audio}
 
 
 @app.get("/session/{session_id}", dependencies=[Depends(verifier_jeton)])
@@ -264,14 +283,31 @@ def bootstrap_demo():
 
 @app.post("/call", dependencies=[Depends(verifier_jeton)])
 def appeler(requete: AppelRequete, agent: AgentVocal = Depends(obtenir_agent)):
+    """Comme /call_audio, mais à partir de texte déjà disponible (ex. un choix
+
+    de menu tapé "1".."6" sur la page de test, voir web/index.html) : évite
+    de repasser par le micro pour tester rapidement le menu numérique (R2).
+    Synthétise aussi la réponse en audio (avant : texte seul, jamais parlé),
+    avec le même repli que /call_audio si le TTS échoue.
+    """
     resultat = agent.traiter_texte(requete.session_id, requete.utilisatrice_id, requete.texte)
+    audio_base64, type_audio = None, "wav"
+    try:
+        chemin_audio = _obtenir_syntheser()(resultat["message"])
+        with open(chemin_audio, "rb") as f:
+            audio_base64 = base64.b64encode(f.read()).decode()
+        type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
+    except Exception:
+        logger.exception("Échec TTS pour /call (session %s)", requete.session_id)
+        audio_base64 = _obtenir_audio_secours()
     return {
         "message": resultat["message"],
         "intention": resultat["contrat"]["intention"],
         "confiance": resultat["contrat"]["confiance"],
         "action": resultat["contrat"]["action"],
         "champs": resultat["contrat"]["champs"],
-        "audio": resultat["audio"],
+        "audio_base64": audio_base64,
+        "type_audio": type_audio,
     }
 
 

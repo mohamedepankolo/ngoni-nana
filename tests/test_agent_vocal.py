@@ -419,3 +419,28 @@ def test_client_paiement_recu_reduit_la_dette(agent):
     assert r["contrat"]["action"] == "enregistrer"
     client = db.consulter_client(bd, agent.utilisatrice_id, "fanta")
     assert client.montant_du == 10_000 - 3_500
+
+
+def test_choix_menu_demarre_une_vente_comme_le_mot_cle(agent):
+    """Taper/dire "1" (menu numérique, R2) démarre une vente, comme "feere"."""
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "1")
+    assert r["contrat"]["intention"] == "vente"
+    assert r["contrat"]["action"] == "demander_confirmation"
+
+
+def test_choix_menu_apres_veux_tu_faire_autre_chose(agent):
+    """Après "veux-tu faire autre chose ?", choisir "3" (capital) au menu
+
+    démarre directement une nouvelle action, sans avoir à dire "oui" d'abord
+    - même comportement que la redite d'un mot-clé (voir
+    test_enchainer_directement_sur_une_nouvelle_action_sans_dire_oui).
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["contrat"]["action"] == "enregistrer"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "3")  # 3 = capital, sans dire "oui" d'abord
+    assert r["contrat"]["intention"] == "capital"
+    assert "jagokun" in r["message"]  # réponse directe de consultation, comme "n ka jagokun"

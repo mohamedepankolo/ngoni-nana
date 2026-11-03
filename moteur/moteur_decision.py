@@ -21,7 +21,13 @@ from dataclasses import dataclass, field
 
 from montants import ET, NUMERAUX, extraire_nombres, normaliser
 
-from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, _mot_present, reconnaitre_intention
+from moteur.dictionnaire_mots_cles import (
+    EXCEPTIONS_NOMS_PROPRES,
+    MOTS_CLES,
+    _mot_present,
+    reconnaitre_choix_menu,
+    reconnaitre_intention,
+)
 
 # Conversion dɔrɔmɛ -> FCFA (1 dɔrɔmɛ = 5 FCFA). La plupart des montants sont
 # énoncés en dɔrɔmɛ sans que le mot soit prononcé (voir montants.py) ; ce
@@ -140,6 +146,14 @@ def _affiner_intention_capital(texte: str, intention: str | None) -> str | None:
     tokens = normaliser(texte).split()
     if "fara" in tokens:
         return "capital_ajout"
+    # Un énoncé qui N'EST QUE le chiffre du menu numérique (R2) ne doit pas
+    # être pris pour un montant déclaré : "3" tout seul sélectionne la
+    # consultation du capital (voir MENU_NUMERIQUE), ce n'est pas "mon
+    # capital est de 3 dɔrɔmɛ". Vérifié avant extraire_nombres, qui verrait
+    # sinon ce même chiffre comme un montant (bug réel, trouvé en testant le
+    # menu numérique : "3" tapé seul devenait à tort "capital_declaration").
+    if reconnaitre_choix_menu(texte) == "capital":
+        return "capital"
     if extraire_nombres(texte):
         return "capital_declaration"
     return "capital"
@@ -185,7 +199,7 @@ def analyser(texte: str) -> dict:
     session, pour rester testable isolément (voir Architecture_Technique
     section 9, stratégie de test).
     """
-    intention = reconnaitre_intention(texte)
+    intention = reconnaitre_intention(texte) or reconnaitre_choix_menu(texte)
     if intention is None:
         return {"intention": None, "champs": {}, "confiance": "echec", "action": "reformuler"}
     intention = _affiner_intention_capital(texte, intention)
@@ -243,7 +257,16 @@ class Session:
             return {"intention": self.intention, "champs": dict(self.champs_confirmes),
                      "confiance": "echec", "action": "escalade_humaine"}
 
-        intention = reconnaitre_intention(texte) or self.intention
+        # Le choix de menu (chiffre 1-6) n'est consulté que si AUCUNE intention
+        # n'est encore active cette session : sinon un chiffre isolé donné en
+        # réponse à un champ demandé ("quelle quantité ?" -> "1") serait repris
+        # à tort pour un nouveau choix de menu plutôt que la valeur du champ
+        # (collision chiffre de menu / chiffre de champ, voir
+        # dictionnaire_mots_cles.reconnaitre_choix_menu).
+        intention = reconnaitre_intention(texte)
+        if intention is None and self.intention is None:
+            intention = reconnaitre_choix_menu(texte)
+        intention = intention or self.intention
         intention = _affiner_intention_capital(texte, intention)
         nouveaux_champs = extraire_entites(texte, intention) if intention else {}
 

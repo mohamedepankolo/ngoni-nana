@@ -8,7 +8,12 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "asr_test" / "scripts"))
 
-from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention  # noqa: E402
+from moteur.dictionnaire_mots_cles import (  # noqa: E402
+    MENU_NUMERIQUE,
+    reconnaitre_choix_menu,
+    reconnaitre_confirmation,
+    reconnaitre_intention,
+)
 from moteur.moteur_decision import Session, analyser, extraire_entites  # noqa: E402
 
 # categorie (phrases_reelles.csv) -> intention du moteur. Le parcours
@@ -232,3 +237,63 @@ def test_combler_champ_quantite_prend_le_plus_petit_chiffre():
     session.recevoir("n ye misi naani feere")  # un seul chiffre : pris pour le montant
     resultat = session.combler_champ("quantite", "misi naani feere wa bi duuru")
     assert resultat["champs"]["quantite"] == 4
+
+
+# --- Menu numérique (R2, intégration téléphonie/USSD) ---------------------
+
+def test_reconnaitre_choix_menu_chiffre_tape():
+    """Un chiffre arabe tapé tel quel (canal USSD/clavier) -> l'action du menu."""
+    for chiffre, intention in MENU_NUMERIQUE.items():
+        assert reconnaitre_choix_menu(str(chiffre)) == intention
+
+
+def test_reconnaitre_choix_menu_mot_bambara():
+    """Le même choix, dit en toutes lettres bambara (canal vocal)."""
+    assert reconnaitre_choix_menu("kelen") == "vente"
+    assert reconnaitre_choix_menu("saba") == "capital"
+    assert reconnaitre_choix_menu("wooro") == "consultation"
+
+
+def test_reconnaitre_choix_menu_rejette_un_nombre_dans_une_vraie_phrase():
+    """"saba" (3) apparaît dans cette phrase, mais ce n'est pas un choix de
+
+    menu : reconnaitre_choix_menu doit rester strict (un seul nombre, rien
+    d'autre) pour ne jamais confondre une vraie phrase avec un menu.
+    """
+    assert reconnaitre_choix_menu("n ye saga saba feere wa bi duuru") is None
+
+
+def test_analyser_reconnait_un_choix_de_menu():
+    """analyser() (fonction pure, sans session) accepte aussi un chiffre de menu."""
+    resultat = analyser("1")
+    assert resultat["intention"] == "vente"
+    assert resultat["action"] == "demander_confirmation"
+    assert resultat["confiance"] == "a_confirmer"  # article/quantité/montant encore manquants
+
+
+def test_session_choix_menu_demarre_la_bonne_intention():
+    """Une session qui démarre par un chiffre de menu se comporte comme si
+
+    le mot-clé correspondant avait été dit.
+    """
+    session = Session()
+    resultat = session.recevoir("3")  # 3 = capital (voir MENU_NUMERIQUE)
+    assert resultat["intention"] == "capital"
+
+
+def test_choix_menu_ignore_une_fois_une_intention_deja_active():
+    """Régression de conception : une fois une intention active, un chiffre
+
+    isolé est la réponse à un champ demandé (quantité, montant...), jamais un
+    nouveau choix de menu - sinon répondre "2" à une question posée après
+    avoir choisi "1" (vente) changerait silencieusement l'intention en
+    "depense" au lieu de remplir le champ attendu (voir
+    dictionnaire_mots_cles.reconnaitre_choix_menu et
+    Session.recevoir, moteur_decision.py).
+    """
+    session = Session()
+    premier = session.recevoir("1")  # 1 = vente
+    assert premier["intention"] == "vente"
+
+    deuxieme = session.recevoir("2")  # ne doit PAS redevenir "depense"
+    assert deuxieme["intention"] == "vente"

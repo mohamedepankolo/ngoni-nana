@@ -26,6 +26,20 @@
   }
   #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 28px; }
 
+  /* MODE TEST (menu numerique, R2) : boutons 1-6 pour tester le menu sans
+     repasser par le micro a chaque fois (plus rapide que d'enregistrer la
+     voix pour chaque essai). A RETIRER avec le reste du MODE TEST avant un
+     usage reel : le vrai canal est la voix/telephonie, pas des boutons a
+     l'ecran (voir le commentaire sur #filEchanges, meme raison). */
+  #menuNumerique {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 320px;
+  }
+  #menuNumerique button {
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid #b85424;
+    background: #fff; color: #b85424; font-size: 16px; font-weight: 600;
+  }
+  #menuNumerique button:disabled { opacity: 0.4; }
+
   /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
      ce qui est reconnu/repondu pendant les tests internes, sans avoir a
      ouvrir le reglage cache a chaque tour. A RETIRER avant un usage reel
@@ -109,6 +123,16 @@
         <line x1="12" y1="18" x2="12" y2="21" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
     </button>
+  </div>
+
+  <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>. -->
+  <div id="menuNumerique">
+    <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">1</button>
+    <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">2</button>
+    <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">3</button>
+    <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">4</button>
+    <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">5</button>
+    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">6</button>
   </div>
 
   <!-- MODE TEST : voir le commentaire sur #filEchanges dans <style>. -->
@@ -233,6 +257,11 @@ async function appelApi(chemin, options = {}) {
   return reponse.json();
 }
 
+function activerControles(actif) {
+  $("bouton").disabled = !actif;
+  document.querySelectorAll("#menuNumerique button").forEach((b) => { b.disabled = !actif; });
+}
+
 async function demarrer() {
   if (!jeton) { journal("Aucun jeton enregistre."); return; }
   try {
@@ -240,16 +269,28 @@ async function demarrer() {
     utilisatriceId = bootstrap.utilisatrice_id;
     await nouvelleSession();
     journal("Pret.");
-    $("bouton").disabled = false;
+    activerControles(true);
   } catch (e) {
     await signalerErreur("Erreur de connexion : " + e.message);
   }
 }
 
+// Message d'accueil + menu numérique (menu_principal, messages_bambara.py) :
+// joué automatiquement à chaque nouvelle session (démarrage de l'app, ou
+// reprise après "fin_session"/"escalade_humaine" dans traiterReponseAgent),
+// pour que l'utilisatrice sache quoi dire/taper sans avoir à deviner.
 async function nouvelleSession() {
   const s = await appelApi("/session", { methode: "POST", corps: { utilisatrice_id: utilisatriceId } });
   sessionId = s.session_id;
   journal("Session " + sessionId + " demarree.");
+  ajouterAuFil("N'GONI NANA", s.message);
+  if (s.audio_base64) {
+    const lecteur = $("lecteur");
+    lecteur.src = `data:audio/${s.type_audio};base64,${s.audio_base64}`;
+    etatBouton("parle");
+    await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
+    etatBouton("");
+  }
 }
 
 async function commencerEnregistrement() {
@@ -270,43 +311,70 @@ function arreterEnregistrement() {
   });
 }
 
+// Partagé entre le tour vocal (/call_audio) et un choix de menu tapé (/call,
+// voir envoyerChoixMenu) : même traitement de la réponse quel que soit le
+// canal d'entrée, pour ne pas dupliquer la logique de lecture audio / fin de
+// session entre les deux chemins.
+async function traiterReponseAgent(resultat, texteEnvoye) {
+  journal(`reconnu: « ${resultat.texte_reconnu ?? texteEnvoye ?? "(rien)"} » -> ${resultat.message}`);
+  ajouterAuFil("Toi", resultat.texte_reconnu ?? texteEnvoye ?? "(rien compris)");  // MODE TEST, voir #filEchanges
+  ajouterAuFil("N'GONI NANA", resultat.message);                                  // MODE TEST, voir #filEchanges
+
+  if (resultat.audio_base64) {
+    const lecteur = $("lecteur");
+    lecteur.src = `data:audio/${resultat.type_audio};base64,${resultat.audio_base64}`;
+    etatBouton("parle");
+    await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
+  }
+
+  if (resultat.action === "fin_session" || resultat.action === "escalade_humaine") {
+    // "enregistrer" ne declenche plus une nouvelle session tout de suite :
+    // le systeme demande d'abord "veux-tu faire autre chose ?" et attend
+    // une vraie reponse (voir agent_vocal.py, _traiter_reponse_continuer).
+    // Une nouvelle session ne demarre qu'une fois cet echange termine
+    // (oui -> "continuer_session" reste sur la meme session ; non ->
+    // "fin_session" ici). Avant ce correctif, la session changeait tout de
+    // suite apres l'enregistrement et la reponse a la question etait
+    // traitee comme une tentative d'action ratee (bug reel, 2026-10-09).
+    await nouvelleSession();
+  }
+}
+
 async function envoyerTour(blobAudio) {
   etatBouton("traitement");
-  $("bouton").disabled = true;
+  activerControles(false);
   try {
     const donnees = new FormData();
     donnees.append("session_id", sessionId);
     donnees.append("utilisatrice_id", utilisatriceId);
     donnees.append("fichier", blobAudio, "tour.webm");
     const resultat = await appelApi("/call_audio", { methode: "POST", corps: donnees });
-
-    journal(`reconnu: « ${resultat.texte_reconnu || "(rien)"} » -> ${resultat.message}`);
-    ajouterAuFil("Toi", resultat.texte_reconnu || "(rien compris)");  // MODE TEST, voir #filEchanges
-    ajouterAuFil("N'GONI NANA", resultat.message);                   // MODE TEST, voir #filEchanges
-
-    if (resultat.audio_base64) {
-      const lecteur = $("lecteur");
-      lecteur.src = `data:audio/${resultat.type_audio};base64,${resultat.audio_base64}`;
-      etatBouton("parle");
-      await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
-    }
-
-    if (resultat.action === "fin_session" || resultat.action === "escalade_humaine") {
-      // "enregistrer" ne declenche plus une nouvelle session tout de suite :
-      // le systeme demande d'abord "veux-tu faire autre chose ?" et attend
-      // une vraie reponse (voir agent_vocal.py, _traiter_reponse_continuer).
-      // Une nouvelle session ne demarre qu'une fois cet echange termine
-      // (oui -> "continuer_session" reste sur la meme session ; non ->
-      // "fin_session" ici). Avant ce correctif, la session changeait tout de
-      // suite apres l'enregistrement et la reponse a la question etait
-      // traitee comme une tentative d'action ratee (bug reel, 2026-10-09).
-      await nouvelleSession();
-    }
+    await traiterReponseAgent(resultat);
   } catch (e) {
     await signalerErreur("Erreur : " + e.message);
   } finally {
     etatBouton("");
-    $("bouton").disabled = false;
+    activerControles(true);
+  }
+}
+
+// MODE TEST (menu numerique, R2) : un chiffre tape (1-6) part directement en
+// texte via /call, sans passer par le micro - voir reconnaitre_choix_menu
+// (dictionnaire_mots_cles.py). Memes etats visuels que le bouton vocal.
+async function envoyerChoixMenu(chiffre) {
+  etatBouton("traitement");
+  activerControles(false);
+  try {
+    const resultat = await appelApi("/call", {
+      methode: "POST",
+      corps: { session_id: sessionId, utilisatrice_id: utilisatriceId, texte: String(chiffre) },
+    });
+    await traiterReponseAgent(resultat, String(chiffre));
+  } catch (e) {
+    await signalerErreur("Erreur : " + e.message);
+  } finally {
+    etatBouton("");
+    activerControles(true);
   }
 }
 
