@@ -1,0 +1,61 @@
+id,fichier_audio,transcription,latence_s
+P01,P01_L01_calme.wav,nɛkɛmɛ duuru bɛ marriage na,0.36
+P02,P02_L01_calme.wav,n ye saga saba feere wa bi duuru,0.31
+P03,P03_L01_calme.wav,n ye tika bɔrɛ fere wa,0.30
+P04,P04_L01_calme.wav,ne ye safunɛ feere kɛmɛ,0.31
+P05,P05_L01_calme.wav,n ye gansara tan,0.32
+P06,P06_L01_calme.wav,ne ye fini tafe kelen feere wa kelen ni kɛmɛ duuru,0.39
+P07,P07_L01_calme.wav,n ye san ka bɔrɛ kelen san wa duuru,0.33
+P08,P08_L01_calme.wav,ne ye situlu san kɛmɛ fila ni bi duuru,0.35
+P09,P09_L01_calme.wav,ne ye sɛden duuru san waa fila ni kɛmɛ duuru,0.36
+P10,P10_L01_calme.wav,n ye n ka paser sa kɛmɛ ni bi duuru,0.31
+P11,P11_L01_calme.wav,ne ye n ka so sigiyɔrɔ sara dɔrɔmɛ mugan,0.33
+P12,P12_L01_calme.wav,ne ye waa kelen kɛ ka mana foroko san,0.29
+P13,P13_L01_calme.wav,ne ka waa fila juru bɛ aw la,0.27
+P14,P14_L01_calme.wav,nɛkɛmɛ wolonwula jurumu bi fa ta la a y'o sara,0.42
+P15,P15_L01_calme.wav,ne ka jagokun ye waa tan,0.25
+P16,P16_L01_calme.wav,n ye wa naani fara n ka jagokun kan,0.31
+P17,P17_L01_calme.wav,ne ye joli de feere nin kalo in na,0.30
+P18,P18_L01_calme.wav,ne ka juru bɛ mɔgɔ jɔn na,0.27
+P19,P19_L01_calme.wav,sanɲɔgɔn bɔrɔ naani de bɛ ne bolo a tɔ la,0.33
+P20,P20_L01_calme.wav,n ye saga saba feere wa mugan ni duuru,0.32
+P01b,P01b_L02_calme.wav,ne ka kɛmɛ duuru bɛ mariage na,0.31
+P02b,P02b_L02_calme.wav,ne ye saga saba feere wa duuru,0.37
+P03b,P03b_L02_calme.wav,ne ye bɔrɔ fila t'a bɔrɔ fila nan yo feere wasa,0.46
+P04b,P04b_L02_calme.wav,ne ye safunɛ fe yen,0.25
+P05b,P05b_L02_calme.wav,ne ye gansa fere,0.28
+P06b,P06b_L02_calme.wav,ne ye fini fere a kelen ni kɛmɛ duuru,0.40
+P07b,P07b_L02_calme.wav,ne ye san bɔrɛ fere wa duuru,0.37
+P08b,P08b_L02_calme.wav,n'i ye situlu feere kɛmɛ fila ni bi duuru,0.35
+P09b,P09b_L02_calme.wav,n'i ye sɛ duuru feere wa duuru,0.35
+P10b,P10b_L02_calme.wav,n ye passe sara kɛmɛ ni bi duuru,0.30
+P11b,P11b_L02_calme.wav,n ye n ka sugu sigiyɔrɔ sara mugan,0.31
+P12b,P12b_L02_calme.wav,ɲɛ mana foroko ni bɔrɛw san,0.34
+P13b,P13b_L02_calme.wav,ne ka wa fila bɛ aw juru bɛ aw la,0.30
+P14b,P14b_L02_calme.wav,fanta ye kɛmɛ wolonwula sara ne ka juru la,0.36
+P15b,P15b_L02_calme.wav,ne ka jagokun bɛɛ ye waa tan,0.27
+P16b,P16b_L02_calme.wav,n ye wa naani fara n ka jagokun kan,0.30
+P17b,P17b_L02_calme.wav,ne yɛrɛ ka minɛn tɔ tora joli nin kalo in na,0.33
+P18b,P18b_L02_calme.wav,mɔgɔ jɔn ni jɔn de ka ne ka juru b'olu la,0.32
+P19b,P19b_L02_calme.wav,ɛɛ ɲɔ bɔrɛ naani de tora an bolo,0.31
+P20b,P20b_L02_calme.wav,n'i ye saga fere wa mugan ni duuru,0.36
+P01c,P01c_L03_calme.wav,ne ka kɛmɛ duuru bɛ mariama fɛ,0.28
+P02c,P02c_L03_calme.wav,saga saba feere bɛ na wa abizulu ma i sɔnna,0.41
+P03c,P03c_L03_calme.wav,ne ye tika bɔrɔ feere wasa,0.29
+P04c,P04c_L03_calme.wav,ne ye safunɛ san,0.24
+P05c,P05c_L03_calme.wav,ne ye gwa sara tan kɛmɛ duuru,0.32
+P06c,P06c_L03_calme.wav,ne ye fini san waa kelen ni kɛmɛ duuru,0.29
+P07c,P07c_L03_calme.wav,ne ye ɲɔ bɔnɛ kelen san wa duuru,0.29
+P08c,P08c_L03_calme.wav,ne ye si tulu san ne ye si tulu kɛmɛ fila ni bi duuru la san,0.37
+P09c,P09c_L03_calme.wav,ne ye sɛ san waa fila ni kɛmɛ duuru,0.32
+P10c,P10c_L03_calme.wav,n'a ye passer sara kɛmɛ ni bi duuru,0.29
+P11c,P11c_L03_calme.wav,ne ye n sigiyɔrɔ sara damɛ mugan,0.30
+P12c,P12c_L03_calme.wav,ne ye waa kelen don bɔrɛw la,0.30
+P13c,P13c_L03_calme.wav,ne ka waa fila de bɛ aw la,0.26
+P14c,P14c_L03_calme.wav,fanta ye ne ka kɛmɛ wolonwula sara,0.29
+P15c,P15c_L03_calme.wav,ne ka jagokun tun ye waa tan ye,0.28
+P16c,P16c_L03_calme.wav,ne ye waa tan fa o kan,0.26
+P17c,P17c_L03_calme.wav,ne ye joli feere ni kalo in na,0.28
+P18c,P18c_L03_calme.wav,ne ka wari bɛ jɔn na,0.24
+P19c,P19c_L03_calme.wav,ne ka ɲɔ tun ye bɔrɔ naani ye,0.27
+P20c,P20c_L03_calme.wav,ne ye saga saba feere wa mugan ni duuru,0.33
