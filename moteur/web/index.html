@@ -52,7 +52,7 @@
   #carteCapital .depense { color: #e8695a; }
 
   /* Grille d'actions (equivalent des tuiles "Favorites" de Max it) : memes
-     6 choix que le menu vocal/telephonie (voir MENU_NUMERIQUE,
+     5 choix que le menu vocal/telephonie (voir MENU_NUMERIQUE,
      dictionnaire_mots_cles.py), juste presentes en tuiles plutot qu'en
      boutons ronds numerotes. */
   #menuNumerique {
@@ -208,7 +208,7 @@
   </div>
 
   <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
-       Memes 6 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py). -->
+       Memes 5 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py). -->
   <div id="menuNumerique">
     <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
       <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
@@ -224,9 +224,6 @@
     </button>
     <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
       <span class="badge">5</span><span class="etiquette">Bolo<small>stock</small></span>
-    </button>
-    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
-      <span class="badge">6</span><span class="etiquette">Joli<small>consultation</small></span>
     </button>
   </div>
 
@@ -660,33 +657,40 @@ function fermerBilanVue() { $("vueBilan").classList.remove("visible"); }
 
 const bouton = $("bouton");
 let enTraitement = false;
-bouton.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  // L'attribut HTML "disabled" n'empeche pas toujours un pointerdown de se
-  // declencher (observe en test reel, 2026-10-08 : bouton grise car demarrer()
-  // n'avait pas encore reussi, mais le micro s'activait quand meme et l'envoi
-  // echouait en 401 plus loin, au lieu de simplement ne rien faire).
-  if (bouton.disabled || enTraitement) return;
-  commencerEnregistrement().catch((err) => signalerErreur("Micro indisponible : " + err.message));
-});
-["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
-  bouton.addEventListener(evt, async () => {
-    if (!enregistreur || enregistreur.state !== "recording") return;
-    // Desactive IMMEDIATEMENT, avant tout await : sinon un second
-    // pointerdown entre ce relachement et l'envoi reel peut demarrer un
-    // nouvel enregistrement qui ecrase `morceaux` en plein milieu.
+// Un clic pour parler, un second pour envoyer (PAS "maintenir appuye") :
+// essaye d'abord en "maintenir appuye, relacher pour envoyer" (voir
+// l'ancienne version de ce bloc), mais observe en test reel (2026-11-16)
+// qu'une utilisatrice clique et relache tout de suite AVANT de parler,
+// pensant que ca reste a l'ecoute - l'enregistrement s'arretait donc avant
+// qu'elle ait rien dit, d'ou "il n'a pas compris" a chaque fois. `bascule`
+// protege contre un double-clic trop rapide (avant que le premier clic
+// n'ait fini de demarrer le micro, ex. en attendant l'autorisation la toute
+// premiere fois) qui lancerait un second enregistrement en parallele.
+let bascule = false;
+bouton.addEventListener("click", async () => {
+  if (bouton.disabled || enTraitement || bascule) return;
+  bascule = true;
+  try {
+    if (!enregistreur || enregistreur.state !== "recording") {
+      await commencerEnregistrement();
+      return;
+    }
     enTraitement = true;
-    $("bouton").disabled = true;
+    bouton.disabled = true;
     const blob = await arreterEnregistrement();
     if (blob && blob.size > 0) {
       await envoyerTour(blob);
     } else {
       etatBouton("");
-      $("bouton").disabled = false;
+      bouton.disabled = false;
     }
     enTraitement = false;
-  })
-);
+  } catch (err) {
+    signalerErreur("Micro indisponible : " + err.message);
+  } finally {
+    bascule = false;
+  }
+});
 
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
   journal("Microphone indisponible (ouvrir cette page en https).");

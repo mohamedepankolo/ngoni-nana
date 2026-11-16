@@ -251,7 +251,7 @@ def test_reconnaitre_choix_menu_mot_bambara():
     """Le même choix, dit en toutes lettres bambara (canal vocal)."""
     assert reconnaitre_choix_menu("kelen") == "vente"
     assert reconnaitre_choix_menu("saba") == "capital"
-    assert reconnaitre_choix_menu("wooro") == "consultation"
+    assert reconnaitre_choix_menu("duuru") == "stock"
 
 
 def test_reconnaitre_choix_menu_rejette_un_nombre_dans_une_vraie_phrase():

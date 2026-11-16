@@ -70,18 +70,20 @@ def reponse_stock(article: str, quantite: int, seuil_bas: bool) -> str:
 def menu_principal() -> str:
     """Message d'accueil avec le menu numérique (MENU_NUMERIQUE,
 
-    dictionnaire_mots_cles.py) : annonce les 6 actions avec leur chiffre ET
+    dictionnaire_mots_cles.py) : annonce les 5 actions avec leur chiffre ET
     leur mot-clé bambara habituel, pour qu'une utilisatrice puisse répondre
     soit par le chiffre (plus fiable sur un canal USSD/clavier), soit par le
     mot qu'elle dirait naturellement - le moteur reconnaît les deux (voir
     moteur_decision.Session.recevoir). Mots-clés repris tels quels de
     dictionnaire_mots_cles.MOTS_CLES plutôt que de nouveaux mots, pour ne pas
     ajouter de vocabulaire non validé supplémentaire à celui déjà signalé
-    comme À VALIDER (R9) en tête de ce module.
+    comme À VALIDER (R9) en tête de ce module. Le 6e choix ("consultation",
+    "joli") a été retiré (2026-11-16) : pas de vraie réponse construite
+    derrière (voir AgentVocal.consultation_non_disponible).
     """
     return ("I ni ce, aw bisimila N'GONI NANA na. "
             "Kelen : feere. Fila : sara. Saba : jagokun. "
-            "Naani : juru. Duuru : bolo. Wooro : joli.")
+            "Naani : juru. Duuru : bolo.")
 
 
 def continuer() -> str:

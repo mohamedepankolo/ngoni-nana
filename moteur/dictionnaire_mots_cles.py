@@ -88,20 +88,26 @@ def reconnaitre_intention(texte: str) -> str | None:
 
 
 # Menu numérique (R2, intégration téléphonie/USSD) : une utilisatrice peut
-# choisir une action en disant ou en tapant un chiffre de 1 à 6 plutôt que le
+# choisir une action en disant ou en tapant un chiffre de 1 à 5 plutôt que le
 # mot-clé bambara correspondant - plus fiable sur un canal USSD/clavier, où un
 # chiffre isolé est quasi toujours bien reconnu, alors qu'un mot-clé parlé
 # dépend de la qualité de l'ASR. Ordre arbitraire mais à garder stable une
 # fois annoncé aux utilisatrices (voir messages_bambara.menu_principal) : le
 # changer casserait l'association déjà apprise par une utilisatrice régulière.
+# "consultation" (6, "joli") retiré du menu (2026-11-16, demande explicite) :
+# cette intention n'a pas de vraie réponse construite derrière
+# (voir AgentVocal.consultation_non_disponible), proposer un chiffre pour ça
+# promettait une fonction qui n'existe pas encore. L'intention "consultation"
+# reste reconnue en reconnaissance libre (MOTS_CLES ci-dessus), juste plus
+# proposée comme raccourci chiffré.
 MENU_NUMERIQUE: dict[int, str] = {
     1: "vente", 2: "depense", 3: "capital",
-    4: "client", 5: "stock", 6: "consultation",
+    4: "client", 5: "stock",
 }
 
 
 def reconnaitre_choix_menu(texte: str) -> str | None:
-    """Un chiffre isolé (1 à 6) -> l'intention correspondante du menu, sinon None.
+    """Un chiffre isolé (1 à 5) -> l'intention correspondante du menu, sinon None.
 
     Accepte aussi bien un chiffre arabe tapé tel quel ("1", canal USSD/clavier)
     qu'un nombre dit en toutes lettres bambara ("kelen", canal vocal) - voir
