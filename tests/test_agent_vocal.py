@@ -444,3 +444,79 @@ def test_choix_menu_apres_veux_tu_faire_autre_chose(agent):
     r = agent.traiter_texte(sid, agent.utilisatrice_id, "3")  # 3 = capital, sans dire "oui" d'abord
     assert r["contrat"]["intention"] == "capital"
     assert "jagokun" in r["message"]  # réponse directe de consultation, comme "n ka jagokun"
+
+
+# --- Confirmation unitaire quantité/montant (saisie clavier, appli mobile) ---
+
+def test_quantite_et_montant_sont_relus_et_confirmes_un_par_un(agent):
+    """Chaque champ numérique (quantité, puis montant) est relu en bambara et
+
+    confirmé séparément avant de passer au suivant, puis la confirmation
+    globale habituelle a toujours lieu à la fin - demande explicite : saisie
+    clavier des chiffres sur l'application mobile, avec relecture immédiate.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga feere")  # article seul, rien de chiffré
+    assert r["contrat"]["action"] == "demander_confirmation"
+    assert "Hakɛ" in r["message"]  # demande la quantité (demander_quantite)
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "saba")  # quantite = 3
+    assert r["contrat"]["champs"]["quantite"] == 3
+    assert "saba" in r["message"]  # relecture : "I ko saba..." (nombre_en_bambara(3))
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme la quantite
+    assert "Wari" in r["message"]  # passe au champ suivant : demande le montant
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "waa saba")  # montant = 3000 dorome -> 15000 FCFA
+    assert r["contrat"]["champs"]["montant_fcfa"] == 15_000
+    assert "wari" in r["message"].lower()  # relecture du montant
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant
+    assert r["contrat"]["confiance"] == "haute"
+    assert "sɔnna" in r["message"]  # confirmation globale habituelle (confirmation_vente)
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+    assert r["contrat"]["action"] == "enregistrer"
+
+    bd = agent._session_factory()
+    transactions = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id).all()
+    assert len(transactions) == 1
+    assert transactions[0].montant_fcfa == 15_000
+    assert transactions[0].quantite == 3
+
+
+def test_refuser_la_relecture_dun_champ_redemande_ce_champ(agent):
+    """Dire "non" à la relecture d'un chiffre redemande CE champ précisément,
+
+    pas une incompréhension générique ni le dernier champ confirmé au hasard.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga feere")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "saba")  # quantite = 3, en attente de confirmation
+    assert r["contrat"]["champs"]["quantite"] == 3
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non" : la quantite dite n'est pas la bonne
+    assert "quantite" not in r["contrat"]["champs"]
+    assert "Hakɛ" in r["message"]  # redemande bien la quantite, pas une confirmation globale
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "naani")  # la bonne quantite, cette fois : 4
+    assert r["contrat"]["champs"]["quantite"] == 4
+
+
+def test_redire_toute_la_phrase_pendant_la_confirmation_unitaire_corrige(agent):
+    """Même garde-fou que pour la confirmation globale (voir
+
+    test_redire_toute_la_phrase_pendant_la_confirmation_corrige_le_montant) :
+    redire la phrase entière PENDANT la relecture d'un champ (plutôt que de
+    dire oui/non) doit corriger via le chemin normal, pas être rejeté comme
+    une réponse incomprise.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi naani feere")  # 4 pris a tort pour le montant
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "naani")  # comble la quantite -> en attente de confirmation
+    assert r["contrat"]["champs"]["montant_fcfa"] == 4 * 5  # toujours faux a ce stade
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi naani feere wa bi duuru")
+    assert r["contrat"]["champs"]["quantite"] == 4
+    assert r["contrat"]["champs"]["montant_fcfa"] == 250_000  # corrige

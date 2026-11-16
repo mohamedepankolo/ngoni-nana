@@ -126,6 +126,22 @@ def escalade() -> str:
     return "Ne bɛna i bila animatrice kɔrɔ."
 
 
+def confirmer_champ(champ: str, valeur) -> str:
+    """Relit UNE valeur tout juste saisie (quantité ou montant) avant de
+
+    poursuivre - sécurité supplémentaire sur les deux champs numériques les
+    plus sensibles à la saisie clavier (voir
+    agent_vocal.CHAMPS_A_CONFIRMER_UNITAIREMENT). Pas pour l'article ou le
+    client : un nom mal compris se corrige sans risque, un chiffre mal
+    compris peut fausser toute l'écriture comptable.
+    """
+    if champ == "montant_fcfa":
+        return f"I ko wari {_montant_bambara(valeur)}. I sɔnna wa?"
+    if champ == "quantite":
+        return f"I ko {nombre_en_bambara(valeur)}. I sɔnna wa?"
+    return "I sɔnna wa?"
+
+
 def demander_precision_montant() -> str:
     return "Wari hakɛ fɔ tuguni."
 

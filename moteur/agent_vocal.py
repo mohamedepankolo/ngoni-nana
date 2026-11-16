@@ -45,6 +45,15 @@ CONSTRUCTEURS_DEMANDE_CHAMP = {
     "client": msg.demander_client,
 }
 
+# Champs pour lesquels la valeur tout juste saisie (clavier ou voix) est
+# relue en bambara et doit être confirmée AVANT de passer au champ suivant
+# (demande explicite : saisie clavier des chiffres sur l'application mobile,
+# avec relecture immédiate, en plus de la confirmation globale de fin de
+# transaction déjà existante). Limité aux deux champs numériques : un nom
+# d'article ou de client mal compris se corrige sans risque particulier,
+# un chiffre mal compris peut fausser toute l'écriture comptable.
+CHAMPS_A_CONFIRMER_UNITAIREMENT = {"quantite", "montant_fcfa"}
+
 
 @dataclass
 class _EtatSession:
@@ -55,6 +64,11 @@ class _EtatSession:
     # dit "non" et qu'on lui redemande ce champ-là) : voir
     # _combler_champ_en_attente et _demarrer_correction.
     champ_en_attente: str | None = None
+    # Champ dont la valeur vient d'être saisie et attend sa confirmation
+    # unitaire (voir CHAMPS_A_CONFIRMER_UNITAIREMENT, _traiter_confirmation_champ)
+    # - distinct de champ_en_attente (qui attend une NOUVELLE valeur) et de
+    # en_attente_confirmation (qui attend le "oui" global de fin de transaction).
+    champ_a_confirmer: str | None = None
     # Compte les "non" d'affilée, séparément de Session.tentatives_reformulation
     # (qui compte les énoncés non compris). Nécessaire car un champ libre
     # (article, nom de client) est "rempli avec succès" par n'importe quel mot
@@ -122,6 +136,9 @@ class AgentVocal:
 
         if etat.attente_continuer:
             return self._traiter_reponse_continuer(bd, etat, session_id, utilisatrice_id, texte)
+
+        if etat.champ_a_confirmer:
+            return self._traiter_confirmation_champ(bd, etat, session_id, texte)
 
         if etat.champ_en_attente:
             return self._combler_champ_en_attente(bd, etat, session_id, texte)
@@ -344,6 +361,26 @@ class AgentVocal:
             return self._repondre(bd, session_id, contrat, construire())
 
         s.tentatives_reformulation = 0
+        if champ in CHAMPS_A_CONFIRMER_UNITAIREMENT:
+            # Relecture immédiate AVANT de passer au champ suivant ou à la
+            # confirmation globale (voir CHAMPS_A_CONFIRMER_UNITAIREMENT) :
+            # la décision du "champ suivant vs confirmation globale" est
+            # reportée dans _apres_champ_confirme, rejouée une fois le "oui"
+            # reçu (_traiter_confirmation_champ).
+            etat.champ_en_attente = None
+            etat.champ_a_confirmer = champ
+            return self._repondre(bd, session_id, contrat, msg.confirmer_champ(champ, s.champs_confirmes[champ]))
+        return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+
+    def _apres_champ_confirme(self, bd, etat: "_EtatSession", session_id: int, s: Session, contrat: dict) -> dict:
+        """Que faire une fois un champ réglé : poser la question du prochain
+
+        champ manquant, ou passer à la confirmation globale de fin de
+        transaction si c'était le dernier. Factorisé pour être rejoué aussi
+        bien juste après un remplissage direct (champs qui n'exigent pas de
+        confirmation unitaire) qu'après un "oui" à la relecture d'un champ
+        qui en exigeait une (_traiter_confirmation_champ).
+        """
         if contrat["confiance"] == "haute":
             etat.champ_en_attente = None
             etat.en_attente_confirmation = True
@@ -355,6 +392,66 @@ class AgentVocal:
         etat.champ_en_attente = manquant
         construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
         return self._repondre(bd, session_id, contrat, construire())
+
+    def _traiter_confirmation_champ(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+        """Répond à la relecture d'un champ numérique tout juste saisi
+
+        (CHAMPS_A_CONFIRMER_UNITAIREMENT). "oui" : passe à l'étape suivante
+        (champ manquant suivant, ou confirmation globale si c'était le
+        dernier - voir _apres_champ_confirme). "non" : redemande CE champ
+        précis, valeur fausse retirée - pas le dernier champ confirmé au
+        hasard comme _demarrer_correction, puisqu'ici le champ en cause est
+        déjà connu avec certitude.
+
+        Limite connue, assumée pour cette première version : contrairement
+        à _repeter_confirmation_ou_escalader, une réponse ni oui ni non ici
+        ne compte dans aucun compteur de tentatives - ne peut donc pas
+        encore escalader vers une personne si ça boucle. À corriger si
+        observé en test réel, comme le reste des compteurs d'échec de ce
+        fichier.
+        """
+        s = etat.session_moteur
+        champ = etat.champ_a_confirmer
+
+        # Même motif que _combler_champ_en_attente : redire la phrase ENTIÈRE
+        # (même mot-clé/choix de menu reconnu) corrige via le chemin normal
+        # (s.recevoir), qui peut aussi corriger un autre champ déjà faux en
+        # même temps (ex. un montant mal pris pour la quantité plus tôt) -
+        # sinon une telle redite serait rejetée comme "ni oui ni non" et le
+        # champ fautif resterait figé (même bug que celui déjà corrigé le
+        # 2026-10-09 pour la confirmation globale, voir _demarrer_correction).
+        meme_action_redite = s.intention is not None and (
+            reconnaitre_intention(texte) == s.intention or reconnaitre_choix_menu(texte) == s.intention
+        )
+        if meme_action_redite:
+            etat.champ_a_confirmer = None
+            contrat = s.recevoir(texte)
+            if contrat["action"] == "reformuler":
+                return self._repondre(bd, session_id, contrat, msg.reformulation(s.tentatives_reformulation))
+            return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+
+        reponse = reconnaitre_confirmation(texte)
+
+        if reponse is True:
+            etat.champ_a_confirmer = None
+            contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                       "confiance": "a_confirmer" if s.premier_champ_manquant() else "haute",
+                       "action": "demander_confirmation"}
+            return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+
+        if reponse is False:
+            etat.champ_a_confirmer = None
+            s.champs_confirmes.pop(champ, None)
+            etat.champ_en_attente = champ
+            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+            contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                       "confiance": "a_confirmer", "action": "demander_confirmation"}
+            return self._repondre(bd, session_id, contrat, construire())
+
+        # Ni oui ni non : redemande la même relecture (voir limite dans la docstring).
+        contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                   "confiance": "a_confirmer", "action": "demander_confirmation"}
+        return self._repondre(bd, session_id, contrat, msg.confirmer_champ(champ, s.champs_confirmes.get(champ)))
 
     def _repondre_lecture(self, bd, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]
