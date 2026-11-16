@@ -1,0 +1,16 @@
+{
+  "name": "ngoni-nana-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enveloppe Capacitor (Android) autour de la PWA moteur/web de N'GONI NANA",
+  "scripts": {
+    "sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.0",
+    "@capacitor/core": "6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.0"
+  }
+}

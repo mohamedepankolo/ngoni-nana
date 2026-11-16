@@ -231,6 +231,8 @@
 <div id="vueReglage">
   <button id="fermerReglage" onclick="fermerReglage()">×</button>
   <h2>Reglage (equipe)</h2>
+  <label>Adresse du serveur (vide = meme serveur que cette page ; ex: https://192.168.1.50:8099 pour l'appli mobile)</label>
+  <input type="text" id="champServeur">
   <label>Jeton API (API_TOKEN du serveur)</label>
   <input type="text" id="champJeton">
   <button onclick="enregistrerJeton()">Enregistrer et demarrer</button>
@@ -249,6 +251,11 @@ const $ = (id) => document.getElementById(id);
 // autre serveur par ex.) > celui fourni automatiquement par ce serveur
 // (config.js) > vide (jamais atteint en usage normal).
 let jeton = localStorage.getItem("ngoni_jeton") || window.NGONI_JETON || "";
+// Vide quand la page est servie PAR le serveur (PWA navigateur, chemins
+// relatifs valides). Non vide dans l'appli mobile (Capacitor) : la page y est
+// embarquee localement, donc "/session" seul ne pointerait nulle part - il
+// faut l'origine complete du serveur distant.
+let serveur = localStorage.getItem("ngoni_serveur") || window.NGONI_SERVEUR || "";
 let utilisatriceId = null;
 let sessionId = null;
 let media = null, enregistreur = null, morceaux = [];
@@ -305,13 +312,16 @@ function gererTapLogo() {
   if (compteurTapLogo >= 5) {
     compteurTapLogo = 0;
     $("champJeton").value = jeton;
+    $("champServeur").value = serveur;
     $("vueReglage").classList.add("visible");
   }
 }
 function fermerReglage() { $("vueReglage").classList.remove("visible"); }
 function enregistrerJeton() {
   jeton = $("champJeton").value.trim();
+  serveur = $("champServeur").value.trim().replace(/\/$/, "");
   localStorage.setItem("ngoni_jeton", jeton);
+  localStorage.setItem("ngoni_serveur", serveur);
   fermerReglage();
   demarrer();
 }
@@ -331,7 +341,7 @@ async function appelApi(chemin, options = {}) {
   const minuteur = setTimeout(() => controleur.abort(), DELAI_MAX_MS);
   let reponse;
   try {
-    reponse = await fetch(chemin, {
+    reponse = await fetch(serveur + chemin, {
       method: options.methode || "GET", headers: entetes,
       body: options.corps instanceof FormData ? options.corps : options.corps ? JSON.stringify(options.corps) : undefined,
       signal: controleur.signal,

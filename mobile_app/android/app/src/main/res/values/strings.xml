@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">N\'GONI NANA</string>
+    <string name="title_activity_main">N\'GONI NANA</string>
+    <string name="package_name">ml.abic.ngoninana</string>
+    <string name="custom_url_scheme">ml.abic.ngoninana</string>
+</resources>
