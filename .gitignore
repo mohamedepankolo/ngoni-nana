@@ -8,6 +8,7 @@ __pycache__/
 debug_audio/
 serveur.log
 server.log
+server_run.log
 
 # Enregistrements : voix des participantes -> stockés hors dépôt (Drive), jamais sur GitHub
 asr_test/audio/*

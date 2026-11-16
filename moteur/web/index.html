@@ -132,7 +132,7 @@
 
   /* ---------- Vue réglage (staff uniquement, cachée) ---------- */
   #vueReglage {
-    display: none; height: 100%; overflow-y: auto; padding: 24px; background: #faf7f2;
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px; background: #faf7f2;
     font-size: 14px; color: #2a2a2a;
   }
   #vueReglage.visible { display: block; }
@@ -146,8 +146,7 @@
   /* ---------- Vue bilan (résumé/dashboard - demande explicite, "une partie
      bilan/résumé" en plus du flux vocal) ---------- */
   #vueBilan {
-    display: none; height: 100%; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
-    position: relative;
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
   }
   #vueBilan.visible { display: block; }
   #vueBilan h2 { font-size: 15px; color: #666; font-weight: 500; margin: 0 0 4px; }
