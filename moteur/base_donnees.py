@@ -218,6 +218,47 @@ def ajouter_au_capital(db: SessionSQLAlchemy, *, utilisatrice_id: int,
     return t
 
 
+def bilan_utilisatrice(db: SessionSQLAlchemy, utilisatrice_id: int, limite_transactions: int = 10) -> dict:
+    """Résumé en lecture seule pour le tableau de bord de l'utilisatrice elle-même
+
+    (écran "bilan" de l'application mobile - différent du dashboard admin ABIC,
+    voir moteur/admin/, qui agrège par coopérative, jamais le détail d'une
+    seule utilisatrice vu par elle-même). Même principe que calculer_capital :
+    uniquement des lectures agrégées, aucune écriture.
+    """
+    transactions_toutes = db.query(Transaction).filter_by(utilisatrice_id=utilisatrice_id).all()
+    total_ventes = sum(t.montant_fcfa for t in transactions_toutes if t.type == "vente")
+    total_depenses = sum(t.montant_fcfa for t in transactions_toutes if t.type == "depense")
+
+    dernieres = (db.query(Transaction)
+                 .filter_by(utilisatrice_id=utilisatrice_id)
+                 .order_by(Transaction.date.desc())
+                 .limit(limite_transactions).all())
+
+    # Seulement les dettes encore actives (montant_du != 0) : un client soldé
+    # n'a pas besoin d'apparaître dans le bilan.
+    dettes = (db.query(Client)
+              .filter_by(utilisatrice_id=utilisatrice_id)
+              .filter(Client.montant_du != 0)
+              .order_by(Client.date_dernier_mouvement.desc()).all())
+
+    stock = db.query(Stock).filter_by(utilisatrice_id=utilisatrice_id).all()
+
+    return {
+        "capital": calculer_capital(db, utilisatrice_id),
+        "total_ventes": total_ventes,
+        "total_depenses": total_depenses,
+        "transactions": [
+            {"type": t.type, "article": t.article, "quantite": t.quantite,
+             "montant_fcfa": t.montant_fcfa, "date": t.date}
+            for t in dernieres
+        ],
+        "dettes_clients": [{"nom": c.nom_ou_code, "montant_du": c.montant_du} for c in dettes],
+        "stock": [{"article": s.article, "quantite": s.quantite_actuelle, "seuil_alerte": s.seuil_alerte}
+                  for s in stock],
+    }
+
+
 def consulter_client(db: SessionSQLAlchemy, utilisatrice_id: int, nom_client: str) -> Client | None:
     return (db.query(Client)
             .filter_by(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_client)

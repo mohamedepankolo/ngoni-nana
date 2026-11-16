@@ -175,7 +175,12 @@ def _obtenir_audio_secours() -> str | None:
     return _audio_secours_base64
 
 
-def _reponse_secours(texte_reconnu: str | None, message: str) -> dict:
+def _reponse_secours(texte_reconnu: str | None, message: str, session_id: int | None = None) -> dict:
+    # L'état de la session n'a pas bougé (l'échec arrive AVANT le moteur :
+    # ASR/conversion en panne) : "attente" doit refléter ce qui était déjà
+    # attendu, pas "menu" par défaut, sinon l'interface afficherait le mauvais
+    # widget de saisie après une simple erreur réseau/micro.
+    attente = _agent.etat_attente(session_id) if session_id is not None else "menu"
     return {
         "texte_reconnu": texte_reconnu,
         "message": message,
@@ -184,6 +189,7 @@ def _reponse_secours(texte_reconnu: str | None, message: str) -> dict:
         "champs": {},
         "audio_base64": _obtenir_audio_secours(),
         "type_audio": "wav",
+        "attente": attente,
     }
 
 
@@ -250,7 +256,8 @@ def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obte
         type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
     except Exception:
         logger.exception("Échec TTS pour le message d'accueil (session %s)", session_id)
-    return {"session_id": session_id, "message": message, "audio_base64": audio_base64, "type_audio": type_audio}
+    return {"session_id": session_id, "message": message, "audio_base64": audio_base64,
+            "type_audio": type_audio, "attente": "menu"}
 
 
 @app.get("/session/{session_id}", dependencies=[Depends(verifier_jeton)])
@@ -308,6 +315,7 @@ def appeler(requete: AppelRequete, agent: AgentVocal = Depends(obtenir_agent)):
         "champs": resultat["contrat"]["champs"],
         "audio_base64": audio_base64,
         "type_audio": type_audio,
+        "attente": resultat["attente"],
     }
 
 
@@ -325,10 +333,10 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
 
     contenu = await fichier.read()
     if not contenu:
-        return _reponse_secours(None, msg.reformulation(0))
+        return _reponse_secours(None, msg.reformulation(0), session_id)
     if len(contenu) > TAILLE_MAX_AUDIO_OCTETS:
         logger.warning("Enregistrement rejeté (%d octets > limite) pour la session %s", len(contenu), session_id)
-        return _reponse_secours(None, msg.reformulation(0))
+        return _reponse_secours(None, msg.reformulation(0), session_id)
 
     suffixe_entree = Path(fichier.filename or "audio.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffixe_entree, delete=False) as brut:
@@ -358,19 +366,19 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
             # téléphone, elle doit entendre qu'il faut réessayer (voir
             # _reponse_secours, section audit robustesse).
             logger.exception("Échec conversion/ASR pour la session %s", session_id)
-            return _reponse_secours(None, msg.reformulation(0))
+            return _reponse_secours(None, msg.reformulation(0), session_id)
     finally:
         os.unlink(chemin_brut)
         Path(chemin_wav).unlink(missing_ok=True)
 
     if not texte_reconnu or not texte_reconnu.strip():
-        return _reponse_secours(texte_reconnu, msg.reformulation(0))
+        return _reponse_secours(texte_reconnu, msg.reformulation(0), session_id)
 
     try:
         resultat = _agent.traiter_texte(session_id, utilisatrice_id, texte_reconnu)
     except Exception:
         logger.exception("Échec du moteur de décision pour la session %s", session_id)
-        return _reponse_secours(texte_reconnu, msg.reformulation(0))
+        return _reponse_secours(texte_reconnu, msg.reformulation(0), session_id)
 
     try:
         chemin_audio_reponse = _obtenir_syntheser()(resultat["message"])
@@ -396,7 +404,21 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
         "champs": resultat["contrat"]["champs"],
         "audio_base64": audio_base64,
         "type_audio": type_audio,
+        "attente": resultat["attente"],
     }
+
+
+@app.get("/bilan/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def bilan(utilisatrice_id: int):
+    """Écran "bilan" de l'application mobile (lecture seule, section 3
+
+    du vocal, "une partie bilan/résumé" demandée en plus du flux vocal) :
+    capital, totaux ventes/dépenses, dernières transactions, dettes clients,
+    stock. Voir moteur/base_donnees.bilan_utilisatrice - différent du
+    dashboard admin ABIC (moteur/admin/), qui agrège par coopérative.
+    """
+    with _SessionLocal() as bd:
+        return db.bilan_utilisatrice(bd, utilisatrice_id)
 
 
 class SmsRequete(BaseModel):

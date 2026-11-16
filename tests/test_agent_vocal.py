@@ -520,3 +520,34 @@ def test_redire_toute_la_phrase_pendant_la_confirmation_unitaire_corrige(agent):
     r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye misi naani feere wa bi duuru")
     assert r["contrat"]["champs"]["quantite"] == 4
     assert r["contrat"]["champs"]["montant_fcfa"] == 250_000  # corrige
+
+
+def test_attente_decrit_le_prochain_widget_pour_une_interface(agent):
+    """"attente" (ajouté pour l'application mobile) doit refléter exactement
+
+    ce que le système attend au prochain tour, à chaque étape d'un parcours
+    complet - pour qu'une interface sache afficher un clavier numérique, un
+    choix oui/non, ou le menu, sans avoir à deviner depuis le texte parlé.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga feere")
+    assert r["attente"] == "champ:quantite"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "saba")
+    assert r["attente"] == "confirmation_champ:quantite"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["attente"] == "champ:montant_fcfa"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "waa saba")
+    assert r["attente"] == "confirmation_champ:montant_fcfa"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["attente"] == "confirmation"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")
+    assert r["attente"] == "continuer"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # ne veut rien faire d'autre
+    assert r["attente"] == "menu"

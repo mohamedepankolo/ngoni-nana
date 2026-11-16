@@ -195,6 +195,28 @@ def test_call_avec_un_chiffre_de_menu_demarre_la_bonne_action(monkeypatch):
     assert corps["audio_base64"]
 
 
+def test_bilan_agrege_les_transactions_de_lutilisatrice():
+    """Écran "bilan" de l'application mobile (lecture seule)."""
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_transaction(bd, utilisatrice_id=u.id, type_="vente",
+                                champs={"article": "mil", "quantite": 2, "montant_fcfa": 10_000})
+
+    r = client.get(f"/bilan/{u.id}", headers=ENTETES)
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["capital"] == 10_000
+    assert corps["total_ventes"] == 10_000
+    assert len(corps["transactions"]) == 1
+
+
 def _wav_silence(duree_s: float = 0.3) -> bytes:
     tampon = io.BytesIO()
     with wave.open(tampon, "wb") as w:

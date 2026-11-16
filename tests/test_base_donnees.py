@@ -58,6 +58,43 @@ def test_dette_client_nouvelle_puis_paiement_partiel(bd):
     assert db.consulter_client(bd, bd.utilisatrice_id, "mariam").montant_du == 1500
 
 
+def test_bilan_utilisatrice_agrege_tout(bd):
+    """Écran "bilan" de l'application mobile (lecture seule) : capital, totaux,
+
+    dernières transactions, dettes clients actives, stock.
+    """
+    db.enregistrer_transaction(bd, utilisatrice_id=bd.utilisatrice_id, type_="vente",
+                                champs={"article": "mil", "quantite": 2, "montant_fcfa": 10_000})
+    db.enregistrer_transaction(bd, utilisatrice_id=bd.utilisatrice_id, type_="depense",
+                                champs={"article": "transport", "montant_fcfa": 750})
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=bd.utilisatrice_id,
+                                     nom_client="mariam", montant_fcfa=2500, est_un_paiement=False)
+    # Client soldé (montant_du == 0) : ne doit pas apparaitre dans les dettes actives.
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=bd.utilisatrice_id,
+                                     nom_client="fanta", montant_fcfa=1000, est_un_paiement=False)
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=bd.utilisatrice_id,
+                                     nom_client="fanta", montant_fcfa=1000, est_un_paiement=True)
+
+    bilan = db.bilan_utilisatrice(bd, bd.utilisatrice_id)
+
+    assert bilan["capital"] == 10_000 - 750 - 2500
+    assert bilan["total_ventes"] == 10_000
+    assert bilan["total_depenses"] == 750
+    assert len(bilan["transactions"]) == 2
+    assert {d["nom"] for d in bilan["dettes_clients"]} == {"mariam"}
+    assert bilan["stock"][0]["article"] == "mil"
+    assert bilan["stock"][0]["quantite"] == -2  # vente de 2, jamais approvisionne dans ce test
+
+
+def test_bilan_utilisatrice_sans_transaction_reste_coherent(bd):
+    """Une utilisatrice toute neuve ne doit jamais faire planter le bilan."""
+    bilan = db.bilan_utilisatrice(bd, bd.utilisatrice_id)
+    assert bilan == {
+        "capital": 0, "total_ventes": 0, "total_depenses": 0,
+        "transactions": [], "dettes_clients": [], "stock": [],
+    }
+
+
 def test_consulter_stock_inexistant_renvoie_none(bd):
     assert db.consulter_stock(bd, bd.utilisatrice_id, "savon") is None
 

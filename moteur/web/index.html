@@ -40,6 +40,40 @@
   }
   #menuNumerique button:disabled { opacity: 0.4; }
 
+  /* MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
+     client), affichee quand attente = "champ:<nom>" (voir agent_vocal.py,
+     AgentVocal._attente). Clavier numerique pour quantite/montant, texte
+     libre pour article/client (voir LABELS_CHAMP plus bas). */
+  #champSaisie { display: none; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 280px; }
+  #champSaisie input {
+    width: 100%; padding: 14px; font-size: 20px; text-align: center;
+    border: 2px solid #b85424; border-radius: 10px;
+  }
+  #champSaisie button {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    background: #b85424; color: #fff; font-weight: 600; font-size: 16px;
+  }
+  #champSaisie button:disabled, #choixOuiNon button:disabled { opacity: 0.4; }
+
+  /* MODE TEST : choix oui/non (confirmation d'un champ tout juste saisi,
+     confirmation globale de fin de transaction, ou "veux-tu faire autre
+     chose ?" - memes 3 cas que attente dans agent_vocal.py). */
+  #choixOuiNon { display: none; gap: 14px; }
+  #choixOuiNon button {
+    width: 72px; height: 72px; border-radius: 50%; border: none; font-size: 28px; color: #fff;
+  }
+  #choixOuiNon .oui { background: #4f8f5a; }
+  #choixOuiNon .non { background: #c23b2e; }
+
+  /* Bouton d'ouverture du bilan/resume - visible (contrairement au geste
+     cache du reglage equipe) : partie explicitement demandee en plus du
+     flux vocal, pas reservee a l'equipe. */
+  #ouvrirBilanBouton {
+    position: absolute; top: 16px; right: 16px; width: 40px; height: 40px;
+    border-radius: 50%; border: 1px solid #b85424; background: #fff; color: #b85424;
+    font-size: 18px; display: flex; align-items: center; justify-content: center;
+  }
+
   /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
      ce qui est reconnu/repondu pendant les tests internes, sans avoir a
      ouvrir le reglage cache a chaque tour. A RETIRER avant un usage reel
@@ -108,12 +142,33 @@
   #vueReglage button { margin-top: 16px; padding: 10px 16px; border-radius: 8px; border: none; background: #b85424; color: #fff; font-weight: 600; }
   #vueReglage .journal { margin-top: 20px; font-size: 12px; color: #555; white-space: pre-wrap; max-height: 40vh; overflow-y: auto; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
   #fermerReglage { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; }
+
+  /* ---------- Vue bilan (résumé/dashboard - demande explicite, "une partie
+     bilan/résumé" en plus du flux vocal) ---------- */
+  #vueBilan {
+    display: none; height: 100%; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
+    position: relative;
+  }
+  #vueBilan.visible { display: block; }
+  #vueBilan h2 { font-size: 15px; color: #666; font-weight: 500; margin: 0 0 4px; }
+  #vueBilan .gros-chiffre { font-size: 38px; font-weight: 700; color: #2a2a2a; margin: 0 0 20px; }
+  #vueBilan .gros-chiffre.negatif { color: #c23b2e; }
+  #vueBilan .carte {
+    background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #vueBilan .ligne { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  #vueBilan .ligne + .ligne { border-top: 1px solid #f0ebe3; }
+  #vueBilan .vente { color: #4f8f5a; }
+  #vueBilan .depense { color: #c23b2e; }
+  #fermerBilan { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 22px; }
 </style>
 </head>
 <body>
 
 <div id="vuePrincipale">
   <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
+  <button id="ouvrirBilanBouton" onclick="ouvrirBilan()" title="Bilan">&#9776;</button>
 
   <div id="zoneBouton">
     <button id="bouton" disabled>
@@ -135,8 +190,42 @@
     <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">6</button>
   </div>
 
+  <!-- MODE TEST : saisie clavier d'un champ precis (voir #champSaisie dans <style>). -->
+  <div id="champSaisie">
+    <input id="champSaisieEntree" type="text">
+    <button disabled onclick="envoyerChampSaisi()">Valider</button>
+  </div>
+
+  <!-- MODE TEST : choix oui/non (voir #choixOuiNon dans <style>). -->
+  <div id="choixOuiNon">
+    <button class="oui" disabled onclick="envoyerOuiNon(true)">&#10003;</button>
+    <button class="non" disabled onclick="envoyerOuiNon(false)">&#10007;</button>
+  </div>
+
   <!-- MODE TEST : voir le commentaire sur #filEchanges dans <style>. -->
   <div id="filEchanges"></div>
+</div>
+
+<div id="vueBilan">
+  <button id="fermerBilan" onclick="fermerBilanVue()">×</button>
+  <h2>Jagokun (capital)</h2>
+  <div class="gros-chiffre" id="bilanCapital">—</div>
+  <div class="carte">
+    <div class="ligne"><span>Feereli (ventes)</span><span class="vente" id="bilanVentes">—</span></div>
+    <div class="ligne"><span>Wariboli (dépenses)</span><span class="depense" id="bilanDepenses">—</span></div>
+  </div>
+  <div class="carte" id="bilanDettesCarte">
+    <h2>Juru (dettes clients)</h2>
+    <div id="bilanDettes"></div>
+  </div>
+  <div class="carte" id="bilanStockCarte">
+    <h2>Bolo (stock)</h2>
+    <div id="bilanStock"></div>
+  </div>
+  <div class="carte">
+    <h2>Kɛwale laban (dernières transactions)</h2>
+    <div id="bilanTransactions"></div>
+  </div>
 </div>
 
 <div id="vueReglage">
@@ -259,7 +348,42 @@ async function appelApi(chemin, options = {}) {
 
 function activerControles(actif) {
   $("bouton").disabled = !actif;
-  document.querySelectorAll("#menuNumerique button").forEach((b) => { b.disabled = !actif; });
+  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button")
+    .forEach((b) => { b.disabled = !actif; });
+}
+
+// MODE TEST : quel widget de saisie proposer selon "attente" (voir
+// agent_vocal.AgentVocal._attente) - clavier numerique pour quantite/montant,
+// texte libre pour article/client, sinon un simple choix oui/non.
+const LABELS_CHAMP = {
+  quantite: { type: "number", inputmode: "numeric", placeholder: "Hakɛ (quantité)" },
+  montant_fcfa: { type: "number", inputmode: "numeric", placeholder: "Wari hakɛ (montant)" },
+  article: { type: "text", inputmode: "text", placeholder: "Fɛn tɔgɔ (article)" },
+  client: { type: "text", inputmode: "text", placeholder: "Mɔgɔ tɔgɔ (client)" },
+};
+
+function appliquerAttente(attente) {
+  $("menuNumerique").style.display = "none";
+  $("champSaisie").style.display = "none";
+  $("choixOuiNon").style.display = "none";
+
+  if (!attente || attente === "menu") {
+    $("menuNumerique").style.display = "flex";
+    return;
+  }
+  if (attente.startsWith("champ:")) {
+    const champ = attente.split(":")[1];
+    const config = LABELS_CHAMP[champ] || { type: "text", inputmode: "text", placeholder: champ };
+    const entree = $("champSaisieEntree");
+    entree.type = config.type;
+    entree.inputMode = config.inputmode;
+    entree.placeholder = config.placeholder;
+    entree.value = "";
+    $("champSaisie").style.display = "flex";
+    return;
+  }
+  // "confirmation_champ:...", "confirmation", "continuer" : oui/non.
+  $("choixOuiNon").style.display = "flex";
 }
 
 async function demarrer() {
@@ -284,6 +408,7 @@ async function nouvelleSession() {
   sessionId = s.session_id;
   journal("Session " + sessionId + " demarree.");
   ajouterAuFil("N'GONI NANA", s.message);
+  appliquerAttente(s.attente);
   if (s.audio_base64) {
     const lecteur = $("lecteur");
     lecteur.src = `data:audio/${s.type_audio};base64,${s.audio_base64}`;
@@ -319,6 +444,7 @@ async function traiterReponseAgent(resultat, texteEnvoye) {
   journal(`reconnu: « ${resultat.texte_reconnu ?? texteEnvoye ?? "(rien)"} » -> ${resultat.message}`);
   ajouterAuFil("Toi", resultat.texte_reconnu ?? texteEnvoye ?? "(rien compris)");  // MODE TEST, voir #filEchanges
   ajouterAuFil("N'GONI NANA", resultat.message);                                  // MODE TEST, voir #filEchanges
+  appliquerAttente(resultat.attente);
 
   if (resultat.audio_base64) {
     const lecteur = $("lecteur");
@@ -358,18 +484,19 @@ async function envoyerTour(blobAudio) {
   }
 }
 
-// MODE TEST (menu numerique, R2) : un chiffre tape (1-6) part directement en
-// texte via /call, sans passer par le micro - voir reconnaitre_choix_menu
-// (dictionnaire_mots_cles.py). Memes etats visuels que le bouton vocal.
-async function envoyerChoixMenu(chiffre) {
+// MODE TEST : chemin texte partagé par le menu numérique, la saisie clavier
+// d'un champ, et le choix oui/non - tous passent par /call, seul le texte
+// envoyé change (voir reconnaitre_choix_menu, dictionnaire_mots_cles.py,
+// pour le menu ; reconnaitre_confirmation pour le oui/non).
+async function envoyerTexteLibre(texte) {
   etatBouton("traitement");
   activerControles(false);
   try {
     const resultat = await appelApi("/call", {
       methode: "POST",
-      corps: { session_id: sessionId, utilisatrice_id: utilisatriceId, texte: String(chiffre) },
+      corps: { session_id: sessionId, utilisatrice_id: utilisatriceId, texte: String(texte) },
     });
-    await traiterReponseAgent(resultat, String(chiffre));
+    await traiterReponseAgent(resultat, String(texte));
   } catch (e) {
     await signalerErreur("Erreur : " + e.message);
   } finally {
@@ -377,6 +504,76 @@ async function envoyerChoixMenu(chiffre) {
     activerControles(true);
   }
 }
+
+async function envoyerChoixMenu(chiffre) { await envoyerTexteLibre(chiffre); }
+
+// MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
+// client) - voir #champSaisie et appliquerAttente.
+async function envoyerChampSaisi() {
+  const valeur = $("champSaisieEntree").value.trim();
+  if (!valeur) return;
+  await envoyerTexteLibre(valeur);
+}
+
+// MODE TEST : confirmation unitaire d'un champ, confirmation globale, ou
+// "veux-tu faire autre chose ?" - voir #choixOuiNon et appliquerAttente.
+async function envoyerOuiNon(reponse) {
+  await envoyerTexteLibre(reponse ? "owo" : "ayi");
+}
+
+// --- Bilan/résumé (demande explicite, en plus du flux vocal) ---
+
+function construireLigne(gauche, droite, classeDroite) {
+  const ligne = document.createElement("div");
+  ligne.className = "ligne";
+  const spanGauche = document.createElement("span");
+  spanGauche.textContent = gauche;
+  const spanDroite = document.createElement("span");
+  if (classeDroite) spanDroite.className = classeDroite;
+  spanDroite.textContent = droite;
+  ligne.appendChild(spanGauche);
+  ligne.appendChild(spanDroite);
+  return ligne;
+}
+
+function remplirListe(conteneurId, items, construireItem) {
+  const conteneur = $(conteneurId);
+  conteneur.innerHTML = "";
+  if (!items.length) {
+    conteneur.appendChild(construireLigne("—", ""));
+    return;
+  }
+  items.forEach((item) => conteneur.appendChild(construireItem(item)));
+}
+
+async function ouvrirBilan() {
+  if (!utilisatriceId) return;
+  try {
+    const bilan = await appelApi(`/bilan/${utilisatriceId}`, { methode: "GET" });
+    $("bilanCapital").textContent = bilan.capital.toLocaleString("fr-FR") + " FCFA";
+    $("bilanCapital").classList.toggle("negatif", bilan.capital < 0);
+    $("bilanVentes").textContent = "+" + bilan.total_ventes.toLocaleString("fr-FR");
+    $("bilanDepenses").textContent = "-" + bilan.total_depenses.toLocaleString("fr-FR");
+
+    remplirListe("bilanDettes", bilan.dettes_clients,
+      (d) => construireLigne(d.nom, d.montant_du.toLocaleString("fr-FR")));
+    $("bilanDettesCarte").style.display = bilan.dettes_clients.length ? "block" : "none";
+
+    remplirListe("bilanStock", bilan.stock,
+      (s) => construireLigne(s.article, String(s.quantite)));
+    $("bilanStockCarte").style.display = bilan.stock.length ? "block" : "none";
+
+    remplirListe("bilanTransactions", bilan.transactions, (t) => {
+      const texte = [t.article, t.quantite].filter(Boolean).join(" x") || t.type;
+      return construireLigne(texte, t.montant_fcfa.toLocaleString("fr-FR"), t.type === "vente" ? "vente" : "depense");
+    });
+
+    $("vueBilan").classList.add("visible");
+  } catch (e) {
+    await signalerErreur("Bilan indisponible : " + e.message);
+  }
+}
+function fermerBilanVue() { $("vueBilan").classList.remove("visible"); }
 
 const bouton = $("bouton");
 let enTraitement = false;

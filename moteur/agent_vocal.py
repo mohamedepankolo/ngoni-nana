@@ -122,13 +122,52 @@ class AgentVocal:
         texte = self._transcrire(chemin_audio)
         return self.traiter_texte(session_id, utilisatrice_id, texte)
 
+    def etat_attente(self, session_id: int) -> str:
+        """Interroge l'attente courante d'une session SANS traiter de nouvel
+
+        énoncé (voir _attente) : utile quand un tour échoue avant même
+        d'atteindre le moteur (ex. ASR en panne, api.py/_reponse_secours) -
+        l'état de la session n'a alors pas bougé, mais l'appelant a quand
+        même besoin de savoir quoi proposer comme widget de saisie.
+        """
+        etat = self._etats.setdefault(session_id, _EtatSession())
+        return self._attente(etat)
+
     def traiter_texte(self, session_id: int, utilisatrice_id: int, texte: str) -> dict:
         etat = self._etats.setdefault(session_id, _EtatSession())
         bd = self._session_factory()
         try:
-            return self._traiter_texte_interne(bd, etat, session_id, utilisatrice_id, texte)
+            resultat = self._traiter_texte_interne(bd, etat, session_id, utilisatrice_id, texte)
+            # Ajouté ici, en un seul point, plutôt que threadé à travers les ~25
+            # appels internes à _repondre : dit à une interface (application
+            # mobile) ce qu'il faut proposer au PROCHAIN tour (clavier numérique,
+            # oui/non, menu...) sans qu'elle ait à deviner depuis le texte parlé.
+            resultat["attente"] = self._attente(etat)
+            return resultat
         finally:
             bd.close()
+
+    @staticmethod
+    def _attente(etat: "_EtatSession") -> str:
+        """Ce que le système attend au prochain tour, pour que l'interface
+
+        choisisse le bon widget de saisie : "menu" (aucune intention active -
+        menu numérique ou parole libre), "champ:<nom>" (un champ précis
+        manque - clavier numérique pour quantite/montant_fcfa, texte libre
+        pour article/client), "confirmation_champ:<nom>" (relecture d'un
+        chiffre à confirmer), "confirmation" (confirmation globale de fin de
+        transaction) ou "continuer" ("veux-tu faire autre chose ?"). Reflète
+        exactement l'ordre de branchement de _traiter_texte_interne.
+        """
+        if etat.attente_continuer:
+            return "continuer"
+        if etat.champ_a_confirmer:
+            return f"confirmation_champ:{etat.champ_a_confirmer}"
+        if etat.champ_en_attente:
+            return f"champ:{etat.champ_en_attente}"
+        if etat.en_attente_confirmation:
+            return "confirmation"
+        return "menu"
 
     def _traiter_texte_interne(self, bd, etat: "_EtatSession", session_id: int,
                                 utilisatrice_id: int, texte: str) -> dict:
