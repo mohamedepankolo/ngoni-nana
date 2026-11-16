@@ -25,6 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -73,6 +74,20 @@ async def _cycle_de_vie(_app: FastAPI):
 
 
 app = FastAPI(title="N'GONI NANA : API", lifespan=_cycle_de_vie)
+
+# Necessaire pour l'appli mobile (Capacitor) : sa page est chargee depuis une
+# origine locale (https://localhost), differente de celle du serveur - sans
+# CORS, le navigateur embarque bloque silencieusement la requete ("Failed to
+# fetch") avant meme qu'elle n'atteigne l'API, independamment du reseau ou du
+# jeton. Sans impact sur la securite : le jeton (verifier_jeton, plus bas)
+# reste exige sur chaque endpoint, CORS ne fait qu'autoriser le navigateur a
+# LIRE la reponse d'une origine differente.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/web/config.js")
