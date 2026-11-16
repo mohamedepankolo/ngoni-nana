@@ -173,6 +173,15 @@ def _obtenir_syntheser():
     return _syntheser
 
 
+def _syntheser_message(texte: str) -> str:
+    """Synthétise un message complet (voir syntheser_par_phrases,
+    tts_maliba.py) : une vraie pause entre chaque phrase pour les messages
+    qui en contiennent plusieurs (le menu principal notamment), sans coût
+    ajouté pour les messages à une seule phrase (la grande majorité)."""
+    from moteur.tts_maliba import syntheser_par_phrases
+    return syntheser_par_phrases(_obtenir_syntheser(), texte)
+
+
 # Message audio de secours, pré-synthétisé une seule fois (voir
 # scripts/generer_audio_secours.py) et bundlé avec l'app plutôt que généré à
 # la volée : si le TTS en ligne (Space Gradio, section tts_maliba.py) est en
@@ -265,7 +274,7 @@ def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obte
     message = msg.menu_principal()
     audio_base64, type_audio = None, "wav"
     try:
-        chemin_audio = _obtenir_syntheser()(message)
+        chemin_audio = _syntheser_message(message)
         with open(chemin_audio, "rb") as f:
             audio_base64 = base64.b64encode(f.read()).decode()
         type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
@@ -315,7 +324,7 @@ def appeler(requete: AppelRequete, agent: AgentVocal = Depends(obtenir_agent)):
     resultat = agent.traiter_texte(requete.session_id, requete.utilisatrice_id, requete.texte)
     audio_base64, type_audio = None, "wav"
     try:
-        chemin_audio = _obtenir_syntheser()(resultat["message"])
+        chemin_audio = _syntheser_message(resultat["message"])
         with open(chemin_audio, "rb") as f:
             audio_base64 = base64.b64encode(f.read()).decode()
         type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
@@ -396,7 +405,7 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
         return _reponse_secours(texte_reconnu, msg.reformulation(0), session_id)
 
     try:
-        chemin_audio_reponse = _obtenir_syntheser()(resultat["message"])
+        chemin_audio_reponse = _syntheser_message(resultat["message"])
         with open(chemin_audio_reponse, "rb") as f:
             audio_base64 = base64.b64encode(f.read()).decode()
         type_audio = Path(chemin_audio_reponse).suffix.lstrip(".") or "wav"

@@ -325,7 +325,13 @@ function ajouterAuFil(etiquette, texte) {
   const gras = document.createElement("strong");
   gras.textContent = etiquette + " : ";
   ligne.appendChild(gras);
-  ligne.appendChild(document.createTextNode(texte));
+  // Une phrase par ligne plutot que tout colle en continu - utile surtout
+  // pour le menu principal (accueil, bienvenue puis 6 choix) : voir
+  // _decouper_phrases, tts_maliba.py, meme logique de decoupage cote audio.
+  String(texte).split(/(?<=\.)\s+/).forEach((phrase, i) => {
+    if (i > 0) ligne.appendChild(document.createElement("br"));
+    ligne.appendChild(document.createTextNode(phrase));
+  });
   fil.appendChild(ligne);
   fil.scrollTop = fil.scrollHeight;
 }
