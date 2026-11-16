@@ -21,8 +21,16 @@ def test_decouper_phrases_une_seule_phrase_reste_seule():
 
 
 def test_decouper_phrases_plusieurs_phrases():
-    texte = "Kelen : feere. Fila : sara. Saba : jagokun."
-    assert _decouper_phrases(texte) == ["Kelen : feere.", "Fila : sara.", "Saba : jagokun."]
+    texte = "I ni ce. Fila sara."
+    assert _decouper_phrases(texte) == ["I ni ce.", "Fila sara."]
+
+
+def test_decouper_phrases_coupe_aussi_sur_le_deux_points():
+    # "Kelen : feere." (menu_principal, messages_bambara.py) doit devenir 2
+    # phrases pour la synthese (voir docstring) - le texte affiche a l'ecran,
+    # lui, garde le ":" (voir ajouterAuFil, web/index.html), inchange ici.
+    texte = "Kelen : feere. Fila : sara."
+    assert _decouper_phrases(texte) == ["Kelen.", "feere.", "Fila.", "sara."]
 
 
 def test_syntheser_par_phrases_une_seule_phrase_appelle_syntheser_une_fois(tmp_path):
@@ -46,7 +54,7 @@ def test_syntheser_par_phrases_plusieurs_phrases_recolle_avec_silence(tmp_path):
         _ecrire_wav(chemin, 1.0)
         return str(chemin)
 
-    texte = "Kelen : feere. Fila : sara. Saba : jagokun."
+    texte = "I ni ce. Fila sara. Saba jagokun."
     chemin_sortie = syntheser_par_phrases(faux_syntheser, texte, pause_ms=500)
 
     with wave.open(chemin_sortie, "rb") as w:

@@ -46,11 +46,20 @@ def obtenir_synthetiseur(espace: str = ESPACE_PAR_DEFAUT) -> Callable[[str], str
 def _decouper_phrases(texte: str) -> list[str]:
     """Découpe sur les frontières de phrase (point suivi d'espace).
 
+    " : " (menu_principal, messages_bambara.py : "Kelen : feere.") est
+    d'abord traité comme une frontière lui aussi - le modèle distant ne
+    marque quasiment aucune pause sur un simple ":" (constaté en test réel,
+    2026-11-16 : "un vente, deux achat, trois capital" dit d'une traite,
+    sans qu'on ait le temps de suivre). Uniquement pour la synthèse : le
+    texte affiché à l'écran (voir ajouterAuFil, web/index.html) garde lui le
+    ":" d'origine, pour rester "Kelen : feere." sur une seule ligne visible.
+
     Une seule "phrase" renvoyée si `texte` n'en contient qu'une (cas normal,
     la grande majorité des messages) - `syntheser_par_phrases` ci-dessous ne
     paie alors aucun coût supplémentaire (voir son docstring).
     """
-    return [m for m in re.split(r"(?<=\.)\s+", texte.strip()) if m]
+    texte_normalise = texte.replace(" : ", ". ")
+    return [m for m in re.split(r"(?<=\.)\s+", texte_normalise.strip()) if m]
 
 
 def syntheser_par_phrases(syntheser: Callable[[str], str], texte: str, pause_ms: int = 450) -> str:
