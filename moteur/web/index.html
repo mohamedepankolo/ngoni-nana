@@ -17,27 +17,60 @@
   }
 
   /* ---------- Vue principale (utilisatrice) ---------- */
-  /* Un seul element visible et interactif sur cet ecran : le gros bouton.
-     Pas de logo, pas de point d'etat separe (la couleur du bouton suffit) :
-     un deuxieme element qui ressemble a un micro ou a un bouton a cote du
-     vrai bouton a cause une vraie confusion en test reel (2026-10-08). */
+  /* Ecran d'accueil = tableau de bord (capital + actions), inspire de
+     l'appli "Max it" d'Orange Money (demande explicite, 2026-11-16) : carte
+     de solde sombre en haut, grille d'actions en dessous, le micro reste
+     l'entree principale mais n'est plus seul sur l'ecran. Palette Max it :
+     blanc / noir / orange (PAS rouge - verifie sur captures reelles de
+     l'appli, le rouge ne fait pas partie de sa charte). */
   #vuePrincipale {
-    height: 100%; display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px;
+    height: 100%; overflow-y: auto; display: flex; flex-direction: column;
+    align-items: center; padding: 20px 20px 32px; gap: 14px; background: #fff;
   }
-  #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 28px; }
+  #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
 
-  /* MODE TEST (menu numerique, R2) : boutons 1-6 pour tester le menu sans
-     repasser par le micro a chaque fois (plus rapide que d'enregistrer la
-     voix pour chaque essai). A RETIRER avec le reste du MODE TEST avant un
-     usage reel : le vrai canal est la voix/telephonie, pas des boutons a
-     l'ecran (voir le commentaire sur #filEchanges, meme raison). */
+  /* Carte de solde (equivalent de la carte sombre "Main USD / Main LRD" de
+     Max it) : capital en gros, ventes/depenses en resume juste en dessous. */
+  #carteCapital {
+    width: 100%; max-width: 360px; background: #161616; color: #fff;
+    border-radius: 18px; padding: 18px 20px; margin-top: 4px;
+  }
+  #carteCapital .capital-entete {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: #bbb; margin-bottom: 6px;
+  }
+  #carteCapital .lien-voir-tout {
+    background: none; border: none; color: #e8863a; font-weight: 600; font-size: 13px; padding: 0;
+  }
+  #carteCapital .capital-chiffre { font-size: 30px; font-weight: 700; }
+  #carteCapital .capital-chiffre.negatif { color: #e8695a; }
+  #carteCapital .capital-resume {
+    display: flex; gap: 18px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid #333; font-size: 14px; font-weight: 600;
+  }
+  #carteCapital .vente { color: #6fcf7d; }
+  #carteCapital .depense { color: #e8695a; }
+
+  /* Grille d'actions (equivalent des tuiles "Favorites" de Max it) : memes
+     6 choix que le menu vocal/telephonie (voir MENU_NUMERIQUE,
+     dictionnaire_mots_cles.py), juste presentes en tuiles plutot qu'en
+     boutons ronds numerotes. */
   #menuNumerique {
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 320px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    width: 100%; max-width: 360px;
   }
   #menuNumerique button {
-    width: 44px; height: 44px; border-radius: 50%; border: 1px solid #b85424;
-    background: #fff; color: #b85424; font-size: 16px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: #fff; border: none; border-radius: 14px; padding: 14px 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
   }
+  #menuNumerique .badge {
+    width: 34px; height: 34px; border-radius: 50%; background: #e8863a;
+    color: #fff; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #menuNumerique .etiquette { font-size: 11px; color: #333; text-align: center; line-height: 1.3; }
+  #menuNumerique .etiquette small { display: block; color: #888; font-weight: 400; }
   #menuNumerique button:disabled { opacity: 0.4; }
 
   /* MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
@@ -65,15 +98,6 @@
   #choixOuiNon .oui { background: #4f8f5a; }
   #choixOuiNon .non { background: #c23b2e; }
 
-  /* Bouton d'ouverture du bilan/resume - visible (contrairement au geste
-     cache du reglage equipe) : partie explicitement demandee en plus du
-     flux vocal, pas reservee a l'equipe. */
-  #ouvrirBilanBouton {
-    position: absolute; top: 16px; right: 16px; width: 40px; height: 40px;
-    border-radius: 50%; border: 1px solid #b85424; background: #fff; color: #b85424;
-    font-size: 18px; display: flex; align-items: center; justify-content: center;
-  }
-
   /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
      ce qui est reconnu/repondu pendant les tests internes, sans avoir a
      ouvrir le reglage cache a chaque tour. A RETIRER avant un usage reel
@@ -92,12 +116,12 @@
   #zoneReglageSecrete { position: absolute; top: 0; left: 0; width: 72px; height: 72px; }
 
   #bouton {
-    width: 220px; height: 220px; border-radius: 50%; border: none;
+    width: 120px; height: 120px; border-radius: 50%; border: none;
     background: #b85424; display: flex; align-items: center; justify-content: center;
     box-shadow: 0 8px 24px rgba(184,84,36,0.35);
     transition: background-color 0.25s ease, transform 0.15s ease;
   }
-  #bouton svg { width: 88px; height: 88px; }
+  #bouton svg { width: 48px; height: 48px; }
   #bouton.enregistre {
     background: #c23b2e;
     animation: pouls 1.1s ease-in-out infinite;
@@ -167,7 +191,44 @@
 
 <div id="vuePrincipale">
   <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
-  <button id="ouvrirBilanBouton" onclick="ouvrirBilan()" title="Bilan">&#9776;</button>
+
+  <!-- Carte de solde (equivalent "Main USD/LRD" de Max it) : capital + resume
+       ventes/depenses, toujours visible en ouvrant l'appli. Detail complet
+       (dettes, stock, transactions) via "Bɛɛ" -> ouvrirBilan() (#vueBilan). -->
+  <div id="carteCapital">
+    <div class="capital-entete">
+      <span>Jagokun (capital)</span>
+      <button class="lien-voir-tout" onclick="ouvrirBilan()">Bɛɛ &#8594;</button>
+    </div>
+    <div class="capital-chiffre" id="carteCapitalChiffre">—</div>
+    <div class="capital-resume">
+      <span class="vente" id="carteVentes">+0</span>
+      <span class="depense" id="carteDepenses">-0</span>
+    </div>
+  </div>
+
+  <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
+       Memes 6 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py). -->
+  <div id="menuNumerique">
+    <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
+      <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
+    </button>
+    <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">
+      <span class="badge">2</span><span class="etiquette">Sara<small>dépense</small></span>
+    </button>
+    <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">
+      <span class="badge">3</span><span class="etiquette">Jagokun<small>capital</small></span>
+    </button>
+    <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
+      <span class="badge">4</span><span class="etiquette">Juru<small>client</small></span>
+    </button>
+    <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
+      <span class="badge">5</span><span class="etiquette">Bolo<small>stock</small></span>
+    </button>
+    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
+      <span class="badge">6</span><span class="etiquette">Joli<small>consultation</small></span>
+    </button>
+  </div>
 
   <div id="zoneBouton">
     <button id="bouton" disabled>
@@ -177,16 +238,6 @@
         <line x1="12" y1="18" x2="12" y2="21" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
     </button>
-  </div>
-
-  <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>. -->
-  <div id="menuNumerique">
-    <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">1</button>
-    <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">2</button>
-    <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">3</button>
-    <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">4</button>
-    <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">5</button>
-    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">6</button>
   </div>
 
   <!-- MODE TEST : saisie clavier d'un champ precis (voir #champSaisie dans <style>). -->
@@ -395,12 +446,28 @@ function appliquerAttente(attente) {
   $("choixOuiNon").style.display = "flex";
 }
 
+// Carte de solde (haut de l'ecran d'accueil) : rafraichie au demarrage et
+// apres chaque transaction (voir traiterReponseAgent), comme le solde
+// toujours a jour de Max it. Best-effort : un echec ne bloque pas le flux
+// vocal/menu, la carte garde juste son dernier etat connu.
+async function rafraichirCarteCapital() {
+  if (!utilisatriceId) return;
+  try {
+    const bilan = await appelApi(`/bilan/${utilisatriceId}`, { methode: "GET" });
+    $("carteCapitalChiffre").textContent = bilan.capital.toLocaleString("fr-FR") + " FCFA";
+    $("carteCapitalChiffre").classList.toggle("negatif", bilan.capital < 0);
+    $("carteVentes").textContent = "+" + bilan.total_ventes.toLocaleString("fr-FR");
+    $("carteDepenses").textContent = "-" + bilan.total_depenses.toLocaleString("fr-FR");
+  } catch (e) { /* best-effort, voir commentaire ci-dessus */ }
+}
+
 async function demarrer() {
   if (!jeton) { journal("Aucun jeton enregistre."); return; }
   try {
     const bootstrap = await appelApi("/demo/bootstrap", { methode: "POST", corps: {} });
     utilisatriceId = bootstrap.utilisatrice_id;
     await nouvelleSession();
+    await rafraichirCarteCapital();
     journal("Pret.");
     activerControles(true);
   } catch (e) {
@@ -454,6 +521,7 @@ async function traiterReponseAgent(resultat, texteEnvoye) {
   ajouterAuFil("Toi", resultat.texte_reconnu ?? texteEnvoye ?? "(rien compris)");  // MODE TEST, voir #filEchanges
   ajouterAuFil("N'GONI NANA", resultat.message);                                  // MODE TEST, voir #filEchanges
   appliquerAttente(resultat.attente);
+  await rafraichirCarteCapital();
 
   if (resultat.audio_base64) {
     const lecteur = $("lecteur");
