@@ -221,6 +221,39 @@ def escalade() -> str:
     return "Ne bɛna i bila animatrice kɔrɔ."
 
 
+# Mot bambara court identifiant chaque champ corrigible (voir
+# agent_vocal.CHAMPS_CORRIGIBLES) - repris tel quel des messages demander_*
+# ci-dessous (demander_article dit "a tɔgɔ", demander_quantite dit "hakɛ",
+# etc.) : pas un nouveau mot inventé pour l'occasion, juste la réutilisation
+# du mot déjà choisi pour ce champ ailleurs dans ce fichier.
+NOMS_CHAMPS_BAMBARA = {
+    "article": "a tɔgɔ",
+    "quantite": "hakɛ",
+    "montant_fcfa": "wari",
+    "client": "mɔgɔ tɔgɔ",
+    "fournisseur": "fɛn feerelikɛla tɔgɔ",
+}
+
+
+def demander_quel_champ_corriger(champs: list[str]) -> str:
+    """Propose un choix numéroté (1, 2, 3...) parmi les champs réellement
+
+    saisis pour cette transaction, pour cibler PRÉCISÉMENT ce qui doit être
+    corrigé après un "non" au résumé final - au lieu de deviner le dernier
+    champ confirmé (ancien comportement de agent_vocal._demarrer_correction),
+    qui n'était pas forcément le bon si l'erreur portait sur un champ saisi
+    plus tôt (retour terrain, 2026-11-17, Mohamed : "ça peut concerner autant
+    la quantité que le montant, que le produit"). Même format parlé "chiffre
+    : mot" que menu_principal() (chaque ":" devient une vraie pause à la
+    synthèse, voir tts_maliba._decouper_phrases).
+    """
+    options = " ".join(
+        f"{nombre_en_bambara(i)} : {NOMS_CHAMPS_BAMBARA.get(champ, champ)}."
+        for i, champ in enumerate(champs, start=1)
+    )
+    return f"Mun tɛ bɛn? {options}"
+
+
 def confirmer_champ(champ: str, valeur) -> str:
     """Relit UNE valeur tout juste saisie (quantité ou montant) avant de
 

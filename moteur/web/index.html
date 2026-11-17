@@ -105,6 +105,26 @@
   #choixOuiNon .oui { background: #4f8f5a; }
   #choixOuiNon .non { background: #c23b2e; }
 
+  /* MODE TEST : choix du champ a corriger apres un "non" au resume final
+     (attente = "choix_champ:<nom1>,<nom2>,..." - voir agent_vocal.py,
+     _demarrer_correction/_traiter_choix_champ_a_corriger). Boutons generes
+     dynamiquement (voir appliquerAttente) : la liste de champs varie selon
+     la transaction (CHAMPS_CORRIGIBLES), pas fixe comme #menuNumerique. */
+  #choixChamp { display: none; flex-wrap: wrap; gap: 10px; width: 100%; max-width: 360px; }
+  #choixChamp button {
+    flex: 1 1 100px;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    background: #fff; border: none; border-radius: 14px; padding: 18px 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  #choixChamp .badge {
+    width: 40px; height: 40px; border-radius: 50%; background: #c23b2e;
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #choixChamp .etiquette { font-size: 13px; color: #333; text-align: center; }
+  #choixChamp button:disabled { opacity: 0.4; }
+
   /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
      ce qui est reconnu/repondu pendant les tests internes, sans avoir a
      ouvrir le reglage cache a chaque tour. A RETIRER avant un usage reel
@@ -270,6 +290,10 @@
     <button class="non" disabled onclick="envoyerOuiNon(false)">&#10007;</button>
   </div>
 
+  <!-- MODE TEST : choix du champ a corriger (voir #choixChamp dans <style>,
+       rempli dynamiquement par appliquerAttente). -->
+  <div id="choixChamp"></div>
+
   <!-- MODE TEST : voir le commentaire sur #filEchanges dans <style>. -->
   <div id="filEchanges"></div>
 </div>
@@ -432,7 +456,7 @@ async function appelApi(chemin, options = {}) {
 
 function activerControles(actif) {
   $("bouton").disabled = !actif;
-  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button")
+  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button, #choixChamp button")
     .forEach((b) => { b.disabled = !actif; });
 }
 
@@ -447,10 +471,22 @@ const LABELS_CHAMP = {
   fournisseur: { type: "text", inputmode: "text", placeholder: "Fournisseur" },
 };
 
+// Libelle francais court pour chaque champ, pour les boutons de
+// #choixChamp (voir messages_bambara.NOMS_CHAMPS_BAMBARA pour l'equivalent
+// bambara parle par le TTS - memes champs, juste traduits pour l'ecran).
+const LABELS_CHAMP_FR = {
+  article: "Article",
+  quantite: "Quantité",
+  montant_fcfa: "Montant",
+  client: "Client",
+  fournisseur: "Fournisseur",
+};
+
 function appliquerAttente(attente) {
   $("menuNumerique").style.display = "none";
   $("champSaisie").style.display = "none";
   $("choixOuiNon").style.display = "none";
+  $("choixChamp").style.display = "none";
 
   if (!attente || attente === "menu") {
     $("menuNumerique").style.display = "flex";
@@ -465,6 +501,20 @@ function appliquerAttente(attente) {
     entree.placeholder = config.placeholder;
     entree.value = "";
     $("champSaisie").style.display = "flex";
+    return;
+  }
+  if (attente.startsWith("choix_champ:")) {
+    const champs = attente.slice("choix_champ:".length).split(",");
+    const conteneur = $("choixChamp");
+    conteneur.innerHTML = "";
+    champs.forEach((champ, i) => {
+      const bouton = document.createElement("button");
+      bouton.innerHTML = `<span class="badge">${i + 1}</span>` +
+        `<span class="etiquette">${LABELS_CHAMP_FR[champ] || champ}</span>`;
+      bouton.onclick = () => envoyerChoixChamp(i + 1);
+      conteneur.appendChild(bouton);
+    });
+    conteneur.style.display = "flex";
     return;
   }
   // "confirmation_champ:...", "confirmation", "continuer" : oui/non.
@@ -622,6 +672,11 @@ async function envoyerChampSaisi() {
 async function envoyerOuiNon(reponse) {
   await envoyerTexteLibre(reponse ? "owo" : "ayi");
 }
+
+// MODE TEST : choix du champ a corriger apres un "non" au resume final -
+// voir #choixChamp et appliquerAttente. Le numero (1, 2...) correspond a sa
+// position dans la liste recue (_reconnaitre_choix_champ, agent_vocal.py).
+async function envoyerChoixChamp(numero) { await envoyerTexteLibre(numero); }
 
 // --- Bilan/résumé (demande explicite, en plus du flux vocal) ---
 

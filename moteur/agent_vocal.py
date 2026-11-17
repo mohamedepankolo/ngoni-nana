@@ -16,6 +16,8 @@ traduction, pas un texte validé. Voir la réserve en tête de ce module-là.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from montants import extraire_nombres, normaliser
+
 from moteur import base_donnees as db
 from moteur import messages_bambara as msg
 from moteur.dictionnaire_mots_cles import reconnaitre_choix_menu, reconnaitre_confirmation, reconnaitre_intention
@@ -74,6 +76,40 @@ CONSTRUCTEURS_REDEMANDE_CHAMP = {
 # un chiffre mal compris peut fausser toute l'écriture comptable.
 CHAMPS_A_CONFIRMER_UNITAIREMENT = {"quantite", "montant_fcfa"}
 
+# Champs qu'on peut proposer de corriger après un "non" au résumé final (voir
+# _demarrer_correction, msg.demander_quel_champ_corriger) - ordre fixe plutôt
+# que l'ordre de CHAMPS_ATTENDUS (moteur_decision.py) : certaines intentions
+# (ex. "client") ont un montant effectivement saisi sans l'exiger dans
+# CHAMPS_ATTENDUS, cet ordre fixe les propose quand même s'ils sont présents.
+CHAMPS_CORRIGIBLES = ("article", "quantite", "montant_fcfa", "client", "fournisseur")
+
+
+def _reconnaitre_choix_champ(texte: str, champs: list[str]) -> str | None:
+    """Reconnaît le choix d'UN champ parmi `champs` (voir
+
+    msg.demander_quel_champ_corriger) : un chiffre tapé (1, 2...), un nombre
+    dit en bambara (kelen, fila...), ou le mot bambara du champ lui-même
+    (msg.NOMS_CHAMPS_BAMBARA) - même principe à plusieurs canaux que
+    reconnaitre_choix_menu (dictionnaire_mots_cles.py), mais sur une liste
+    choisie à la volée (les champs de CETTE transaction), pas le menu fixe.
+    None si rien de tout ça ne correspond.
+    """
+    texte_brut = texte.strip()
+    if texte_brut.isdigit():
+        indice = int(texte_brut)
+        return champs[indice - 1] if 1 <= indice <= len(champs) else None
+
+    nombres = extraire_nombres(texte)
+    if len(nombres) == 1 and 1 <= nombres[0] <= len(champs):
+        return champs[nombres[0] - 1]
+
+    tokens = set(normaliser(texte).split())
+    for champ in champs:
+        mots_champ = set(normaliser(msg.NOMS_CHAMPS_BAMBARA.get(champ, "")).split())
+        if mots_champ and mots_champ <= tokens:
+            return champ
+    return None
+
 
 @dataclass
 class _EtatSession:
@@ -89,6 +125,11 @@ class _EtatSession:
     # - distinct de champ_en_attente (qui attend une NOUVELLE valeur) et de
     # en_attente_confirmation (qui attend le "oui" global de fin de transaction).
     champ_a_confirmer: str | None = None
+    # Liste des champs proposés au choix après un "non" au résumé final (voir
+    # _demarrer_correction, _traiter_choix_champ_a_corriger) - distinct de
+    # champ_en_attente (qui attend la NOUVELLE valeur d'UN champ déjà choisi) :
+    # ici on attend encore LEQUEL corriger, avant de demander sa valeur.
+    champs_a_choisir: list[str] | None = None
     # Compte les "non" d'affilée, séparément de Session.tentatives_reformulation
     # (qui compte les énoncés non compris). Nécessaire car un champ libre
     # (article, nom de client) est "rempli avec succès" par n'importe quel mot
@@ -184,12 +225,16 @@ class AgentVocal:
         menu numérique ou parole libre), "champ:<nom>" (un champ précis
         manque - clavier numérique pour quantite/montant_fcfa, texte libre
         pour article/client), "confirmation_champ:<nom>" (relecture d'un
-        chiffre à confirmer), "confirmation" (confirmation globale de fin de
-        transaction) ou "continuer" ("veux-tu faire autre chose ?"). Reflète
-        exactement l'ordre de branchement de _traiter_texte_interne.
+        chiffre à confirmer), "choix_champ:<nom1>,<nom2>,..." (après un "non"
+        au résumé : lequel de ces champs corriger, voir CHAMPS_CORRIGIBLES),
+        "confirmation" (confirmation globale de fin de transaction) ou
+        "continuer" ("veux-tu faire autre chose ?"). Reflète exactement
+        l'ordre de branchement de _traiter_texte_interne.
         """
         if etat.attente_continuer:
             return "continuer"
+        if etat.champs_a_choisir:
+            return "choix_champ:" + ",".join(etat.champs_a_choisir)
         if etat.champ_a_confirmer:
             return f"confirmation_champ:{etat.champ_a_confirmer}"
         if etat.champ_en_attente:
@@ -204,6 +249,9 @@ class AgentVocal:
 
         if etat.attente_continuer:
             return self._traiter_reponse_continuer(bd, etat, session_id, utilisatrice_id, texte)
+
+        if etat.champs_a_choisir:
+            return self._traiter_choix_champ_a_corriger(bd, etat, session_id, texte)
 
         if etat.champ_a_confirmer:
             return self._traiter_confirmation_champ(bd, etat, session_id, texte)
@@ -336,11 +384,14 @@ class AgentVocal:
         return self._repondre(bd, session_id, contrat, msg.continuer())
 
     def _demarrer_correction(self, bd, etat: "_EtatSession", session_id: int) -> dict:
-        """L'utilisatrice dit "non" à la confirmation : cible un champ précis à
+        """L'utilisatrice dit "non" à la confirmation : propose un choix
 
-        corriger plutôt qu'un "je n'ai pas compris" générique, qui poussait à
-        tout répéter depuis le début et relançait un cycle complet sans
-        jamais faire progresser aucun compteur d'échec (bug réel, 2026-10-09).
+        numéroté parmi les champs réellement saisis (CHAMPS_CORRIGIBLES),
+        plutôt qu'un "je n'ai pas compris" générique OU deviner tout seul le
+        dernier champ confirmé (ancien comportement, pas forcément le bon
+        champ en cause - retour terrain, 2026-11-17, Mohamed : "ça peut
+        concerner autant la quantité que le montant, que le produit"). Voir
+        _traiter_choix_champ_a_corriger pour la suite (le choix lui-même).
         """
         s = etat.session_moteur
         etat.refus_consecutifs += 1
@@ -353,11 +404,35 @@ class AgentVocal:
             self._cloturer_session(bd, session_id, statut="incomplete")
             return self._repondre(bd, session_id, contrat, msg.escalade())
 
-        champ = etat.champ_en_attente or (list(s.champs_confirmes)[-1] if s.champs_confirmes else None)
+        champs_possibles = [c for c in CHAMPS_CORRIGIBLES if c in s.champs_confirmes]
         etat.en_attente_confirmation = False
-        if champ is None:
+        if not champs_possibles:
             contrat = {"intention": s.intention, "champs": {}, "confiance": "echec", "action": "reformuler"}
             return self._repondre(bd, session_id, contrat, msg.demander_precision_montant())
+        etat.champs_a_choisir = champs_possibles
+        contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                   "confiance": "a_confirmer", "action": "demander_confirmation"}
+        return self._repondre(bd, session_id, contrat, msg.demander_quel_champ_corriger(champs_possibles))
+
+    def _traiter_choix_champ_a_corriger(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+        """Répond au choix du champ à corriger (demander_quel_champ_corriger,
+
+        posé par _demarrer_correction) : un chiffre (1, 2...), un nombre dit
+        en bambara, ou le mot bambara du champ lui-même (voir
+        _reconnaitre_choix_champ). Une fois le champ choisi, l'efface et
+        redemande sa valeur (CONSTRUCTEURS_REDEMANDE_CHAMP, comme l'ancien
+        comportement de _demarrer_correction une fois le champ identifié).
+        """
+        s = etat.session_moteur
+        champs_possibles = etat.champs_a_choisir or []
+        champ = _reconnaitre_choix_champ(texte, champs_possibles)
+
+        if champ is None:
+            contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                       "confiance": "a_confirmer", "action": "demander_confirmation"}
+            return self._repondre(bd, session_id, contrat, msg.demander_quel_champ_corriger(champs_possibles))
+
+        etat.champs_a_choisir = None
         s.champs_confirmes.pop(champ, None)
         etat.champ_en_attente = champ
         contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),

@@ -238,7 +238,10 @@ def test_dire_non_puis_redonner_la_valeur_corrige_et_enregistre(agent):
     sid = agent.demarrer_session(agent.utilisatrice_id)
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
 
-    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non"
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non" -> propose un choix de champ
+    assert r["contrat"]["action"] == "demander_confirmation"
+
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "1")  # choisit l'article (1er champ proposé)
     assert r["contrat"]["action"] == "demander_confirmation"
     assert "article" not in r["contrat"]["champs"]  # retiré, en attente d'être redonné
 
@@ -284,7 +287,9 @@ def test_non_repete_sur_un_article_mal_rempli_finit_par_escalader(agent):
     agent.traiter_texte(sid, agent.utilisatrice_id, "n ye saga saba feere wa bi duuru")
 
     for _ in range(2):
-        r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non" -> cible l'article
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "ayi")  # "non" -> propose un choix de champ
+        assert r["contrat"]["action"] == "demander_confirmation"
+        r = agent.traiter_texte(sid, agent.utilisatrice_id, "1")  # choisit l'article
         assert r["contrat"]["action"] == "demander_confirmation"
         r = agent.traiter_texte(sid, agent.utilisatrice_id, "bruit")  # "remplit" l'article avec du bruit
         assert r["contrat"]["action"] == "demander_confirmation"
