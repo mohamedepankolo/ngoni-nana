@@ -39,6 +39,30 @@ from moteur.dictionnaire_mots_cles import (
 # converti à l'utilisatrice (Cas 8 du parcours) avant de l'enregistrer.
 FACTEUR_DOROME = 5
 
+# Mots qui, dits explicitement à côté d'un nombre, signalent que ce nombre EST
+# déjà le montant FCFA (pas un montant en dɔrɔmɛ à multiplier par
+# FACTEUR_DOROME) : "franc(s)"/"FCFA" sont des emprunts au français déjà
+# présents comme forme ASR réaliste dans ce projet (tests/test_montants.py,
+# "Mariam ka jɛnɛ ye 2500 francs", "2 500 FCFA") - pas un mot bambara inventé.
+# Bug réel signalé en test (2026-11-17, Mohamed) : un montant dit avec ce
+# marqueur explicite ("1000 francs") subissait quand même le x5 dɔrɔmɛ,
+# contrairement à la convention du cahier des charges (dɔrɔmɛ SANS dire le
+# mot, voir montants.py) - un marqueur franc/FCFA explicite dit le contraire :
+# le nombre EST le montant FCFA, pas un nombre de dɔrɔmɛ.
+MOTS_MONTANT_LITTERAL = {"franc", "francs", "fcfa"}
+
+
+def _montant_est_litteral(texte: str) -> bool:
+    """Vrai si le nombre de `texte` doit être pris comme montant FCFA direct
+
+    (pas de x5 dɔrɔmɛ) : soit un chiffre tapé tel quel (canal clavier, voir
+    Session.combler_champ), soit un nombre dit avec franc(s)/FCFA explicite
+    à côté (voir MOTS_MONTANT_LITTERAL).
+    """
+    if texte.strip().isdigit():
+        return True
+    return bool(set(normaliser(texte).split()) & MOTS_MONTANT_LITTERAL)
+
 # Champs attendus par intention (couche 2, slot filling), tel que décrit dans
 # le document d'architecture et le parcours utilisateur.
 CHAMPS_ATTENDUS: dict[str, list[str]] = {
@@ -219,8 +243,12 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
     if intention in intentions_avec_montant:
         if nombres:
             montant_brut = max(nombres)
-            champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
-            champs["unite_dite"] = "dorome"
+            if _montant_est_litteral(texte):
+                champs["montant_fcfa"] = montant_brut
+                champs["unite_dite"] = "fcfa"
+            else:
+                champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
+                champs["unite_dite"] = "dorome"
         if intention in ("vente", "vente_credit") and len(nombres) >= 2:
             champs["quantite"] = min(nombres)
 
@@ -411,21 +439,19 @@ class Session:
         mots = _mots_restants(texte)
 
         if champ == "montant_fcfa" and nombres:
-            # Un chiffre arabe tapé tel quel (clavier numérique de l'appli,
-            # #champSaisie) est un montant FCFA direct, jamais un montant en
-            # dɔrɔmɛ : contrairement à la voix (où le dɔrɔmɛ est la
-            # convention orale réelle, validée sur phrases_reelles.csv), il
-            # n'y a aucune raison qu'une utilisatrice qui TAPE "1000" sur un
-            # clavier veuille dire autre chose que 1000 FCFA - bug réel
-            # signalé en test (2026-11-17) : le clavier appliquait quand
-            # même le x5, donc taper 1000 enregistrait 5000 FCFA, sans que
-            # la relecture vocale (qui redit le même chiffre tapé) ne le
-            # révèle. Même heuristique déjà utilisée pour le choix de menu
-            # (reconnaitre_choix_menu : chiffre tapé vs nombre dit en
-            # bambara) : ici un texte entièrement numérique = canal
-            # clavier/USSD, un texte avec des mots bambara = canal vocal.
-            if texte.strip().isdigit():
-                self.champs_confirmes["montant_fcfa"] = int(texte.strip())
+            # Voir _montant_est_litteral : un chiffre arabe tapé tel quel
+            # (clavier numérique de l'appli, #champSaisie) OU un nombre dit
+            # avec franc(s)/FCFA explicite est un montant FCFA direct, jamais
+            # un montant en dɔrɔmɛ - contrairement à la voix sans ce marqueur
+            # (où le dɔrɔmɛ est la convention orale réelle, validée sur
+            # phrases_reelles.csv). Bug réel signalé en test (2026-11-17,
+            # clavier) : le clavier appliquait quand même le x5, donc taper
+            # 1000 enregistrait 5000 FCFA sans que la relecture vocale (qui
+            # redit le même chiffre) ne le révèle - puis (même jour, re-signalé)
+            # le même x5 pour un montant dit à voix haute avec "francs"
+            # explicite ("1000 francs" -> 5000 prononcé).
+            if _montant_est_litteral(texte):
+                self.champs_confirmes["montant_fcfa"] = max(nombres)
                 self.champs_confirmes["unite_dite"] = "fcfa"
             else:
                 self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
