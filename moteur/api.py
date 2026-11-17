@@ -44,6 +44,21 @@ logger = logging.getLogger("ngoni_nana")
 # enregistrement, à rejeter avant de le charger entièrement en mémoire.
 TAILLE_MAX_AUDIO_OCTETS = 15 * 1024 * 1024  # 15 Mo
 
+# Message d'accueil : voix humaine réelle plutôt que le TTS synthétique, si
+# ce fichier local existe (2026-11-17, demande explicite - un des 5
+# enregistrements de l'équipe terrain couvrant les 9 choix du menu, bien
+# plus naturel qu'une synthèse, et sans le problème de vocabulaire bambara
+# non validé pour les items 4 à 8, voir messages_bambara.menu_principal).
+# Fichier dans ressource/ : jamais commité sur GitHub (voix de vraies
+# personnes, pas d'accord explicite pour une publication publique) - d'où
+# le repli silencieux sur le TTS si absent (ex. sur un autre poste), pas une
+# erreur. Choix du fichier à changer ici une fois l'équipe a écouté les 5 et
+# tranché (voir ressource/enregistrements_menu_bambara_2026-11-17/).
+CHEMIN_AUDIO_ACCUEIL_HUMAIN = (
+    Path(__file__).resolve().parent.parent
+    / "ressource" / "enregistrements_menu_bambara_2026-11-17" / "personne_1.ogg"
+)
+
 
 @asynccontextmanager
 async def _cycle_de_vie(_app: FastAPI):
@@ -274,7 +289,10 @@ def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obte
     message = msg.menu_principal()
     audio_base64, type_audio = None, "wav"
     try:
-        chemin_audio = _syntheser_message(message)
+        if CHEMIN_AUDIO_ACCUEIL_HUMAIN.exists():
+            chemin_audio = str(CHEMIN_AUDIO_ACCUEIL_HUMAIN)
+        else:
+            chemin_audio = _syntheser_message(message)
         with open(chemin_audio, "rb") as f:
             audio_base64 = base64.b64encode(f.read()).decode()
         type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
