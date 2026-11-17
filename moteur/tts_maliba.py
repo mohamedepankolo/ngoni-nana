@@ -84,7 +84,7 @@ def _fondu(echantillons: np.ndarray, n: int, sens: str) -> np.ndarray:
 
 
 def syntheser_par_phrases(
-    syntheser: Callable[[str], str], texte: str, pause_ms: int = 450, fondu_ms: int = 25
+    syntheser: Callable[[str], str], texte: str, pause_ms: int = 2000, fondu_ms: int = 25
 ) -> str:
     """Synthétise `texte` phrase par phrase (en parallèle) et recolle les
     audios avec un vrai silence (+ un fondu sur chaque raccord) entre chaque.
@@ -99,6 +99,17 @@ def syntheser_par_phrases(
     exemple) : seuls les messages à plusieurs phrases paient le coût de
     plusieurs appels distants (en parallèle, pas en série, pour limiter ce
     coût - voir ThreadPoolExecutor ci-dessous).
+
+    `pause_ms` par défaut passé de 450ms à 2000ms (2026-11-17) : mesuré sur
+    les horodatages mot-par-mot des 5 enregistrements humains du script à 9
+    phrases (ressource/enregistrements_menu_bambara_2026-11-17/), la pause
+    naturelle entre deux énumérations consécutives ("appuyez sur 1 pour...",
+    "appuyez sur 2 pour...") est de 2,2s en médiane sur 40 pauses mesurées
+    (1,0 à 2,3s pour la grande majorité, quelques valeurs jusqu'à 7s qui
+    semblent être de l'hésitation plutôt qu'un rythme voulu, écartées pour
+    choisir cette valeur). 450ms (l'ancien défaut, choisi au jugé) était 4 à
+    5 fois plus court que ce rythme réel - demande explicite de suivre le
+    rythme observé chez les locuteurs humains plutôt qu'une valeur arbitraire.
 
     `fondu_ms` suppose du mono 16 bits (nchannels=1, sampwidth=2) : format
     constaté sur chaque appel réel à ce Space à ce jour. Si ça changeait un
