@@ -24,8 +24,9 @@ from moteur.moteur_decision import Session, est_une_redite_numerique_fiable
 # Intentions qui ne font que lire des données déjà en base : rien à écrire, et
 # donc rien à faire confirmer par un "oui" avant de répondre (cas 4 et 6 du
 # parcours). "client" reste à part : consulter une dette ne demande pas de
-# confirmation, mais enregistrer un paiement, oui.
-INTENTIONS_LECTURE_SEULE = {"capital", "consultation", "stock"}
+# confirmation, mais enregistrer un paiement, oui. "fournisseur_consultation"
+# (item 7, 2026-11-17) : même principe, côté dette fournisseur.
+INTENTIONS_LECTURE_SEULE = {"capital", "consultation", "stock", "fournisseur_consultation"}
 
 CONSTRUCTEURS_CONFIRMATION = {
     "vente": msg.confirmation_vente,
@@ -33,6 +34,10 @@ CONSTRUCTEURS_CONFIRMATION = {
     "client": msg.confirmation_client,
     "capital_declaration": msg.confirmation_capital_declaration,
     "capital_ajout": msg.confirmation_capital_ajout,
+    "vente_credit": msg.confirmation_vente_credit,
+    "achat_credit": msg.confirmation_achat_credit,
+    "fournisseur_paiement": msg.confirmation_fournisseur_paiement,
+    "stock_ecriture": msg.confirmation_stock_ecriture,
 }
 
 # Une question ciblée par champ manquant, plutôt qu'un "redonne le montant"
@@ -43,6 +48,7 @@ CONSTRUCTEURS_DEMANDE_CHAMP = {
     "quantite": msg.demander_quantite,
     "article": msg.demander_article,
     "client": msg.demander_client,
+    "fournisseur": msg.demander_fournisseur,
 }
 
 # Champs pour lesquels la valeur tout juste saisie (clavier ou voix) est
@@ -504,6 +510,13 @@ class AgentVocal:
                 return f"An ma {article} sɔrɔ."
             seuil_bas = ligne.quantite_actuelle <= (ligne.seuil_alerte or 0)
             return msg.reponse_stock(article, ligne.quantite_actuelle, seuil_bas)
+        if intention == "fournisseur_consultation":
+            fournisseur = contrat["champs"].get("fournisseur")
+            if fournisseur:
+                ligne = db.consulter_fournisseur(bd, utilisatrice_id, fournisseur)
+                montant = ligne.montant_du if ligne else 0
+                return msg.reponse_fournisseur_consultation(montant, fournisseur)
+            return msg.reponse_fournisseur_consultation(db.total_du_aux_fournisseurs(bd, utilisatrice_id))
         # "consultation" (ex. "combien ai-je vendu ce mois-ci ?") n'a pas
         # encore de vraie réponse construite (pas de requête par période) :
         # message honnête plutôt que de réutiliser continuer() à tort, qui
@@ -528,6 +541,34 @@ class AgentVocal:
         elif intention == "capital_ajout":
             db.ajouter_au_capital(bd, utilisatrice_id=utilisatrice_id,
                                    montant_fcfa=champs.get("montant_fcfa", 0), session_id=session_id)
+        elif intention == "vente_credit":
+            # Une vente à crédit reste une vraie vente (chiffre d'affaires,
+            # mouvement de stock) ET crée une créance client - les deux
+            # écritures, jamais l'une sans l'autre (voir base_donnees.py).
+            db.enregistrer_transaction(bd, utilisatrice_id=utilisatrice_id, type_="vente",
+                                        champs=champs, session_id=session_id)
+            db.enregistrer_mouvement_client(bd, utilisatrice_id=utilisatrice_id,
+                                             nom_client=champs.get("client", "inconnu"),
+                                             montant_fcfa=champs.get("montant_fcfa", 0),
+                                             est_un_paiement=False)
+        elif intention == "achat_credit":
+            # Même principe côté achat : une dépense (qui augmente le stock,
+            # voir enregistrer_transaction) ET une dette fournisseur.
+            db.enregistrer_transaction(bd, utilisatrice_id=utilisatrice_id, type_="depense",
+                                        champs=champs, session_id=session_id)
+            db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=utilisatrice_id,
+                                                  nom_fournisseur=champs.get("fournisseur", "inconnu"),
+                                                  montant_fcfa=champs.get("montant_fcfa", 0),
+                                                  est_un_paiement=False)
+        elif intention == "fournisseur_paiement":
+            db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=utilisatrice_id,
+                                                  nom_fournisseur=champs.get("fournisseur", "inconnu"),
+                                                  montant_fcfa=champs.get("montant_fcfa", 0),
+                                                  est_un_paiement=True)
+        elif intention == "stock_ecriture":
+            db.enregistrer_mouvement_stock(bd, utilisatrice_id=utilisatrice_id,
+                                            article=champs.get("article", ""),
+                                            quantite=champs.get("quantite", 0))
         self._cloturer_session(bd, session_id, statut="complete")
         return msg.enregistrement_confirme()
 

@@ -68,6 +68,24 @@ class Client(Base):
     date_dernier_mouvement = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class Fournisseur(Base):
+    """Dette "fournisseur" : symétrique de Client, mais dans l'autre sens -
+
+    ici, c'est l'utilisatrice qui doit de l'argent (achat à crédit, item 5
+    du menu, 2026-11-17), pas un client. Table séparée plutôt que de
+    réutiliser Client avec un simple booléen "sens" : évite de mélanger deux
+    listes de tiers qui n'ont jamais de raison de se recouper (un client et
+    un fournisseur sont des personnes différentes) et garde la même logique
+    simple "nom -> montant_du" déjà éprouvée pour Client.
+    """
+    __tablename__ = "fournisseurs"
+    id = Column(Integer, primary_key=True)
+    utilisatrice_id = Column(Integer, ForeignKey("utilisatrices.id"), nullable=False)
+    nom_ou_code = Column(String, nullable=False)
+    montant_du = Column(Integer, default=0)
+    date_dernier_mouvement = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Stock(Base):
     __tablename__ = "stock"
     id = Column(Integer, primary_key=True)
@@ -175,15 +193,77 @@ def enregistrer_mouvement_client(db: SessionSQLAlchemy, *, utilisatrice_id: int,
     return client
 
 
+def enregistrer_mouvement_fournisseur(db: SessionSQLAlchemy, *, utilisatrice_id: int,
+                                        nom_fournisseur: str, montant_fcfa: int,
+                                        est_un_paiement: bool) -> Fournisseur:
+    """Symétrique de enregistrer_mouvement_client : nouvelle dette (achat à
+
+    crédit, item 5) ou paiement fait au fournisseur (échéance/dépôt, item 6).
+    """
+    fournisseur = (db.query(Fournisseur)
+                   .filter_by(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_fournisseur)
+                   .one_or_none())
+    if fournisseur is None:
+        fournisseur = Fournisseur(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_fournisseur, montant_du=0)
+        db.add(fournisseur)
+    fournisseur.montant_du = (fournisseur.montant_du or 0) + (-montant_fcfa if est_un_paiement else montant_fcfa)
+    fournisseur.date_dernier_mouvement = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(fournisseur)
+    return fournisseur
+
+
+def consulter_fournisseur(db: SessionSQLAlchemy, utilisatrice_id: int, nom_fournisseur: str) -> Fournisseur | None:
+    return (db.query(Fournisseur)
+            .filter_by(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_fournisseur)
+            .one_or_none())
+
+
+def total_du_aux_fournisseurs(db: SessionSQLAlchemy, utilisatrice_id: int) -> int:
+    """Somme du reste à payer, tous fournisseurs confondus (item 7, quand
+
+    aucun nom de fournisseur précis n'est donné - voir
+    CHAMPS_ATTENDUS["fournisseur_consultation"], moteur_decision.py).
+    """
+    return sum(f.montant_du or 0 for f in
+               db.query(Fournisseur).filter_by(utilisatrice_id=utilisatrice_id).all())
+
+
+def enregistrer_mouvement_stock(db: SessionSQLAlchemy, *, utilisatrice_id: int,
+                                  article: str, quantite: int) -> tuple[Stock, bool]:
+    """Item 8 du menu : "stock initial" si aucune ligne n'existe encore pour
+
+    cet article (la quantité REMPLACE, comme une première déclaration),
+    "réapprovisionnement" si une ligne existe déjà (la quantité s'AJOUTE à
+    l'existant) - même distinction que capital_declaration/capital_ajout,
+    mais décidée ici plutôt que dans moteur_decision.py (couche pure, sans
+    accès à la base) : seule cette fonction sait si une ligne existe déjà.
+    Renvoie (ligne_stock, est_une_declaration_initiale) pour que l'appelant
+    choisisse le bon message de confirmation si besoin.
+    """
+    ligne = (db.query(Stock)
+             .filter_by(utilisatrice_id=utilisatrice_id, article=article)
+             .one_or_none())
+    if ligne is None:
+        ligne = Stock(utilisatrice_id=utilisatrice_id, article=article, quantite_actuelle=quantite, seuil_alerte=0)
+        db.add(ligne)
+        db.commit()
+        db.refresh(ligne)
+        return ligne, True
+    (db.query(Stock).filter_by(id=ligne.id)
+     .update({Stock.quantite_actuelle: Stock.quantite_actuelle + quantite}))
+    db.commit()
+    db.refresh(ligne)
+    return ligne, False
+
+
 def calculer_capital(db: SessionSQLAlchemy, utilisatrice_id: int) -> int:
-    """Capital initial + ajouts + recettes - dépenses - dettes clients
+    """Capital initial + ajouts + recettes - dépenses - dettes clients + dettes fournisseurs
 
-    (+ dettes fournisseurs, formule de l'architecture).
-
-    "Dettes fournisseurs" n'a pas encore de table dédiée dans ce premier jet
-    (non observée dans phrases_reelles.csv ni dans le parcours utilisateur
-    actuel) : traitée comme 0 pour l'instant, à corriger si Fadima confirme
-    ce cas d'usage.
+    (formule de l'architecture). "Dettes fournisseurs" n'avait pas de table
+    dédiée avant l'item 5 du menu (achat à crédit, 2026-11-17) : implémenté
+    maintenant que le cas d'usage existe réellement (voir Fournisseur,
+    enregistrer_mouvement_fournisseur).
     """
     utilisatrice = db.get(Utilisatrice, utilisatrice_id)
     capital_initial = (utilisatrice.capital_initial or 0) if utilisatrice else 0
@@ -193,7 +273,9 @@ def calculer_capital(db: SessionSQLAlchemy, utilisatrice_id: int) -> int:
     ajouts_capital = sum(t.montant_fcfa for t in transactions if t.type == "capital_ajout")
     dettes_clients = sum(c.montant_du or 0 for c in
                           db.query(Client).filter_by(utilisatrice_id=utilisatrice_id).all())
-    return capital_initial + ajouts_capital + recettes - depenses - dettes_clients
+    dettes_fournisseurs = sum(f.montant_du or 0 for f in
+                               db.query(Fournisseur).filter_by(utilisatrice_id=utilisatrice_id).all())
+    return capital_initial + ajouts_capital + recettes - depenses - dettes_clients + dettes_fournisseurs
 
 
 def declarer_capital_initial(db: SessionSQLAlchemy, *, utilisatrice_id: int, montant_fcfa: int) -> None:
@@ -242,6 +324,11 @@ def bilan_utilisatrice(db: SessionSQLAlchemy, utilisatrice_id: int, limite_trans
               .filter(Client.montant_du != 0)
               .order_by(Client.date_dernier_mouvement.desc()).all())
 
+    dettes_fournisseurs = (db.query(Fournisseur)
+                            .filter_by(utilisatrice_id=utilisatrice_id)
+                            .filter(Fournisseur.montant_du != 0)
+                            .order_by(Fournisseur.date_dernier_mouvement.desc()).all())
+
     stock = db.query(Stock).filter_by(utilisatrice_id=utilisatrice_id).all()
 
     return {
@@ -254,6 +341,7 @@ def bilan_utilisatrice(db: SessionSQLAlchemy, utilisatrice_id: int, limite_trans
             for t in dernieres
         ],
         "dettes_clients": [{"nom": c.nom_ou_code, "montant_du": c.montant_du} for c in dettes],
+        "dettes_fournisseurs": [{"nom": f.nom_ou_code, "montant_du": f.montant_du} for f in dettes_fournisseurs],
         "stock": [{"article": s.article, "quantite": s.quantite_actuelle, "seuil_alerte": s.seuil_alerte}
                   for s in stock],
     }

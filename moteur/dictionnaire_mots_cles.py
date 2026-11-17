@@ -88,21 +88,33 @@ def reconnaitre_intention(texte: str) -> str | None:
 
 
 # Menu numérique (R2, intégration téléphonie/USSD) : une utilisatrice peut
-# choisir une action en disant ou en tapant un chiffre de 1 à 5 plutôt que le
-# mot-clé bambara correspondant - plus fiable sur un canal USSD/clavier, où un
+# choisir une action en disant ou en tapant un chiffre plutôt que le mot-clé
+# bambara correspondant - plus fiable sur un canal USSD/clavier, où un
 # chiffre isolé est quasi toujours bien reconnu, alors qu'un mot-clé parlé
 # dépend de la qualité de l'ASR. Ordre arbitraire mais à garder stable une
 # fois annoncé aux utilisatrices (voir messages_bambara.menu_principal) : le
 # changer casserait l'association déjà apprise par une utilisatrice régulière.
-# "consultation" (6, "joli") retiré du menu (2026-11-16, demande explicite) :
-# cette intention n'a pas de vraie réponse construite derrière
-# (voir AgentVocal.consultation_non_disponible), proposer un chiffre pour ça
-# promettait une fonction qui n'existe pas encore. L'intention "consultation"
-# reste reconnue en reconnaissance libre (MOTS_CLES ci-dessus), juste plus
-# proposée comme raccourci chiffré.
+# "consultation" (ancien 6, "joli") retiré du menu (2026-11-16) : cette
+# intention n'a pas de vraie réponse construite derrière (voir
+# AgentVocal.consultation_non_disponible). Reste reconnue en reconnaissance
+# libre (MOTS_CLES ci-dessus), juste pas proposée comme raccourci chiffré.
+#
+# Passage de 5 à 9 choix (2026-11-17, script corrigé par l'équipe terrain -
+# voir les 9 phrases "Appuyez sur X pour...") : 4 nouvelles actions (vente à
+# crédit, achat à crédit, échéance/dépôt fournisseur, consultation du reste à
+# payer) et "client" (ancien 4) et "stock" (ancien 5) renumérotés. Ces
+# nouvelles intentions n'ont PAS de mot-clé bambara dans MOTS_CLES ci-dessus :
+# contrairement à vente/depense/capital/stock, aucun mot n'existe encore pour
+# "crédit", "fournisseur" ou "échéance" dans le corpus validé de ce projet -
+# en inventer un casserait la règle du module (jamais de vocabulaire non
+# vérifié). Ces 4 actions ne sont donc accessibles QUE par le chiffre du menu
+# (clavier ou nombre dit en bambara), jamais par reconnaissance libre, tant
+# qu'une personne bambaraphone n'aura pas validé les mots correspondants.
 MENU_NUMERIQUE: dict[int, str] = {
     1: "vente", 2: "depense", 3: "capital",
-    4: "client", 5: "stock",
+    4: "vente_credit", 5: "achat_credit",
+    6: "fournisseur_paiement", 7: "fournisseur_consultation",
+    8: "stock_ecriture", 9: "stock",
 }
 
 

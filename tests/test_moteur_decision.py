@@ -251,7 +251,7 @@ def test_reconnaitre_choix_menu_mot_bambara():
     """Le même choix, dit en toutes lettres bambara (canal vocal)."""
     assert reconnaitre_choix_menu("kelen") == "vente"
     assert reconnaitre_choix_menu("saba") == "capital"
-    assert reconnaitre_choix_menu("duuru") == "stock"
+    assert reconnaitre_choix_menu("kononton") == "stock"
 
 
 def test_reconnaitre_choix_menu_rejette_un_nombre_dans_une_vraie_phrase():
@@ -297,3 +297,81 @@ def test_choix_menu_ignore_une_fois_une_intention_deja_active():
 
     deuxieme = session.recevoir("2")  # ne doit PAS redevenir "depense"
     assert deuxieme["intention"] == "vente"
+
+
+# ---------- Items 4 à 8 (script à 9 choix, 2026-11-17) ----------
+# Pas de mot-clé bambara pour ces 4 intentions (voir MENU_NUMERIQUE) :
+# testées uniquement via le chiffre du menu, jamais via un mot parlé.
+
+def test_choix_menu_vente_credit():
+    """Item 4 : comme tout choix de menu, le chiffre se dit SEUL (voir
+
+    reconnaitre_choix_menu, strict), puis l'article/quantité/montant
+    arrivent sur un tour séparé, et enfin le nom du client - via
+    combler_champ, puisque c'est le chemin que prend réellement
+    AgentVocal._combler_champ_en_attente une fois le champ manquant ciblé.
+    """
+    session = Session()
+    resultat = session.recevoir("4")
+    assert resultat["intention"] == "vente_credit"
+    resultat = session.recevoir("misi fila wa bi duuru")  # misi=vache
+    assert resultat["champs"]["quantite"] == 2
+    assert resultat["champs"]["montant_fcfa"] == 250000
+    assert session.premier_champ_manquant() == "client"
+    resultat = session.combler_champ("client", "Amadou")
+    assert resultat["champs"]["client"] == "amadou"
+    assert resultat["champs"]["article"] == "misi"  # pas écrasé par le nom du client
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_achat_credit():
+    session = Session()
+    resultat = session.recevoir("5")
+    assert resultat["intention"] == "achat_credit"
+    resultat = session.recevoir("saga bi duuru")
+    assert resultat["champs"]["montant_fcfa"] == 250
+    assert session.premier_champ_manquant() == "fournisseur"
+    resultat = session.combler_champ("fournisseur", "Fanta")
+    assert resultat["champs"]["fournisseur"] == "fanta"
+    assert resultat["champs"]["article"] == "saga"  # pas écrasé par le nom du fournisseur
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_fournisseur_paiement():
+    session = Session()
+    resultat = session.recevoir("6")
+    assert resultat["intention"] == "fournisseur_paiement"
+    resultat = session.recevoir("Fanta bi duuru")
+    assert resultat["champs"]["fournisseur"] == "fanta"
+    assert resultat["champs"]["montant_fcfa"] == 250
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_fournisseur_consultation_sans_nom():
+    """Item 7 sans nom de fournisseur précisé : aucun champ n'est requis,
+
+    l'intention est tout de suite en confiance haute (lecture seule, voir
+    AgentVocal.INTENTIONS_LECTURE_SEULE)."""
+    session = Session()
+    resultat = session.recevoir("7")
+    assert resultat["intention"] == "fournisseur_consultation"
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_stock_ecriture():
+    session = Session()
+    resultat = session.recevoir("8")
+    assert resultat["intention"] == "stock_ecriture"
+    resultat = session.recevoir("sukaro bi duuru")  # sukaro=sucre
+    assert resultat["champs"]["article"] == "sukaro"
+    assert resultat["champs"]["quantite"] == 50
+    assert resultat["confiance"] == "haute"
+
+
+def test_affiner_intention_stock_distingue_lecture_et_ecriture():
+    """"bolo" seul (sans chiffre) = consultation ; avec un chiffre = écriture
+
+    (même principe que _affiner_intention_capital, voir moteur_decision.py).
+    """
+    assert analyser("n ka sukaro bolo")["intention"] == "stock"
+    assert analyser("sukaro bi duuru bolo")["intention"] == "stock_ecriture"

@@ -58,6 +58,53 @@ def test_dette_client_nouvelle_puis_paiement_partiel(bd):
     assert db.consulter_client(bd, bd.utilisatrice_id, "mariam").montant_du == 1500
 
 
+def test_dette_fournisseur_nouvelle_puis_paiement_partiel(bd):
+    """Item 5/6 du menu (2026-11-17) : symétrique de test_dette_client..., mais
+
+    côté fournisseur (ce que l'utilisatrice doit, pas ce qu'on lui doit).
+    """
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=bd.utilisatrice_id,
+                                          nom_fournisseur="fanta_grossiste", montant_fcfa=5000,
+                                          est_un_paiement=False)
+    assert db.consulter_fournisseur(bd, bd.utilisatrice_id, "fanta_grossiste").montant_du == 5000
+
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=bd.utilisatrice_id,
+                                          nom_fournisseur="fanta_grossiste", montant_fcfa=2000,
+                                          est_un_paiement=True)
+    assert db.consulter_fournisseur(bd, bd.utilisatrice_id, "fanta_grossiste").montant_du == 3000
+    assert db.total_du_aux_fournisseurs(bd, bd.utilisatrice_id) == 3000
+
+
+def test_dette_fournisseur_augmente_le_capital(bd):
+    """Une dette fournisseur ajoute au capital (formule de l'architecture,
+
+    voir calculer_capital) : contre-intuitif au premier regard (on doit de
+    l'argent), mais c'est la formule documentée depuis le début de ce
+    module - l'argent emprunté au fournisseur reste disponible tant qu'il
+    n'est pas remboursé.
+    """
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=bd.utilisatrice_id, nom_fournisseur="grossiste",
+                                          montant_fcfa=5000, est_un_paiement=False)
+    assert db.calculer_capital(bd, bd.utilisatrice_id) == 5000
+
+
+def test_enregistrer_mouvement_stock_initial_puis_reapprovisionnement(bd):
+    """Item 8 du menu (2026-11-17) : la 1re déclaration pour un article
+
+    REMPLACE (stock initial), les suivantes s'AJOUTENT (réapprovisionnement) -
+    voir enregistrer_mouvement_stock.
+    """
+    ligne, est_initial = db.enregistrer_mouvement_stock(bd, utilisatrice_id=bd.utilisatrice_id,
+                                                         article="riz", quantite=50)
+    assert est_initial is True
+    assert ligne.quantite_actuelle == 50
+
+    ligne, est_initial = db.enregistrer_mouvement_stock(bd, utilisatrice_id=bd.utilisatrice_id,
+                                                         article="riz", quantite=20)
+    assert est_initial is False
+    assert ligne.quantite_actuelle == 70
+
+
 def test_bilan_utilisatrice_agrege_tout(bd):
     """Écran "bilan" de l'application mobile (lecture seule) : capital, totaux,
 
@@ -91,7 +138,7 @@ def test_bilan_utilisatrice_sans_transaction_reste_coherent(bd):
     bilan = db.bilan_utilisatrice(bd, bd.utilisatrice_id)
     assert bilan == {
         "capital": 0, "total_ventes": 0, "total_depenses": 0,
-        "transactions": [], "dettes_clients": [], "stock": [],
+        "transactions": [], "dettes_clients": [], "dettes_fournisseurs": [], "stock": [],
     }
 
 

@@ -421,6 +421,103 @@ def test_client_paiement_recu_reduit_la_dette(agent):
     assert client.montant_du == 10_000 - 3_500
 
 
+# ---------- Items 4 à 8 du menu (script à 9 choix, 2026-11-17) ----------
+# Pas de mot-clé bambara pour ces 4 intentions (voir MENU_NUMERIQUE) : chaque
+# champ arrive sur son propre tour (clavier numérique "un champ à la fois",
+# même UX que #champSaisie dans moteur/web/index.html), jamais toute la
+# phrase en un coup comme pour "vente"/"client" (qui ont un mot-clé pour
+# déclencher le chemin "redite entière", voir _combler_champ_en_attente).
+
+def test_vente_credit_cree_une_vente_et_une_dette_client(agent):
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "4")  # 4 = vente_credit
+    agent.traiter_texte(sid, agent.utilisatrice_id, "misi")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "fila")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme la quantité relue
+    agent.traiter_texte(sid, agent.utilisatrice_id, "50000")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant relu
+    agent.traiter_texte(sid, agent.utilisatrice_id, "Amadou")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    assert r["contrat"]["action"] == "enregistrer"
+    bd = agent._session_factory()
+    ventes = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id, type="vente").all()
+    assert len(ventes) == 1 and ventes[0].montant_fcfa == 250_000
+    assert db.consulter_client(bd, agent.utilisatrice_id, "amadou").montant_du == 250_000
+
+
+def test_achat_credit_cree_une_depense_et_une_dette_fournisseur(agent):
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "5")  # 5 = achat_credit
+    agent.traiter_texte(sid, agent.utilisatrice_id, "saga")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "50")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant relu
+    agent.traiter_texte(sid, agent.utilisatrice_id, "Fanta")
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    assert r["contrat"]["action"] == "enregistrer"
+    bd = agent._session_factory()
+    depenses = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id, type="depense").all()
+    assert len(depenses) == 1 and depenses[0].montant_fcfa == 250
+    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 250
+
+
+def test_fournisseur_paiement_reduit_la_dette_fournisseur(agent):
+    bd = agent._session_factory()
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=agent.utilisatrice_id,
+                                          nom_fournisseur="fanta", montant_fcfa=250, est_un_paiement=False)
+
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "6")  # 6 = fournisseur_paiement (échéance)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "Fanta")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "10")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant relu
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    assert r["contrat"]["action"] == "enregistrer"
+    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 200
+
+
+def test_fournisseur_consultation_ne_demande_pas_de_confirmation(agent):
+    """Item 7, comme "capital"/"stock" : une lecture seule répond tout de suite,
+
+    la session se clôture directement (pas de "c'est bien ça ?" - voir
+    test_consultation_capital_ne_demande_pas_de_confirmation).
+    """
+    bd = agent._session_factory()
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=agent.utilisatrice_id,
+                                          nom_fournisseur="fanta", montant_fcfa=200, est_un_paiement=False)
+
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "7")
+
+    assert r["contrat"]["intention"] == "fournisseur_consultation"
+    assert "?" not in r["message"]
+    assert bd.get(db.SessionAppel, sid).statut == "complete"
+
+
+def test_stock_ecriture_initial_puis_reapprovisionnement(agent):
+    """Item 8 : 1re déclaration pour un article = remplace, la suivante = ajoute."""
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "8")  # 8 = stock_ecriture
+    agent.traiter_texte(sid, agent.utilisatrice_id, "sukaro")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "20")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme la quantité relue
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    bd = agent._session_factory()
+    assert db.consulter_stock(bd, agent.utilisatrice_id, "sukaro").quantite_actuelle == 20
+
+    sid2 = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "8")
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "sukaro")
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "5")
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "owo")
+    agent.traiter_texte(sid2, agent.utilisatrice_id, "owo")
+
+    assert db.consulter_stock(bd, agent.utilisatrice_id, "sukaro").quantite_actuelle == 25
+
+
 def test_choix_menu_demarre_une_vente_comme_le_mot_cle(agent):
     """Taper/dire "1" (menu numérique, R2) démarre une vente, comme "feere"."""
     sid = agent.demarrer_session(agent.utilisatrice_id)

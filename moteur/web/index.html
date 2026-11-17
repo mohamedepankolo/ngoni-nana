@@ -215,7 +215,9 @@
   </div>
 
   <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
-       Memes 5 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py). -->
+       Memes 9 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py).
+       4 a 8 n'ont pas de mot-cle bambara valide (voir messages_bambara.menu_principal) :
+       etiquette en francais seul, pas de mot bambara invente. -->
   <div id="menuNumerique">
     <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
       <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
@@ -227,10 +229,22 @@
       <span class="badge">3</span><span class="etiquette">Jagokun<small>capital</small></span>
     </button>
     <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
-      <span class="badge">4</span><span class="etiquette">Juru<small>client</small></span>
+      <span class="badge">4</span><span class="etiquette">Vente<small>à crédit</small></span>
     </button>
     <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
-      <span class="badge">5</span><span class="etiquette">Bolo<small>stock</small></span>
+      <span class="badge">5</span><span class="etiquette">Achat<small>à crédit</small></span>
+    </button>
+    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
+      <span class="badge">6</span><span class="etiquette">Échéance<small>dette fournisseur</small></span>
+    </button>
+    <button disabled data-chiffre="7" onclick="envoyerChoixMenu(7)">
+      <span class="badge">7</span><span class="etiquette">Reste<small>à payer</small></span>
+    </button>
+    <button disabled data-chiffre="8" onclick="envoyerChoixMenu(8)">
+      <span class="badge">8</span><span class="etiquette">Stock<small>ajouter</small></span>
+    </button>
+    <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
+      <span class="badge">9</span><span class="etiquette">Bolo<small>stock</small></span>
     </button>
   </div>
 
@@ -430,6 +444,7 @@ const LABELS_CHAMP = {
   montant_fcfa: { type: "number", inputmode: "numeric", placeholder: "Wari hakɛ (montant)" },
   article: { type: "text", inputmode: "text", placeholder: "Fɛn tɔgɔ (article)" },
   client: { type: "text", inputmode: "text", placeholder: "Mɔgɔ tɔgɔ (client)" },
+  fournisseur: { type: "text", inputmode: "text", placeholder: "Fournisseur" },
 };
 
 function appliquerAttente(attente) {

@@ -55,6 +55,23 @@ CHAMPS_ATTENDUS: dict[str, list[str]] = {
     "capital_ajout": ["montant_fcfa"],
     "stock": ["article"],
     "consultation": [],
+    # Les 4 intentions suivantes (2026-11-17, script à 9 choix) ne sont
+    # atteignables que par le chiffre du menu (voir MENU_NUMERIQUE,
+    # dictionnaire_mots_cles.py) : pas de mot-clé bambara validé pour
+    # "crédit"/"fournisseur"/"échéance" pour l'instant.
+    "vente_credit": ["article", "quantite", "montant_fcfa", "client"],
+    "achat_credit": ["article", "montant_fcfa", "fournisseur"],
+    "fournisseur_paiement": ["fournisseur", "montant_fcfa"],
+    # Consultation du reste à payer aux fournisseurs : le nom du fournisseur
+    # est optionnel (si absent, réponse = total tous fournisseurs confondus,
+    # voir AgentVocal._repondre_lecture), donc aucun champ n'est STRICTEMENT
+    # requis - même logique que "capital"/"stock" en lecture.
+    "fournisseur_consultation": [],
+    # Déclaration ou réapprovisionnement de stock (distinct de "stock", qui
+    # reste la consultation - voir _affiner_intention_stock) : l'un ou
+    # l'autre est décidé à l'écriture (base_donnees.enregistrer_mouvement_stock),
+    # selon qu'une ligne de stock existe déjà pour cet article, pas ici.
+    "stock_ecriture": ["article", "quantite"],
 }
 
 # Mots grammaticaux bambara à ignorer lors de l'extraction de l'article ou du
@@ -159,24 +176,58 @@ def _affiner_intention_capital(texte: str, intention: str | None) -> str | None:
     return "capital"
 
 
+def _affiner_intention_stock(texte: str, intention: str | None) -> str | None:
+    """"bolo" (stock) peut vouloir dire consulter le stock d'un article, ou en
+
+    déclarer/ajouter une quantité (item 8 du menu, 2026-11-17) - même
+    ambiguïté et même principe de résolution que _affiner_intention_capital
+    ci-dessus : un chiffre prononcé à côté du mot signale une écriture, pas
+    une simple question. Le chiffre du menu (8 ou 9, voir MENU_NUMERIQUE)
+    résout déjà l'ambiguïté sans passer par ici (reconnaitre_choix_menu
+    renvoie directement "stock_ecriture" ou "stock"), donc ce repli ne joue
+    que pour le mot-clé parlé libre ("bolo").
+    """
+    if intention != "stock":
+        return intention
+    if reconnaitre_choix_menu(texte) == "stock":
+        return "stock"
+    if extraire_nombres(texte):
+        return "stock_ecriture"
+    return "stock"
+
+
 def extraire_entites(texte: str, intention: str | None) -> dict:
-    """Couche 2 + 3 : isole article/quantité/montant/client selon l'intention reconnue."""
+    """Couche 2 + 3 : isole article/quantité/montant/client/fournisseur selon l'intention reconnue."""
     champs: dict = {}
-    nombres = extraire_nombres(texte)
+    # Si l'énoncé N'EST QUE le chiffre qui vient de sélectionner CETTE
+    # intention au menu (ex. "4" pour choisir vente_credit), ce chiffre ne
+    # doit jamais être pris pour une valeur métier (montant, quantité...) -
+    # bug réel trouvé en ajoutant les items 4 à 8 (2026-11-17) : "1" seul
+    # faisait déjà silencieusement enregistrer montant_fcfa=5 (1 dɔrɔmɛ*5)
+    # pour "vente", sans jamais redemander le vrai montant tant qu'aucun
+    # autre chiffre n'était redit ensuite (champs_confirmes le considérait
+    # comme déjà rempli). Seul _affiner_intention_capital avait un garde-fou
+    # pour ce cas, limité au choix "capital" ; généralisé ici à toutes les
+    # intentions plutôt que dupliqué pour chacune des 6 nouvelles.
+    nombres = [] if reconnaitre_choix_menu(texte) == intention else extraire_nombres(texte)
     mots = _mots_restants(texte)
 
-    if intention in ("vente", "depense", "capital", "capital_declaration", "capital_ajout", "client"):
+    intentions_avec_montant = (
+        "vente", "depense", "capital", "capital_declaration", "capital_ajout",
+        "client", "vente_credit", "achat_credit", "fournisseur_paiement",
+    )
+    if intention in intentions_avec_montant:
         if nombres:
             montant_brut = max(nombres)
             champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
             champs["unite_dite"] = "dorome"
-        if intention == "vente" and len(nombres) >= 2:
+        if intention in ("vente", "vente_credit") and len(nombres) >= 2:
             champs["quantite"] = min(nombres)
 
-    if intention == "stock" and nombres:
+    if intention in ("stock", "stock_ecriture") and nombres:
         champs["quantite"] = min(nombres)
 
-    if intention in ("vente", "depense", "stock") and mots:
+    if intention in ("vente", "depense", "stock", "stock_ecriture", "vente_credit", "achat_credit") and mots:
         champs["article"] = " ".join(mots)
     if intention == "client" and mots:
         champs["client"] = mots[0]
@@ -187,6 +238,16 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
         tokens_bruts = normaliser(texte).split()
         champs["est_un_paiement"] = any(t.startswith("sara") and t not in EXCEPTIONS_NOMS_PROPRES
                                          for t in tokens_bruts)
+    # fournisseur_paiement/fournisseur_consultation n'ont pas de mot-clé
+    # bambara (voir CHAMPS_ATTENDUS) : atteints uniquement par chiffre de
+    # menu, "mots" ne contient alors que le nom propre dit à côté du chiffre
+    # (ex. "6 Amadou") - même logique que "client" plus haut (premier mot
+    # restant = le nom). "client" du côté vente_credit n'est volontairement
+    # pas extrait ici : "mots" a déjà été pris par "article" juste au-dessus,
+    # le nom du client sera redemandé séparément (voir
+    # CHAMPS_ATTENDUS["vente_credit"], AgentVocal._combler_champ_en_attente).
+    if intention in ("fournisseur_paiement", "fournisseur_consultation") and mots:
+        champs["fournisseur"] = mots[0]
 
     return champs
 
@@ -203,6 +264,7 @@ def analyser(texte: str) -> dict:
     if intention is None:
         return {"intention": None, "champs": {}, "confiance": "echec", "action": "reformuler"}
     intention = _affiner_intention_capital(texte, intention)
+    intention = _affiner_intention_stock(texte, intention)
 
     champs = extraire_entites(texte, intention)
     attendus = CHAMPS_ATTENDUS[intention]
@@ -268,6 +330,7 @@ class Session:
             intention = reconnaitre_choix_menu(texte)
         intention = intention or self.intention
         intention = _affiner_intention_capital(texte, intention)
+        intention = _affiner_intention_stock(texte, intention)
         nouveaux_champs = extraire_entites(texte, intention) if intention else {}
 
         # "Rien d'extrait" ne veut dire "pas compris" que si l'intention
@@ -276,9 +339,18 @@ class Session:
         # elle-même), ne rien extraire est normal, pas un échec - bug réel
         # trouvé en test (2026-10-09) : "n ka jagokun" seul (consulter le
         # capital, sans aucun chiffre) était rejeté comme incompris alors que
-        # l'intention était correctement reconnue.
+        # l'intention était correctement reconnue. Même chose pour un chiffre
+        # de menu qui vient tout juste de sélectionner CETTE intention (ex.
+        # "4" pour vente_credit) : rien n'est encore extrait (le chiffre
+        # lui-même ne compte plus pour un montant, voir extraire_entites),
+        # c'est une sélection réussie, pas un échec de compréhension - bug
+        # réel trouvé en ajoutant les items 4 à 8 (2026-11-17) : sans ce
+        # garde-fou, choisir une action au chiffre seul (ex. "1") déclenchait
+        # tout de suite "je n'ai pas compris" avant même de pouvoir demander
+        # le premier champ manquant.
+        vient_du_choix_menu = reconnaitre_choix_menu(texte) == intention
         champ_requis = bool(CHAMPS_ATTENDUS.get(intention)) if intention else False
-        if intention is None or (not nouveaux_champs and champ_requis):
+        if intention is None or (not nouveaux_champs and champ_requis and not vient_du_choix_menu):
             self.tentatives_reformulation += 1
             if self.tentatives_reformulation > self.MAX_REFORMULATIONS:
                 self.escaladee = True
@@ -350,7 +422,7 @@ class Session:
             # la phrase entiere a ete repetee), max() assignait a tort le
             # plus gros chiffre a la quantite (bug reel, 2026-10-09).
             self.champs_confirmes["quantite"] = min(nombres)
-        elif champ in ("article", "client") and mots:
+        elif champ in ("article", "client", "fournisseur") and mots:
             self.champs_confirmes[champ] = " ".join(mots) if champ == "article" else mots[0]
         else:
             return {"intention": self.intention, "champs": dict(self.champs_confirmes),
