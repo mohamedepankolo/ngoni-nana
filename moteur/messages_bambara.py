@@ -20,38 +20,44 @@ from moteur.nombres_bambara import nombre_en_bambara
 FACTEUR_DOROME = 5  # cohérent avec moteur_decision.FACTEUR_DOROME : on reparle en dɔrɔmɛ, pas en FCFA
 
 
-def _montant_bambara(montant_fcfa: int, unite_dite: str = "dorome") -> str:
-    """Relit un montant en bambara. `unite_dite` (voir Session.combler_champ,
+def _montant_bambara(montant_fcfa: int) -> str:
+    """Relit un montant en bambara TOUJOURS en dɔrɔmɛ (divisé par 5) : c'est
 
-    moteur_decision.py) distingue un montant dit/entendu en dɔrɔmɛ (divisé
-    par 5 pour retomber sur le chiffre réellement dit) d'un montant tapé
-    directement en FCFA au clavier numérique de l'appli (redit tel quel,
-    sans diviser) - sans cette distinction, un montant tapé au clavier était
-    redit divisé par 5 à tort (bug réel, 2026-11-17 : "1000" tapé, enregistré
-    comme 1000 FCFA, mais relu comme "200").
+    la convention réelle pour ÉNONCER un prix en bambara (voir montants.py,
+    "les prix sont très souvent énoncés en dɔrɔmɛ sans dire le mot"), que le
+    montant vienne d'un énoncé vocal déjà en dɔrɔmɛ OU d'un montant tapé/dit
+    directement en FCFA (clavier, ou "3000 francs" à voix haute) - la valeur
+    FCFA enregistrée (moteur_decision.py, unite_dite) ne change pas selon le
+    canal, seule la façon de la PRONONCER suit toujours cette convention.
+    Retour terrain (2026-11-17, Mohamed) : un montant tapé "3000" devait bien
+    s'enregistrer comme 3000 FCFA, mais se prononcer "kɛmɛ wɔɔrɔ" (600,
+    converti) et non "waa saba" (3000, lu tel quel) - un chiffre FCFA brut
+    prononcé tel quel ne sonne pas comme un prix dit naturellement en
+    bambara. Différent de la version précédente de cette fonction (qui ne
+    divisait PAS un montant tapé au clavier) : corrige ce choix, qui avait
+    lui-même corrigé un bug différent (clavier enregistrant à tort x5) sans
+    revenir sur le x5 côté prononciation.
     """
-    if unite_dite == "fcfa":
-        return nombre_en_bambara(montant_fcfa)
     return nombre_en_bambara(montant_fcfa // FACTEUR_DOROME)
 
 
 def confirmation_vente(champs: dict) -> str:
     article = champs.get("article", "")
     quantite = champs.get("quantite")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     qte_mot = nombre_en_bambara(quantite) if quantite else ""
     return f"{article} {qte_mot} feerelen bɛ na {montant} ma. I sɔnna wa?".replace("  ", " ")
 
 
 def confirmation_depense(champs: dict) -> str:
     article = champs.get("article", "")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     return f"{article} : wari {montant} sara. I sɔnna wa?"
 
 
 def confirmation_client(champs: dict) -> str:
     client = champs.get("client", "")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     if champs.get("est_un_paiement"):
         return f"{client} ye wari {montant} sara. I sɔnna wa?"
     return f"{client} ka juru ye wari {montant} ye. I sɔnna wa?"
@@ -71,7 +77,7 @@ def confirmation_vente_credit(champs: dict) -> str:
     """
     article = champs.get("article", "")
     quantite = champs.get("quantite")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     client = champs.get("client", "")
     qte_mot = nombre_en_bambara(quantite) if quantite else ""
     return (f"{article} {qte_mot} feerelen bɛ na {montant} ma, {client} ye juru la. "
@@ -84,7 +90,7 @@ def confirmation_achat_credit(champs: dict) -> str:
     ci-dessus (pas de mot validé pour "crédit"/"fournisseur").
     """
     article = champs.get("article", "")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     fournisseur = champs.get("fournisseur", "")
     return f"{article} : wari {montant} san juru la, {fournisseur} fɛ. I sɔnna wa?"
 
@@ -96,7 +102,7 @@ def confirmation_fournisseur_paiement(champs: dict) -> str:
     toujours est_un_paiement=True pour cette intention).
     """
     fournisseur = champs.get("fournisseur", "")
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     return f"{fournisseur} : wari {montant} sara. I sɔnna wa?"
 
 
@@ -127,12 +133,12 @@ def confirmation_stock_ecriture(champs: dict) -> str:
 
 
 def confirmation_capital_declaration(champs: dict) -> str:
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     return f"I ka jagokun bɛna kɛ wari {montant} ye. I sɔnna wa?"
 
 
 def confirmation_capital_ajout(champs: dict) -> str:
-    montant = _montant_bambara(champs.get("montant_fcfa", 0), champs.get("unite_dite", "dorome"))
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
     return f"Wari {montant} bɛna fara i ka jagokun kan. I sɔnna wa?"
 
 
@@ -215,7 +221,7 @@ def escalade() -> str:
     return "Ne bɛna i bila animatrice kɔrɔ."
 
 
-def confirmer_champ(champ: str, valeur, unite_dite: str = "dorome") -> str:
+def confirmer_champ(champ: str, valeur) -> str:
     """Relit UNE valeur tout juste saisie (quantité ou montant) avant de
 
     poursuivre - sécurité supplémentaire sur les deux champs numériques les
@@ -223,13 +229,9 @@ def confirmer_champ(champ: str, valeur, unite_dite: str = "dorome") -> str:
     agent_vocal.CHAMPS_A_CONFIRMER_UNITAIREMENT). Pas pour l'article ou le
     client : un nom mal compris se corrige sans risque, un chiffre mal
     compris peut fausser toute l'écriture comptable.
-
-    `unite_dite` (voir Session.combler_champ) : relit le montant tel que
-    réellement enregistré, sans diviser par 5 à tort si c'était un montant
-    FCFA tapé au clavier (voir _montant_bambara).
     """
     if champ == "montant_fcfa":
-        return f"I ko wari {_montant_bambara(valeur, unite_dite)}. I sɔnna wa?"
+        return f"I ko wari {_montant_bambara(valeur)}. I sɔnna wa?"
     if champ == "quantite":
         return f"I ko {nombre_en_bambara(valeur)}. I sɔnna wa?"
     return "I sɔnna wa?"
