@@ -104,6 +104,15 @@ class _EtatSession:
     # transaction à enregistrer.
     attente_continuer: bool = False
     tentatives_continuer: int = 0
+    # Compte les "non" d'affilée à LA RELECTURE D'UN CHAMP (CHAMPS_A_CONFIRMER_
+    # UNITAIREMENT, _traiter_confirmation_champ) - encore un autre compteur
+    # distinct (voir refus_consecutifs ci-dessus pour pourquoi chaque étape a
+    # le sien) : avant, dire "non" en boucle à "I ko wari X, i sɔnna wa?" ne
+    # faisait progresser AUCUN compteur d'échec, donc n'escaladait jamais,
+    # même après plus de 10 refus (bug réel signalé en test, 2026-11-17,
+    # Mohamed - la docstring de _traiter_confirmation_champ documentait déjà
+    # cette limite comme "à corriger si observé en test réel").
+    refus_champ_consecutifs: int = 0
 
 
 class AgentVocal:
@@ -461,14 +470,16 @@ class AgentVocal:
         dernier - voir _apres_champ_confirme). "non" : redemande CE champ
         précis, valeur fausse retirée - pas le dernier champ confirmé au
         hasard comme _demarrer_correction, puisqu'ici le champ en cause est
-        déjà connu avec certitude.
+        déjà connu avec certitude. Escalade après trop de "non" d'affilée
+        (etat.refus_champ_consecutifs, voir sa docstring) - corrige une
+        limite réelle signalée en test (2026-11-17, Mohamed : plus de 10
+        "non" sur une quantité sans jamais escalader).
 
-        Limite connue, assumée pour cette première version : contrairement
-        à _repeter_confirmation_ou_escalader, une réponse ni oui ni non ici
-        ne compte dans aucun compteur de tentatives - ne peut donc pas
-        encore escalader vers une personne si ça boucle. À corriger si
-        observé en test réel, comme le reste des compteurs d'échec de ce
-        fichier.
+        Limite connue, assumée pour cette première version : une réponse ni
+        oui ni non ici ne compte dans aucun compteur de tentatives - ne peut
+        donc pas encore escalader vers une personne si ÇA boucle (seule la
+        boucle du "non" explicite est corrigée ici). À corriger si observé
+        en test réel, comme le reste des compteurs d'échec de ce fichier.
         """
         s = etat.session_moteur
         champ = etat.champ_a_confirmer
@@ -494,6 +505,7 @@ class AgentVocal:
 
         if reponse is True:
             etat.champ_a_confirmer = None
+            etat.refus_champ_consecutifs = 0
             contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
                        "confiance": "a_confirmer" if s.premier_champ_manquant() else "haute",
                        "action": "demander_confirmation"}
@@ -501,6 +513,14 @@ class AgentVocal:
 
         if reponse is False:
             etat.champ_a_confirmer = None
+            etat.refus_champ_consecutifs += 1
+            if etat.refus_champ_consecutifs > s.MAX_REFORMULATIONS:
+                s.escaladee = True
+                etat.champ_en_attente = None
+                contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
+                           "confiance": "echec", "action": "escalade_humaine"}
+                self._cloturer_session(bd, session_id, statut="incomplete")
+                return self._repondre(bd, session_id, contrat, msg.escalade())
             s.champs_confirmes.pop(champ, None)
             etat.champ_en_attente = champ
             construire = CONSTRUCTEURS_REDEMANDE_CHAMP.get(champ, msg.demander_precision_montant_encore)
