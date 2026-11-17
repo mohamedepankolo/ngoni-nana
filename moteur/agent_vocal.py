@@ -414,7 +414,9 @@ class AgentVocal:
             # reçu (_traiter_confirmation_champ).
             etat.champ_en_attente = None
             etat.champ_a_confirmer = champ
-            return self._repondre(bd, session_id, contrat, msg.confirmer_champ(champ, s.champs_confirmes[champ]))
+            unite_dite = s.champs_confirmes.get("unite_dite", "dorome")
+            return self._repondre(bd, session_id, contrat,
+                                   msg.confirmer_champ(champ, s.champs_confirmes[champ], unite_dite))
         return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
 
     def _apres_champ_confirme(self, bd, etat: "_EtatSession", session_id: int, s: Session, contrat: dict) -> dict:
@@ -496,7 +498,9 @@ class AgentVocal:
         # Ni oui ni non : redemande la même relecture (voir limite dans la docstring).
         contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
                    "confiance": "a_confirmer", "action": "demander_confirmation"}
-        return self._repondre(bd, session_id, contrat, msg.confirmer_champ(champ, s.champs_confirmes.get(champ)))
+        unite_dite = s.champs_confirmes.get("unite_dite", "dorome")
+        return self._repondre(bd, session_id, contrat,
+                               msg.confirmer_champ(champ, s.champs_confirmes.get(champ), unite_dite))
 
     def _repondre_lecture(self, bd, utilisatrice_id: int, contrat: dict) -> str:
         intention = contrat["intention"]

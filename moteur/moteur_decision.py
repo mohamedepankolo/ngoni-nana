@@ -411,8 +411,25 @@ class Session:
         mots = _mots_restants(texte)
 
         if champ == "montant_fcfa" and nombres:
-            self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
-            self.champs_confirmes["unite_dite"] = "dorome"
+            # Un chiffre arabe tapé tel quel (clavier numérique de l'appli,
+            # #champSaisie) est un montant FCFA direct, jamais un montant en
+            # dɔrɔmɛ : contrairement à la voix (où le dɔrɔmɛ est la
+            # convention orale réelle, validée sur phrases_reelles.csv), il
+            # n'y a aucune raison qu'une utilisatrice qui TAPE "1000" sur un
+            # clavier veuille dire autre chose que 1000 FCFA - bug réel
+            # signalé en test (2026-11-17) : le clavier appliquait quand
+            # même le x5, donc taper 1000 enregistrait 5000 FCFA, sans que
+            # la relecture vocale (qui redit le même chiffre tapé) ne le
+            # révèle. Même heuristique déjà utilisée pour le choix de menu
+            # (reconnaitre_choix_menu : chiffre tapé vs nombre dit en
+            # bambara) : ici un texte entièrement numérique = canal
+            # clavier/USSD, un texte avec des mots bambara = canal vocal.
+            if texte.strip().isdigit():
+                self.champs_confirmes["montant_fcfa"] = int(texte.strip())
+                self.champs_confirmes["unite_dite"] = "fcfa"
+            else:
+                self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
+                self.champs_confirmes["unite_dite"] = "dorome"
         elif champ == "quantite" and nombres:
             # min(), pas max() : coherent avec extraire_entites (le montant
             # est toujours le plus grand des deux chiffres, la quantite le

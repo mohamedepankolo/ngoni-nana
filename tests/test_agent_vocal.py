@@ -442,8 +442,10 @@ def test_vente_credit_cree_une_vente_et_une_dette_client(agent):
     assert r["contrat"]["action"] == "enregistrer"
     bd = agent._session_factory()
     ventes = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id, type="vente").all()
-    assert len(ventes) == 1 and ventes[0].montant_fcfa == 250_000
-    assert db.consulter_client(bd, agent.utilisatrice_id, "amadou").montant_du == 250_000
+    # "50000" tapé au clavier = 50 000 FCFA tel quel, pas de conversion dɔrɔmɛ
+    # (voir Session.combler_champ : un chiffre arabe tapé n'est jamais en dɔrɔmɛ).
+    assert len(ventes) == 1 and ventes[0].montant_fcfa == 50_000
+    assert db.consulter_client(bd, agent.utilisatrice_id, "amadou").montant_du == 50_000
 
 
 def test_achat_credit_cree_une_depense_et_une_dette_fournisseur(agent):
@@ -458,8 +460,9 @@ def test_achat_credit_cree_une_depense_et_une_dette_fournisseur(agent):
     assert r["contrat"]["action"] == "enregistrer"
     bd = agent._session_factory()
     depenses = bd.query(db.Transaction).filter_by(utilisatrice_id=agent.utilisatrice_id, type="depense").all()
-    assert len(depenses) == 1 and depenses[0].montant_fcfa == 250
-    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 250
+    # "50" tapé au clavier = 50 FCFA tel quel (voir test ci-dessus).
+    assert len(depenses) == 1 and depenses[0].montant_fcfa == 50
+    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 50
 
 
 def test_fournisseur_paiement_reduit_la_dette_fournisseur(agent):
@@ -475,7 +478,8 @@ def test_fournisseur_paiement_reduit_la_dette_fournisseur(agent):
     r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
 
     assert r["contrat"]["action"] == "enregistrer"
-    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 200
+    # "10" tapé au clavier = 10 FCFA tel quel (voir tests ci-dessus) : 250 - 10 = 240.
+    assert db.consulter_fournisseur(bd, agent.utilisatrice_id, "fanta").montant_du == 240
 
 
 def test_fournisseur_consultation_ne_demande_pas_de_confirmation(agent):
