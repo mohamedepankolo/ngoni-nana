@@ -51,6 +51,20 @@ CONSTRUCTEURS_DEMANDE_CHAMP = {
     "fournisseur": msg.demander_fournisseur,
 }
 
+# Même chose, mais pour RE-demander un champ après un refus explicite (un
+# "non" à la relecture, ou une valeur mal comprise) : ces messages disent
+# "tuguni" ("encore"), qui ferait bizarre sur la toute première question
+# posée sur ce champ (retour terrain, 2026-11-17, Mohamed) - CONSTRUCTEURS_
+# DEMANDE_CHAMP ci-dessus sert pour cette première question, celui-ci
+# seulement quand on repose la MÊME question après un échec sur CE champ.
+CONSTRUCTEURS_REDEMANDE_CHAMP = {
+    "montant_fcfa": msg.demander_precision_montant_encore,
+    "quantite": msg.demander_quantite_encore,
+    "article": msg.demander_article_encore,
+    "client": msg.demander_client_encore,
+    "fournisseur": msg.demander_fournisseur_encore,
+}
+
 # Champs pour lesquels la valeur tout juste saisie (clavier ou voix) est
 # relue en bambara et doit être confirmée AVANT de passer au champ suivant
 # (demande explicite : saisie clavier des chiffres sur l'application mobile,
@@ -339,7 +353,7 @@ class AgentVocal:
         etat.champ_en_attente = champ
         contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
                    "confiance": "a_confirmer", "action": "demander_confirmation"}
-        construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+        construire = CONSTRUCTEURS_REDEMANDE_CHAMP.get(champ, msg.demander_precision_montant_encore)
         return self._repondre(bd, session_id, contrat, construire())
 
     def _repeter_confirmation_ou_escalader(self, bd, etat: "_EtatSession", session_id: int) -> dict:
@@ -402,7 +416,7 @@ class AgentVocal:
                            "confiance": "echec", "action": "escalade_humaine"}
                 self._cloturer_session(bd, session_id, statut="incomplete")
                 return self._repondre(bd, session_id, contrat, msg.escalade())
-            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+            construire = CONSTRUCTEURS_REDEMANDE_CHAMP.get(champ, msg.demander_precision_montant_encore)
             return self._repondre(bd, session_id, contrat, construire())
 
         s.tentatives_reformulation = 0
@@ -489,7 +503,7 @@ class AgentVocal:
             etat.champ_a_confirmer = None
             s.champs_confirmes.pop(champ, None)
             etat.champ_en_attente = champ
-            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(champ, msg.demander_precision_montant)
+            construire = CONSTRUCTEURS_REDEMANDE_CHAMP.get(champ, msg.demander_precision_montant_encore)
             contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
                        "confiance": "a_confirmer", "action": "demander_confirmation"}
             return self._repondre(bd, session_id, contrat, construire())

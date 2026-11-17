@@ -238,7 +238,7 @@ def confirmer_champ(champ: str, valeur) -> str:
 
 
 def demander_precision_montant() -> str:
-    return "Wari hakɛ fɔ tuguni."
+    return "Wari hakɛ fɔ."
 
 
 # Les trois messages suivants ciblent précisément UN champ manquant (voir
@@ -252,18 +252,44 @@ def demander_precision_montant() -> str:
 # jusqu'ici seul message de ce type ; à valider par une personne
 # bambaraphone comme le reste de ce fichier.
 def demander_quantite() -> str:
-    return "Hakɛ fɔ tuguni."
+    return "Hakɛ fɔ."
 
 
 def demander_article() -> str:
-    return "A tɔgɔ fɔ tuguni."
+    return "A tɔgɔ fɔ."
 
 
 def demander_client() -> str:
-    return "Mɔgɔ tɔgɔ fɔ tuguni."
+    return "Mɔgɔ tɔgɔ fɔ."
 
 
 def demander_fournisseur() -> str:
+    return "Fɛn feerelikɛla tɔgɔ fɔ."
+
+
+# Variantes "encore" (avec "tuguni", = "encore/à nouveau") des cinq messages
+# ci-dessus : à utiliser UNIQUEMENT pour redemander un champ après un refus
+# explicite (un "non" à la relecture, ou une valeur mal comprise) - jamais
+# pour la toute première question posée sur ce champ, qui n'est pas encore
+# une répétition (retour terrain, 2026-11-17, Mohamed : "tuguni" dès la
+# première saisie fait bizarre, ça ne doit apparaître qu'au second essai).
+def demander_precision_montant_encore() -> str:
+    return "Wari hakɛ fɔ tuguni."
+
+
+def demander_quantite_encore() -> str:
+    return "Hakɛ fɔ tuguni."
+
+
+def demander_article_encore() -> str:
+    return "A tɔgɔ fɔ tuguni."
+
+
+def demander_client_encore() -> str:
+    return "Mɔgɔ tɔgɔ fɔ tuguni."
+
+
+def demander_fournisseur_encore() -> str:
     return "Fɛn feerelikɛla tɔgɔ fɔ tuguni."
 
 
