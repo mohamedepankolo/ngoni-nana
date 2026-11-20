@@ -115,11 +115,16 @@ MENU_NUMERIQUE: dict[int, str] = {
     4: "vente_credit", 5: "achat_credit",
     6: "fournisseur_paiement", 7: "fournisseur_consultation",
     8: "stock_ecriture", 9: "stock",
+    # Items 10-12 (2026-11-17, suite aux fiches terrain transmises par
+    # Fadima) : suivi d'un crédit SFD (institution de microfinance), même
+    # principe que 4-8 - aucun mot bambara validé pour "SFD"/"échéance",
+    # chiffre de menu uniquement (voir reconnaitre_choix_menu).
+    10: "sfd_declaration", 11: "sfd_paiement", 12: "sfd_consultation",
 }
 
 
 def reconnaitre_choix_menu(texte: str) -> str | None:
-    """Un chiffre isolé (1 à 5) -> l'intention correspondante du menu, sinon None.
+    """Un chiffre isolé (1 à 12) -> l'intention correspondante du menu, sinon None.
 
     Accepte aussi bien un chiffre arabe tapé tel quel ("1", canal USSD/clavier)
     qu'un nombre dit en toutes lettres bambara ("kelen", canal vocal) - voir

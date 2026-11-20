@@ -368,6 +368,52 @@ def test_choix_menu_stock_ecriture():
     assert resultat["confiance"] == "haute"
 
 
+def test_choix_menu_sfd_declaration():
+    """Item 10 : seuls nom_sfd et montant_fcfa (le total du crédit) sont
+
+    extraits de la phrase initiale ; duree_mois et echeance_mensuelle_fcfa
+    sont toujours redemandés séparément (jamais 3 nombres ambigus extraits
+    d'un seul coup, voir extraire_entites).
+    """
+    session = Session()
+    resultat = session.recevoir("10")
+    assert resultat["intention"] == "sfd_declaration"
+    resultat = session.recevoir("Nyesigiso waa duuru")
+    assert resultat["champs"]["nom_sfd"] == "nyesigiso"
+    assert resultat["champs"]["montant_fcfa"] == 25_000  # waa duuru = 5000 dorome * 5
+    assert "duree_mois" not in resultat["champs"]
+    assert "echeance_mensuelle_fcfa" not in resultat["champs"]
+    assert session.premier_champ_manquant() == "duree_mois"
+
+    resultat = session.combler_champ("duree_mois", "wooro")  # 6 mois
+    assert resultat["champs"]["duree_mois"] == 6
+    assert session.premier_champ_manquant() == "echeance_mensuelle_fcfa"
+
+    resultat = session.combler_champ("echeance_mensuelle_fcfa", "waa duuru")
+    assert resultat["champs"]["echeance_mensuelle_fcfa"] == 25_000
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_sfd_paiement():
+    session = Session()
+    resultat = session.recevoir("11")
+    assert resultat["intention"] == "sfd_paiement"
+    resultat = session.recevoir("waa duuru")
+    assert resultat["champs"]["montant_fcfa"] == 25_000
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_sfd_consultation():
+    """Item 12 : aucun champ requis, lecture seule (voir
+
+    AgentVocal.INTENTIONS_LECTURE_SEULE), même principe que item 7.
+    """
+    session = Session()
+    resultat = session.recevoir("12")
+    assert resultat["intention"] == "sfd_consultation"
+    assert resultat["confiance"] == "haute"
+
+
 def test_affiner_intention_stock_distingue_lecture_et_ecriture():
     """"bolo" seul (sans chiffre) = consultation ; avec un chiffre = écriture
 

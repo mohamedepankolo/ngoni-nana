@@ -28,7 +28,7 @@ from moteur.moteur_decision import Session, est_une_redite_numerique_fiable
 # parcours). "client" reste à part : consulter une dette ne demande pas de
 # confirmation, mais enregistrer un paiement, oui. "fournisseur_consultation"
 # (item 7, 2026-11-17) : même principe, côté dette fournisseur.
-INTENTIONS_LECTURE_SEULE = {"capital", "consultation", "stock", "fournisseur_consultation"}
+INTENTIONS_LECTURE_SEULE = {"capital", "consultation", "stock", "fournisseur_consultation", "sfd_consultation"}
 
 CONSTRUCTEURS_CONFIRMATION = {
     "vente": msg.confirmation_vente,
@@ -40,6 +40,8 @@ CONSTRUCTEURS_CONFIRMATION = {
     "achat_credit": msg.confirmation_achat_credit,
     "fournisseur_paiement": msg.confirmation_fournisseur_paiement,
     "stock_ecriture": msg.confirmation_stock_ecriture,
+    "sfd_declaration": msg.confirmation_sfd_declaration,
+    "sfd_paiement": msg.confirmation_sfd_paiement,
 }
 
 # Une question ciblée par champ manquant, plutôt qu'un "redonne le montant"
@@ -51,6 +53,9 @@ CONSTRUCTEURS_DEMANDE_CHAMP = {
     "article": msg.demander_article,
     "client": msg.demander_client,
     "fournisseur": msg.demander_fournisseur,
+    "nom_sfd": msg.demander_nom_sfd,
+    "duree_mois": msg.demander_duree_mois,
+    "echeance_mensuelle_fcfa": msg.demander_echeance_mensuelle,
 }
 
 # Même chose, mais pour RE-demander un champ après un refus explicite (un
@@ -65,6 +70,9 @@ CONSTRUCTEURS_REDEMANDE_CHAMP = {
     "article": msg.demander_article_encore,
     "client": msg.demander_client_encore,
     "fournisseur": msg.demander_fournisseur_encore,
+    "nom_sfd": msg.demander_nom_sfd_encore,
+    "duree_mois": msg.demander_duree_mois_encore,
+    "echeance_mensuelle_fcfa": msg.demander_echeance_mensuelle_encore,
 }
 
 # Champs pour lesquels la valeur tout juste saisie (clavier ou voix) est
@@ -74,14 +82,15 @@ CONSTRUCTEURS_REDEMANDE_CHAMP = {
 # transaction déjà existante). Limité aux deux champs numériques : un nom
 # d'article ou de client mal compris se corrige sans risque particulier,
 # un chiffre mal compris peut fausser toute l'écriture comptable.
-CHAMPS_A_CONFIRMER_UNITAIREMENT = {"quantite", "montant_fcfa"}
+CHAMPS_A_CONFIRMER_UNITAIREMENT = {"quantite", "montant_fcfa", "duree_mois", "echeance_mensuelle_fcfa"}
 
 # Champs qu'on peut proposer de corriger après un "non" au résumé final (voir
 # _demarrer_correction, msg.demander_quel_champ_corriger) - ordre fixe plutôt
 # que l'ordre de CHAMPS_ATTENDUS (moteur_decision.py) : certaines intentions
 # (ex. "client") ont un montant effectivement saisi sans l'exiger dans
 # CHAMPS_ATTENDUS, cet ordre fixe les propose quand même s'ils sont présents.
-CHAMPS_CORRIGIBLES = ("article", "quantite", "montant_fcfa", "client", "fournisseur")
+CHAMPS_CORRIGIBLES = ("article", "quantite", "montant_fcfa", "client", "fournisseur",
+                       "nom_sfd", "duree_mois", "echeance_mensuelle_fcfa")
 
 
 def _reconnaitre_choix_champ(texte: str, champs: list[str]) -> str | None:
@@ -254,10 +263,10 @@ class AgentVocal:
             return self._traiter_choix_champ_a_corriger(bd, etat, session_id, texte)
 
         if etat.champ_a_confirmer:
-            return self._traiter_confirmation_champ(bd, etat, session_id, texte)
+            return self._traiter_confirmation_champ(bd, etat, session_id, utilisatrice_id, texte)
 
         if etat.champ_en_attente:
-            return self._combler_champ_en_attente(bd, etat, session_id, texte)
+            return self._combler_champ_en_attente(bd, etat, session_id, utilisatrice_id, texte)
 
         if etat.en_attente_confirmation:
             reponse = reconnaitre_confirmation(texte)
@@ -456,7 +465,8 @@ class AgentVocal:
         message = construire(s.champs_confirmes) if construire else msg.demander_precision_montant()
         return self._repondre(bd, session_id, contrat, message)
 
-    def _combler_champ_en_attente(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+    def _combler_champ_en_attente(self, bd, etat: "_EtatSession", session_id: int,
+                                   utilisatrice_id: int, texte: str) -> dict:
         """Traite une réponse à une question ciblée sur un seul champ
 
         (Session.combler_champ) : un chiffre isolé remplit directement CE
@@ -479,15 +489,7 @@ class AgentVocal:
             contrat = s.recevoir(texte)
             if contrat["action"] == "reformuler":
                 return self._repondre(bd, session_id, contrat, msg.reformulation(s.tentatives_reformulation))
-            if contrat["confiance"] == "haute":
-                etat.en_attente_confirmation = True
-                construire = CONSTRUCTEURS_CONFIRMATION.get(contrat["intention"])
-                message = construire(contrat["champs"]) if construire else msg.demander_precision_montant()
-                return self._repondre(bd, session_id, contrat, message)
-            manquant = s.premier_champ_manquant()
-            etat.champ_en_attente = manquant
-            construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
-            return self._repondre(bd, session_id, contrat, construire())
+            return self._apres_champ_confirme(bd, etat, session_id, utilisatrice_id, s, contrat)
 
         contrat = s.combler_champ(champ, texte)
 
@@ -514,9 +516,10 @@ class AgentVocal:
             etat.champ_a_confirmer = champ
             return self._repondre(bd, session_id, contrat,
                                    msg.confirmer_champ(champ, s.champs_confirmes[champ]))
-        return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+        return self._apres_champ_confirme(bd, etat, session_id, utilisatrice_id, s, contrat)
 
-    def _apres_champ_confirme(self, bd, etat: "_EtatSession", session_id: int, s: Session, contrat: dict) -> dict:
+    def _apres_champ_confirme(self, bd, etat: "_EtatSession", session_id: int,
+                               utilisatrice_id: int, s: Session, contrat: dict) -> dict:
         """Que faire une fois un champ réglé : poser la question du prochain
 
         champ manquant, ou passer à la confirmation globale de fin de
@@ -524,7 +527,22 @@ class AgentVocal:
         bien juste après un remplissage direct (champs qui n'exigent pas de
         confirmation unitaire) qu'après un "oui" à la relecture d'un champ
         qui en exigeait une (_traiter_confirmation_champ).
+
+        Une intention de lecture seule (ex. "stock", item 9) peut arriver ici
+        avec confiance "haute" dès que son dernier champ manquant (l'article)
+        vient d'être comblé par ce chemin "un champ à la fois" - distinct du
+        chemin direct de _traiter_nouvelle_action qui, lui, vérifiait déjà
+        INTENTIONS_LECTURE_SEULE. Sans ce même raccourci ici, "stock" n'avait
+        pas d'entrée dans CONSTRUCTEURS_CONFIRMATION et retombait à tort sur
+        msg.demander_precision_montant() - bug réel trouvé en testant "9" puis
+        l'article dans un tour séparé (2026-11-18).
         """
+        if contrat["intention"] in INTENTIONS_LECTURE_SEULE and contrat["confiance"] == "haute":
+            etat.champ_en_attente = None
+            message = self._repondre_lecture(bd, utilisatrice_id, contrat)
+            self._cloturer_session(bd, session_id, statut="complete")
+            return self._repondre(bd, session_id, contrat, message)
+
         if contrat["confiance"] == "haute":
             etat.champ_en_attente = None
             etat.en_attente_confirmation = True
@@ -537,7 +555,8 @@ class AgentVocal:
         construire = CONSTRUCTEURS_DEMANDE_CHAMP.get(manquant, msg.demander_precision_montant)
         return self._repondre(bd, session_id, contrat, construire())
 
-    def _traiter_confirmation_champ(self, bd, etat: "_EtatSession", session_id: int, texte: str) -> dict:
+    def _traiter_confirmation_champ(self, bd, etat: "_EtatSession", session_id: int,
+                                     utilisatrice_id: int, texte: str) -> dict:
         """Répond à la relecture d'un champ numérique tout juste saisi
 
         (CHAMPS_A_CONFIRMER_UNITAIREMENT). "oui" : passe à l'étape suivante
@@ -574,7 +593,7 @@ class AgentVocal:
             contrat = s.recevoir(texte)
             if contrat["action"] == "reformuler":
                 return self._repondre(bd, session_id, contrat, msg.reformulation(s.tentatives_reformulation))
-            return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+            return self._apres_champ_confirme(bd, etat, session_id, utilisatrice_id, s, contrat)
 
         reponse = reconnaitre_confirmation(texte)
 
@@ -584,7 +603,7 @@ class AgentVocal:
             contrat = {"intention": s.intention, "champs": dict(s.champs_confirmes),
                        "confiance": "a_confirmer" if s.premier_champ_manquant() else "haute",
                        "action": "demander_confirmation"}
-            return self._apres_champ_confirme(bd, etat, session_id, s, contrat)
+            return self._apres_champ_confirme(bd, etat, session_id, utilisatrice_id, s, contrat)
 
         if reponse is False:
             etat.champ_a_confirmer = None
@@ -628,6 +647,9 @@ class AgentVocal:
                 montant = ligne.montant_du if ligne else 0
                 return msg.reponse_fournisseur_consultation(montant, fournisseur)
             return msg.reponse_fournisseur_consultation(db.total_du_aux_fournisseurs(bd, utilisatrice_id))
+        if intention == "sfd_consultation":
+            bilan = db.bilan_pret_sfd(bd, utilisatrice_id)
+            return msg.reponse_sfd_consultation(bilan["reste_a_payer_fcfa"], bilan["prochaine_echeance_fcfa"])
         # "consultation" (ex. "combien ai-je vendu ce mois-ci ?") n'a pas
         # encore de vraie réponse construite (pas de requête par période) :
         # message honnête plutôt que de réutiliser continuer() à tort, qui
@@ -645,7 +667,9 @@ class AgentVocal:
             db.enregistrer_mouvement_client(bd, utilisatrice_id=utilisatrice_id,
                                              nom_client=champs.get("client", "inconnu"),
                                              montant_fcfa=champs["montant_fcfa"],
-                                             est_un_paiement=champs.get("est_un_paiement", False))
+                                             est_un_paiement=champs.get("est_un_paiement", False),
+                                             libelle="Paiement reçu" if champs.get("est_un_paiement") else "Nouvelle dette",
+                                             session_id=session_id)
         elif intention == "capital_declaration":
             db.declarer_capital_initial(bd, utilisatrice_id=utilisatrice_id,
                                          montant_fcfa=champs.get("montant_fcfa", 0))
@@ -661,7 +685,9 @@ class AgentVocal:
             db.enregistrer_mouvement_client(bd, utilisatrice_id=utilisatrice_id,
                                              nom_client=champs.get("client", "inconnu"),
                                              montant_fcfa=champs.get("montant_fcfa", 0),
-                                             est_un_paiement=False)
+                                             est_un_paiement=False,
+                                             libelle=f"Vente à crédit : {champs.get('article', '')}".strip(),
+                                             session_id=session_id)
         elif intention == "achat_credit":
             # Même principe côté achat : une dépense (qui augmente le stock,
             # voir enregistrer_transaction) ET une dette fournisseur.
@@ -670,16 +696,32 @@ class AgentVocal:
             db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=utilisatrice_id,
                                                   nom_fournisseur=champs.get("fournisseur", "inconnu"),
                                                   montant_fcfa=champs.get("montant_fcfa", 0),
-                                                  est_un_paiement=False)
+                                                  est_un_paiement=False,
+                                                  libelle=f"Achat à crédit : {champs.get('article', '')}".strip(),
+                                                  session_id=session_id)
         elif intention == "fournisseur_paiement":
             db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=utilisatrice_id,
                                                   nom_fournisseur=champs.get("fournisseur", "inconnu"),
                                                   montant_fcfa=champs.get("montant_fcfa", 0),
-                                                  est_un_paiement=True)
+                                                  est_un_paiement=True,
+                                                  libelle="Paiement fournisseur",
+                                                  session_id=session_id)
         elif intention == "stock_ecriture":
             db.enregistrer_mouvement_stock(bd, utilisatrice_id=utilisatrice_id,
                                             article=champs.get("article", ""),
-                                            quantite=champs.get("quantite", 0))
+                                            quantite=champs.get("quantite", 0),
+                                            session_id=session_id)
+        elif intention == "sfd_declaration":
+            db.declarer_pret_sfd(bd, utilisatrice_id=utilisatrice_id,
+                                  nom_sfd=champs.get("nom_sfd", "inconnu"),
+                                  montant_total_fcfa=champs.get("montant_fcfa", 0),
+                                  duree_mois=champs.get("duree_mois", 0),
+                                  echeance_mensuelle_fcfa=champs.get("echeance_mensuelle_fcfa", 0),
+                                  session_id=session_id)
+        elif intention == "sfd_paiement":
+            db.enregistrer_paiement_sfd(bd, utilisatrice_id=utilisatrice_id,
+                                         montant_fcfa=champs.get("montant_fcfa", 0),
+                                         session_id=session_id)
         self._cloturer_session(bd, session_id, statut="complete")
         return msg.enregistrement_confirme()
 

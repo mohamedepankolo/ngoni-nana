@@ -45,3 +45,36 @@ def test_reformulation_1re_tentative_differente_de_la_2e():
     # la 2e propose les vrais mots-clés reconnus par le moteur, pas leur
     # traduction française (voir dictionnaire_mots_cles.MOTS_CLES)
     assert "feere" in msg.reformulation(2)
+
+
+def test_confirmation_sfd_declaration_contient_le_nom_et_les_nombres():
+    message = msg.confirmation_sfd_declaration({
+        "nom_sfd": "Nyèsigiso", "montant_fcfa": 250_000, "duree_mois": 6,
+        "echeance_mensuelle_fcfa": 25_000,
+    })
+    assert "Nyèsigiso" in message
+    assert "waa bi duuru" in message  # 250000/5 = 50000 dɔrɔmɛ
+    assert "wooro" in message  # 6 mois
+    assert message.endswith("wa?")
+
+
+def test_confirmation_sfd_paiement_contient_le_montant():
+    message = msg.confirmation_sfd_paiement({"montant_fcfa": 25_000})
+    assert "SFD" in message
+    assert message.endswith("wa?")
+
+
+def test_reponse_sfd_consultation_avec_et_sans_prochaine_echeance():
+    sans = msg.reponse_sfd_consultation(100_000)
+    avec = msg.reponse_sfd_consultation(100_000, 25_000)
+    assert "SFD" in sans and "SFD" in avec
+    assert sans != avec
+
+
+def test_demander_variantes_sfd_ont_tuguni_seulement_au_second_essai():
+    assert "tuguni" not in msg.demander_nom_sfd()
+    assert "tuguni" in msg.demander_nom_sfd_encore()
+    assert "tuguni" not in msg.demander_duree_mois()
+    assert "tuguni" in msg.demander_duree_mois_encore()
+    assert "tuguni" not in msg.demander_echeance_mensuelle()
+    assert "tuguni" in msg.demander_echeance_mensuelle_encore()

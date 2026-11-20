@@ -14,10 +14,11 @@ l'architecture) : la seule fonction qui écrit une transaction est
 confirmation explicite (voir agent_vocal.py). Aucune autre fonction de ce
 module n'écrit de transaction partielle.
 """
+import calendar
 import os
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session as SessionSQLAlchemy, sessionmaker
 
 
@@ -44,6 +45,16 @@ class Utilisatrice(Base):
     # X") : remplacé (pas additionné) à chaque nouvelle déclaration, à la
     # différence des ajouts (voir ajouter_au_capital), qui s'accumulent.
     capital_initial = Column(Integer, default=0)
+    # Crédit SFD actif (item 10 du menu, 2026-11-17 - "Fiche 5, Suivi des
+    # remboursements SFD", documentation Fadima) : un seul prêt actif à la
+    # fois, même principe que capital_initial (une nouvelle déclaration
+    # REMPLACE l'ancienne, voir declarer_pret_sfd) - pas de table à part
+    # pour l'en-tête du prêt, l'échéancier lui-même vit dans EcheanceSfd.
+    nom_sfd = Column(String)
+    montant_total_sfd_fcfa = Column(Integer)
+    duree_mois_sfd = Column(Integer)
+    echeance_mensuelle_sfd_fcfa = Column(Integer)
+    date_declaration_sfd = Column(DateTime)
 
 
 class Transaction(Base):
@@ -93,6 +104,78 @@ class Stock(Base):
     article = Column(String, nullable=False)
     quantite_actuelle = Column(Integer, default=0)
     seuil_alerte = Column(Integer, default=0)
+
+
+class MouvementClient(Base):
+    """Historique ligne par ligne des mouvements d'un Client (Fiche 11 "Ventes
+
+    à Crédit" papier : Date/Détails/Valeur de la vente/Montant payé/Reste à
+    payer) - Client.montant_du seul ne garde que le solde courant, pas le
+    détail ligne par ligne nécessaire pour reproduire la fiche en PDF (voir
+    moteur/fiches.py). "Reste à payer" à une ligne donnée se calcule à la
+    lecture (somme cumulative triée par date), jamais stocké ici.
+    """
+    __tablename__ = "mouvements_clients"
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    montant_fcfa = Column(Integer, nullable=False)
+    est_un_paiement = Column(Boolean, default=False)
+    libelle = Column(String)
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+
+
+class MouvementFournisseur(Base):
+    """Symétrique de MouvementClient, côté Fournisseur (Fiche 12 "Achats à Crédit")."""
+    __tablename__ = "mouvements_fournisseurs"
+    id = Column(Integer, primary_key=True)
+    fournisseur_id = Column(Integer, ForeignKey("fournisseurs.id"), nullable=False)
+    montant_fcfa = Column(Integer, nullable=False)
+    est_un_paiement = Column(Boolean, default=False)
+    libelle = Column(String)
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+
+
+class MouvementStock(Base):
+    """Historique ligne par ligne des mouvements de Stock (Carte/Fiche de
+
+    stock papier : Date/Entrée/Sortie/Stock restant) - Stock.quantite_actuelle
+    seul ne garde que la valeur courante. Alimentée depuis DEUX endroits :
+    enregistrer_mouvement_stock (item 8 du menu) ET le bloc d'ajustement
+    stock dans enregistrer_transaction (vente/dépense, items 1/2) - sans ce
+    second point, la carte de stock PDF raterait silencieusement tout
+    mouvement de stock causé par une vente ou une dépense ordinaire.
+    """
+    __tablename__ = "mouvements_stock"
+    id = Column(Integer, primary_key=True)
+    utilisatrice_id = Column(Integer, ForeignKey("utilisatrices.id"), nullable=False)
+    article = Column(String, nullable=False)
+    quantite_entree = Column(Integer, default=0)
+    quantite_sortie = Column(Integer, default=0)
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+
+
+class EcheanceSfd(Base):
+    """Une ligne de l'échéancier SFD (Utilisatrice.nom_sfd et consorts pour
+
+    l'en-tête du prêt) - pré-créée en bloc par declarer_pret_sfd (une ligne
+    par mois de durée), puis complétée une à une par enregistrer_paiement_sfd
+    au fur et à mesure des paiements réels. date_prevue/montant_prevu sont
+    connus dès la déclaration (pas de reconnaissance de date parlée dans ce
+    projet - voir declarer_pret_sfd) ; date_reelle/montant_paye restent NULL
+    tant que cette échéance n'a pas été payée.
+    """
+    __tablename__ = "echeances_sfd"
+    id = Column(Integer, primary_key=True)
+    utilisatrice_id = Column(Integer, ForeignKey("utilisatrices.id"), nullable=False)
+    numero = Column(Integer, nullable=False)
+    date_prevue = Column(DateTime)
+    montant_prevu = Column(Integer)
+    date_reelle = Column(DateTime)
+    montant_paye = Column(Integer)
+    session_id = Column(Integer, ForeignKey("sessions.id"))
 
 
 class SessionAppel(Base):
@@ -171,6 +254,11 @@ def enregistrer_transaction(db: SessionSQLAlchemy, *, utilisatrice_id: int, type
         (db.query(Stock)
          .filter_by(id=ligne_stock.id)
          .update({Stock.quantite_actuelle: Stock.quantite_actuelle + delta}))
+        db.add(MouvementStock(
+            utilisatrice_id=utilisatrice_id, article=champs["article"],
+            quantite_entree=champs["quantite"] if type_ == "depense" else 0,
+            quantite_sortie=champs["quantite"] if type_ == "vente" else 0,
+            session_id=session_id))
 
     db.commit()
     db.refresh(t)
@@ -178,16 +266,24 @@ def enregistrer_transaction(db: SessionSQLAlchemy, *, utilisatrice_id: int, type
 
 
 def enregistrer_mouvement_client(db: SessionSQLAlchemy, *, utilisatrice_id: int,
-                                   nom_client: str, montant_fcfa: int, est_un_paiement: bool) -> Client:
-    """Cas 5 : nouvelle dette (montant positif) ou paiement reçu (négatif sur la dette)."""
+                                   nom_client: str, montant_fcfa: int, est_un_paiement: bool,
+                                   libelle: str | None = None, session_id: int | None = None) -> Client:
+    """Cas 5 : nouvelle dette (montant positif) ou paiement reçu (négatif sur la dette).
+
+    Alimente aussi MouvementClient (historique ligne par ligne, voir sa
+    docstring) en plus du solde courant montant_du.
+    """
     client = (db.query(Client)
               .filter_by(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_client)
               .one_or_none())
     if client is None:
         client = Client(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_client, montant_du=0)
         db.add(client)
+        db.flush()  # assigne client.id avant la ligne d'historique ci-dessous
     client.montant_du = (client.montant_du or 0) + (-montant_fcfa if est_un_paiement else montant_fcfa)
     client.date_dernier_mouvement = datetime.now(timezone.utc)
+    db.add(MouvementClient(client_id=client.id, montant_fcfa=montant_fcfa, est_un_paiement=est_un_paiement,
+                            libelle=libelle, session_id=session_id))
     db.commit()
     db.refresh(client)
     return client
@@ -195,7 +291,8 @@ def enregistrer_mouvement_client(db: SessionSQLAlchemy, *, utilisatrice_id: int,
 
 def enregistrer_mouvement_fournisseur(db: SessionSQLAlchemy, *, utilisatrice_id: int,
                                         nom_fournisseur: str, montant_fcfa: int,
-                                        est_un_paiement: bool) -> Fournisseur:
+                                        est_un_paiement: bool, libelle: str | None = None,
+                                        session_id: int | None = None) -> Fournisseur:
     """Symétrique de enregistrer_mouvement_client : nouvelle dette (achat à
 
     crédit, item 5) ou paiement fait au fournisseur (échéance/dépôt, item 6).
@@ -206,8 +303,11 @@ def enregistrer_mouvement_fournisseur(db: SessionSQLAlchemy, *, utilisatrice_id:
     if fournisseur is None:
         fournisseur = Fournisseur(utilisatrice_id=utilisatrice_id, nom_ou_code=nom_fournisseur, montant_du=0)
         db.add(fournisseur)
+        db.flush()  # assigne fournisseur.id avant la ligne d'historique ci-dessous
     fournisseur.montant_du = (fournisseur.montant_du or 0) + (-montant_fcfa if est_un_paiement else montant_fcfa)
     fournisseur.date_dernier_mouvement = datetime.now(timezone.utc)
+    db.add(MouvementFournisseur(fournisseur_id=fournisseur.id, montant_fcfa=montant_fcfa,
+                                 est_un_paiement=est_un_paiement, libelle=libelle, session_id=session_id))
     db.commit()
     db.refresh(fournisseur)
     return fournisseur
@@ -230,7 +330,8 @@ def total_du_aux_fournisseurs(db: SessionSQLAlchemy, utilisatrice_id: int) -> in
 
 
 def enregistrer_mouvement_stock(db: SessionSQLAlchemy, *, utilisatrice_id: int,
-                                  article: str, quantite: int) -> tuple[Stock, bool]:
+                                  article: str, quantite: int,
+                                  session_id: int | None = None) -> tuple[Stock, bool]:
     """Item 8 du menu : "stock initial" si aucune ligne n'existe encore pour
 
     cet article (la quantité REMPLACE, comme une première déclaration),
@@ -239,7 +340,9 @@ def enregistrer_mouvement_stock(db: SessionSQLAlchemy, *, utilisatrice_id: int,
     mais décidée ici plutôt que dans moteur_decision.py (couche pure, sans
     accès à la base) : seule cette fonction sait si une ligne existe déjà.
     Renvoie (ligne_stock, est_une_declaration_initiale) pour que l'appelant
-    choisisse le bon message de confirmation si besoin.
+    choisisse le bon message de confirmation si besoin. Alimente aussi
+    MouvementStock (toujours une entrée ici, jamais une sortie - voir sa
+    docstring).
     """
     ligne = (db.query(Stock)
              .filter_by(utilisatrice_id=utilisatrice_id, article=article)
@@ -247,11 +350,15 @@ def enregistrer_mouvement_stock(db: SessionSQLAlchemy, *, utilisatrice_id: int,
     if ligne is None:
         ligne = Stock(utilisatrice_id=utilisatrice_id, article=article, quantite_actuelle=quantite, seuil_alerte=0)
         db.add(ligne)
+        db.add(MouvementStock(utilisatrice_id=utilisatrice_id, article=article,
+                               quantite_entree=quantite, quantite_sortie=0, session_id=session_id))
         db.commit()
         db.refresh(ligne)
         return ligne, True
     (db.query(Stock).filter_by(id=ligne.id)
      .update({Stock.quantite_actuelle: Stock.quantite_actuelle + quantite}))
+    db.add(MouvementStock(utilisatrice_id=utilisatrice_id, article=article,
+                           quantite_entree=quantite, quantite_sortie=0, session_id=session_id))
     db.commit()
     db.refresh(ligne)
     return ligne, False
@@ -298,6 +405,101 @@ def ajouter_au_capital(db: SessionSQLAlchemy, *, utilisatrice_id: int,
     db.commit()
     db.refresh(t)
     return t
+
+
+def _ajouter_mois(date_depart: datetime, n: int) -> datetime:
+    """date_depart + n mois, avec gestion du changement d'année et des mois
+
+    plus courts (ex. 31 janvier + 1 mois -> 28/29 février, pas un débordement
+    en mars) - calcul maison avec le module standard `calendar`, pas de
+    nouvelle dépendance (python-dateutil) pour ce seul besoin.
+    """
+    mois_total = date_depart.month - 1 + n
+    annee = date_depart.year + mois_total // 12
+    mois = mois_total % 12 + 1
+    dernier_jour_du_mois = calendar.monthrange(annee, mois)[1]
+    jour = min(date_depart.day, dernier_jour_du_mois)
+    return date_depart.replace(year=annee, month=mois, day=jour)
+
+
+def declarer_pret_sfd(db: SessionSQLAlchemy, *, utilisatrice_id: int, nom_sfd: str,
+                       montant_total_fcfa: int, duree_mois: int, echeance_mensuelle_fcfa: int,
+                       session_id: int | None = None) -> None:
+    """Item 10 : déclare le crédit SFD actif (remplace le précédent, comme
+
+    declarer_capital_initial) et pré-crée tout l'échéancier (une ligne
+    EcheanceSfd par mois de durée, numérotée, date prévue déjà calculée via
+    _ajouter_mois) - la "Fiche 5" papier (documentation Fadima, 2026-11-17)
+    montre un échéancier de 12 lignes connu dès la déclaration du crédit,
+    pas rempli ligne par ligne au fil du temps.
+    """
+    utilisatrice = db.get(Utilisatrice, utilisatrice_id)
+    if utilisatrice is None:
+        return
+    maintenant = datetime.now(timezone.utc)
+    utilisatrice.nom_sfd = nom_sfd
+    utilisatrice.montant_total_sfd_fcfa = montant_total_fcfa
+    utilisatrice.duree_mois_sfd = duree_mois
+    utilisatrice.echeance_mensuelle_sfd_fcfa = echeance_mensuelle_fcfa
+    utilisatrice.date_declaration_sfd = maintenant
+    # Une nouvelle déclaration remplace l'ancien échéancier : on repart d'un
+    # programme propre plutôt que de mélanger deux programmes différents
+    # dans la même liste de lignes (même principe que capital_initial).
+    db.query(EcheanceSfd).filter_by(utilisatrice_id=utilisatrice_id).delete()
+    for n in range(1, duree_mois + 1):
+        db.add(EcheanceSfd(utilisatrice_id=utilisatrice_id, numero=n,
+                            date_prevue=_ajouter_mois(maintenant, n),
+                            montant_prevu=echeance_mensuelle_fcfa, session_id=session_id))
+    db.commit()
+
+
+def enregistrer_paiement_sfd(db: SessionSQLAlchemy, *, utilisatrice_id: int, montant_fcfa: int,
+                               session_id: int | None = None) -> EcheanceSfd:
+    """Item 11 : remplit la prochaine échéance non payée (le plus petit
+
+    "numero" avec date_reelle vide). S'il n'en reste aucune (programme
+    épuisé, ou aucune déclaration SFD existante), le paiement est quand même
+    enregistré dans une ligne supplémentaire plutôt que perdu silencieusement
+    (principe du module, voir son docstring en tête de fichier). Limite v1
+    assumée : un paiement ne se répartit jamais sur plusieurs échéances,
+    même si son montant dépasse le montant prévu d'une échéance.
+    """
+    ligne = (db.query(EcheanceSfd)
+             .filter_by(utilisatrice_id=utilisatrice_id)
+             .filter(EcheanceSfd.date_reelle.is_(None))
+             .order_by(EcheanceSfd.numero.asc())
+             .first())
+    if ligne is None:
+        dernier = (db.query(EcheanceSfd).filter_by(utilisatrice_id=utilisatrice_id)
+                   .order_by(EcheanceSfd.numero.desc()).first())
+        ligne = EcheanceSfd(utilisatrice_id=utilisatrice_id, numero=(dernier.numero + 1) if dernier else 1)
+        db.add(ligne)
+    ligne.date_reelle = datetime.now(timezone.utc)
+    ligne.montant_paye = montant_fcfa
+    ligne.session_id = session_id
+    db.commit()
+    db.refresh(ligne)
+    return ligne
+
+
+def bilan_pret_sfd(db: SessionSQLAlchemy, utilisatrice_id: int) -> dict:
+    """Item 12 (lecture seule) : reste à payer et montant de la prochaine
+
+    échéance sur le crédit SFD actif.
+    """
+    utilisatrice = db.get(Utilisatrice, utilisatrice_id)
+    montant_total = (utilisatrice.montant_total_sfd_fcfa or 0) if utilisatrice else 0
+    lignes = (db.query(EcheanceSfd).filter_by(utilisatrice_id=utilisatrice_id)
+              .order_by(EcheanceSfd.numero.asc()).all())
+    total_paye = sum(l.montant_paye or 0 for l in lignes)
+    prochaine = next((l for l in lignes if l.date_reelle is None), None)
+    return {
+        "nom_sfd": (utilisatrice.nom_sfd or "") if utilisatrice else "",
+        "montant_total_fcfa": montant_total,
+        "reste_a_payer_fcfa": max(montant_total - total_paye, 0),
+        "prochaine_echeance_fcfa": prochaine.montant_prevu if prochaine else None,
+        "echeances": lignes,
+    }
 
 
 def bilan_utilisatrice(db: SessionSQLAlchemy, utilisatrice_id: int, limite_transactions: int = 10) -> dict:
@@ -389,3 +591,60 @@ def journaliser(db: SessionSQLAlchemy, *, session_id: int | None, etape: str,
     """
     db.add(JournalEvenement(session_id=session_id, etape=etape, confiance=confiance, resultat=resultat))
     db.commit()
+
+
+# Fonctions de lecture dédiées à la génération des fiches PDF (moteur/fiches.py) :
+# chacune renvoie l'historique ligne par ligne trié par date, pour que l'appelant
+# calcule lui-même les soldes cumulés ligne à ligne (jamais stockés en double ici,
+# même principe que calculer_capital/bilan_utilisatrice).
+def ligne_journal(db: SessionSQLAlchemy, utilisatrice_id: int) -> list[Transaction]:
+    """Fiche "Journal" : tout l'historique vente/dépense, le plus ancien d'abord."""
+    return (db.query(Transaction)
+            .filter_by(utilisatrice_id=utilisatrice_id)
+            .filter(Transaction.type.in_(("vente", "depense")))
+            .order_by(Transaction.date.asc())
+            .all())
+
+
+def ligne_mouvements_client(db: SessionSQLAlchemy, utilisatrice_id: int, nom_client: str) -> list[MouvementClient]:
+    """Fiche 11 "Ventes à Crédit" pour un client donné."""
+    client = consulter_client(db, utilisatrice_id, nom_client)
+    if client is None:
+        return []
+    return (db.query(MouvementClient)
+            .filter_by(client_id=client.id)
+            .order_by(MouvementClient.date.asc())
+            .all())
+
+
+def ligne_mouvements_fournisseur(db: SessionSQLAlchemy, utilisatrice_id: int,
+                                   nom_fournisseur: str) -> list[MouvementFournisseur]:
+    """Fiche 12 "Achats à Crédit" pour un fournisseur donné."""
+    fournisseur = consulter_fournisseur(db, utilisatrice_id, nom_fournisseur)
+    if fournisseur is None:
+        return []
+    return (db.query(MouvementFournisseur)
+            .filter_by(fournisseur_id=fournisseur.id)
+            .order_by(MouvementFournisseur.date.asc())
+            .all())
+
+
+def ligne_mouvements_stock(db: SessionSQLAlchemy, utilisatrice_id: int, article: str) -> list[MouvementStock]:
+    """Carte/Fiche de stock pour un article donné."""
+    return (db.query(MouvementStock)
+            .filter_by(utilisatrice_id=utilisatrice_id, article=article)
+            .order_by(MouvementStock.date.asc())
+            .all())
+
+
+def lister_tiers(db: SessionSQLAlchemy, utilisatrice_id: int) -> dict:
+    """Noms de clients/fournisseurs/articles connus pour cette utilisatrice -
+
+    alimente les listes déroulantes du panneau "Fiches" côté application
+    mobile (voir moteur/web/index.html), pour éviter de retaper un nom à la
+    main au moment de choisir quelle fiche générer.
+    """
+    clients = [c.nom_ou_code for c in db.query(Client).filter_by(utilisatrice_id=utilisatrice_id).all()]
+    fournisseurs = [f.nom_ou_code for f in db.query(Fournisseur).filter_by(utilisatrice_id=utilisatrice_id).all()]
+    articles = [s.article for s in db.query(Stock).filter_by(utilisatrice_id=utilisatrice_id).all()]
+    return {"clients": clients, "fournisseurs": fournisseurs, "articles": articles}

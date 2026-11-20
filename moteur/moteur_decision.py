@@ -96,6 +96,18 @@ CHAMPS_ATTENDUS: dict[str, list[str]] = {
     # l'autre est décidé à l'écriture (base_donnees.enregistrer_mouvement_stock),
     # selon qu'une ligne de stock existe déjà pour cet article, pas ici.
     "stock_ecriture": ["article", "quantite"],
+    # Items 10-12 (SFD, 2026-11-17, documentation Fadima - "Fiche 5, Suivi
+    # des remboursements SFD") : même principe que 4-9, chiffre de menu
+    # uniquement (MENU_NUMERIQUE, dictionnaire_mots_cles.py). "nom_sfd" est
+    # un champ à part de "fournisseur" (voir messages_bambara.NOMS_CHAMPS_
+    # BAMBARA) : "fournisseur" désigne un fournisseur de marchandises, pas
+    # une institution de microfinance - réutiliser ce champ créerait une
+    # confusion sémantique réelle, pas seulement un style différent.
+    # Un seul prêt SFD actif supposé (comme capital_initial) : pas de nom à
+    # redemander pour "sfd_paiement"/"sfd_consultation".
+    "sfd_declaration": ["nom_sfd", "montant_fcfa", "duree_mois", "echeance_mensuelle_fcfa"],
+    "sfd_paiement": ["montant_fcfa"],
+    "sfd_consultation": [],
 }
 
 # Mots grammaticaux bambara à ignorer lors de l'extraction de l'article ou du
@@ -239,6 +251,14 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
     intentions_avec_montant = (
         "vente", "depense", "capital", "capital_declaration", "capital_ajout",
         "client", "vente_credit", "achat_credit", "fournisseur_paiement",
+        # "sfd_declaration" : seul montant_fcfa (le total du crédit) est
+        # extrait ici ; "duree_mois" et "echeance_mensuelle_fcfa" ne le sont
+        # JAMAIS depuis cette phrase initiale (voir combler_champ plus bas) -
+        # trois nombres dont deux de forme "montant" (total et mensualité) et
+        # un petit ("durée en mois") ne peuvent pas se désambiguïser de façon
+        # fiable par magnitude seule, contrairement au couple montant/quantité
+        # déjà géré ailleurs dans cette fonction.
+        "sfd_declaration", "sfd_paiement",
     )
     if intention in intentions_avec_montant:
         if nombres:
@@ -276,6 +296,12 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
     # CHAMPS_ATTENDUS["vente_credit"], AgentVocal._combler_champ_en_attente).
     if intention in ("fournisseur_paiement", "fournisseur_consultation") and mots:
         champs["fournisseur"] = mots[0]
+    # "sfd_declaration" : seul le nom du SFD est extrait d'une éventuelle
+    # phrase initiale (ex. "10 Soro microfinance") - duree_mois et
+    # echeance_mensuelle_fcfa sont toujours redemandés séparément (voir
+    # intentions_avec_montant plus haut et combler_champ, même fichier).
+    if intention == "sfd_declaration" and mots:
+        champs["nom_sfd"] = " ".join(mots)
 
     return champs
 
@@ -467,6 +493,23 @@ class Session:
             self.champs_confirmes["quantite"] = min(nombres)
         elif champ in ("article", "client", "fournisseur") and mots:
             self.champs_confirmes[champ] = " ".join(mots) if champ == "article" else mots[0]
+        elif champ == "nom_sfd" and mots:
+            # Jointure complète (comme "article"), pas mots[0] (comme
+            # "client"/"fournisseur") : le nom d'une institution de
+            # microfinance est souvent composé de plusieurs mots.
+            self.champs_confirmes["nom_sfd"] = " ".join(mots)
+        elif champ == "duree_mois" and nombres:
+            # Un nombre de mois, pas un montant : jamais de conversion dorome
+            # ici, contrairement à montant_fcfa/echeance_mensuelle_fcfa.
+            self.champs_confirmes["duree_mois"] = min(nombres)
+        elif champ == "echeance_mensuelle_fcfa" and nombres:
+            # Montant FCFA comme montant_fcfa : même convention dorome/
+            # littéral (_montant_est_litteral), une échéance mensuelle se
+            # dit aussi naturellement en dɔrɔmɛ à voix haute.
+            if _montant_est_litteral(texte):
+                self.champs_confirmes["echeance_mensuelle_fcfa"] = max(nombres)
+            else:
+                self.champs_confirmes["echeance_mensuelle_fcfa"] = max(nombres) * FACTEUR_DOROME
         else:
             return {"intention": self.intention, "champs": dict(self.champs_confirmes),
                      "confiance": "echec", "action": "reformuler"}

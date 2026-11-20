@@ -25,3 +25,9 @@ mobile_app/android/app/build/
 mobile_app/android/capacitor-cordova-android-plugins/build/
 mobile_app/android/**/build/
 *.apk
+
+# Sauvegardes de base avant migration : locales, jamais commitees
+*.db.bak_*
+
+# Documents internes (workplan, transcriptions, plan d'action) : hors depot
+ressource/

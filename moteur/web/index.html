@@ -212,6 +212,29 @@
   #vueBilan .vente { color: #4f8f5a; }
   #vueBilan .depense { color: #c23b2e; }
   #fermerBilan { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 22px; }
+
+  /* ---------- Vue fiches (génération de PDF à partir des données déjà
+     enregistrées - demande explicite, 2026-11-17, suite aux fiches papier
+     transmises par Fadima) : même structure que #vueBilan. ---------- */
+  #vueFiches {
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
+  }
+  #vueFiches.visible { display: block; }
+  #vueFiches h2 { font-size: 15px; color: #666; font-weight: 500; margin: 0 0 4px; }
+  #vueFiches .carte {
+    background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #vueFiches .carte select {
+    width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;
+  }
+  #vueFiches .carte button {
+    width: 100%; padding: 10px; border-radius: 8px; border: none;
+    background: #b85424; color: #fff; font-weight: 600; font-size: 14px;
+  }
+  #vueFiches .carte button:disabled { opacity: 0.4; }
+  #vueFiches .carte p { font-size: 12px; color: #888; margin: 0 0 10px; }
+  #fermerFiches { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 22px; }
 </style>
 </head>
 <body>
@@ -226,6 +249,10 @@
     <div class="capital-entete">
       <span>Jagokun (capital)</span>
       <button class="lien-voir-tout" onclick="ouvrirBilan()">Bɛɛ &#8594;</button>
+    </div>
+    <div class="capital-entete" style="margin-top: -4px;">
+      <span></span>
+      <button class="lien-voir-tout" onclick="ouvrirFiches()">Fiches &#8594;</button>
     </div>
     <div class="capital-chiffre" id="carteCapitalChiffre">—</div>
     <div class="capital-resume">
@@ -265,6 +292,17 @@
     </button>
     <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
       <span class="badge">9</span><span class="etiquette">Bolo<small>stock</small></span>
+    </button>
+    <!-- Items 10-12 (SFD, 2026-11-17, documentation Fadima) : meme principe
+         que 4-8, aucun mot bambara valide pour "SFD"/"echeance". -->
+    <button disabled data-chiffre="10" onclick="envoyerChoixMenu(10)">
+      <span class="badge">10</span><span class="etiquette">Crédit SFD<small>déclarer</small></span>
+    </button>
+    <button disabled data-chiffre="11" onclick="envoyerChoixMenu(11)">
+      <span class="badge">11</span><span class="etiquette">Échéance SFD<small>payer</small></span>
+    </button>
+    <button disabled data-chiffre="12" onclick="envoyerChoixMenu(12)">
+      <span class="badge">12</span><span class="etiquette">Crédit SFD<small>reste à payer</small></span>
     </button>
   </div>
 
@@ -317,6 +355,47 @@
   <div class="carte">
     <h2>Kɛwale laban (dernières transactions)</h2>
     <div id="bilanTransactions"></div>
+  </div>
+</div>
+
+<!-- Génération de PDF à partir des données déjà enregistrées (demande
+     explicite, 2026-11-17, suite aux fiches papier transmises par Fadima) :
+     voir moteur/fiches.py et les routes /fiches/* (moteur/api.py). -->
+<div id="vueFiches">
+  <button id="fermerFiches" onclick="fermerFichesVue()">×</button>
+  <h2>Fiches</h2>
+
+  <div class="carte">
+    <h3>Journal</h3>
+    <p>Tout l'historique vente/dépense.</p>
+    <button onclick="genererFiche('/fiches/journal/' + utilisatriceId, 'journal.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Ventes à Crédit</h3>
+    <p>Par client.</p>
+    <select id="ficheSelectClient"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectClient', '/fiches/vente_credit/' + utilisatriceId + '?nom_client=', 'ventes_a_credit.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Achats à Crédit</h3>
+    <p>Par fournisseur.</p>
+    <select id="ficheSelectFournisseur"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectFournisseur', '/fiches/achat_credit/' + utilisatriceId + '?nom_fournisseur=', 'achats_a_credit.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Carte de stock</h3>
+    <p>Par article.</p>
+    <select id="ficheSelectArticle"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectArticle', '/fiches/carte_stock/' + utilisatriceId + '?article=', 'carte_de_stock.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Suivi SFD</h3>
+    <p>Crédit microfinance en cours (item 10-12 du menu).</p>
+    <button onclick="genererFiche('/fiches/sfd/' + utilisatriceId, 'suivi_sfd.pdf')">Générer</button>
   </div>
 </div>
 
@@ -731,6 +810,93 @@ async function ouvrirBilan() {
   }
 }
 function fermerBilanVue() { $("vueBilan").classList.remove("visible"); }
+
+// --- Fiches PDF (demande explicite, 2026-11-17, suite aux fiches papier
+// transmises par Fadima) : voir moteur/fiches.py et les routes /fiches/*
+// (moteur/api.py). ---
+
+function remplirSelect(id, options) {
+  const select = $(id);
+  select.innerHTML = "";
+  if (!options.length) {
+    const vide = document.createElement("option");
+    vide.textContent = "(aucun)";
+    select.appendChild(vide);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  options.forEach((nom) => {
+    const option = document.createElement("option");
+    option.value = nom;
+    option.textContent = nom;
+    select.appendChild(option);
+  });
+}
+
+async function ouvrirFiches() {
+  if (!utilisatriceId) return;
+  try {
+    const tiers = await appelApi(`/fiches/disponibles/${utilisatriceId}`, { methode: "GET" });
+    remplirSelect("ficheSelectClient", tiers.clients);
+    remplirSelect("ficheSelectFournisseur", tiers.fournisseurs);
+    remplirSelect("ficheSelectArticle", tiers.articles);
+    $("vueFiches").classList.add("visible");
+  } catch (e) {
+    await signalerErreur("Fiches indisponibles : " + e.message);
+  }
+}
+function fermerFichesVue() { $("vueFiches").classList.remove("visible"); }
+
+function _blobEnBase64(blob) {
+  return new Promise((resoudre, rejeter) => {
+    const lecteur = new FileReader();
+    lecteur.onloadend = () => resoudre(String(lecteur.result).split(",")[1]);
+    lecteur.onerror = rejeter;
+    lecteur.readAsDataURL(blob);
+  });
+}
+
+// Télécharge le PDF d'une fiche et le propose à l'utilisatrice : sur
+// l'application mobile (Capacitor), écrit le fichier puis ouvre le
+// sélecteur de partage natif Android (visualiser/imprimer/envoyer par
+// WhatsApp...) ; sur la page de test navigateur (window.Capacitor absent ou
+// non natif), simple téléchargement via un lien <a download> classique -
+// même fonction, un seul chemin de code à tester sur desktop avant l'APK.
+async function genererFiche(chemin, nomFichier) {
+  try {
+    const reponse = await fetch(serveur + chemin, { headers: { Authorization: "Bearer " + jeton } });
+    if (!reponse.ok) throw new Error(`${reponse.status} : ${await reponse.text()}`);
+    const blob = await reponse.blob();
+
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      const donnees = await _blobEnBase64(blob);
+      const ecrit = await window.Capacitor.Plugins.Filesystem.writeFile({
+        path: nomFichier, data: donnees, directory: "CACHE",
+      });
+      await window.Capacitor.Plugins.Share.share({ title: nomFichier, url: ecrit.uri });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const lien = document.createElement("a");
+      lien.href = url;
+      lien.download = nomFichier;
+      document.body.appendChild(lien);
+      lien.click();
+      lien.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+  } catch (e) {
+    await signalerErreur("Fiche indisponible : " + e.message);
+  }
+}
+
+// Comme genererFiche, mais pour les fiches qui ont besoin d'un nom choisi
+// dans une liste déroulante (client/fournisseur/article) - voir #vueFiches.
+async function genererFicheAvecSelection(idSelect, cheminPrefixe, nomFichier) {
+  const select = $(idSelect);
+  if (select.disabled || !select.value) return;
+  await genererFiche(cheminPrefixe + encodeURIComponent(select.value), nomFichier);
+}
 
 const bouton = $("bouton");
 let enTraitement = false;

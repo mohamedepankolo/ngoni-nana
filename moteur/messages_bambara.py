@@ -142,6 +142,46 @@ def confirmation_capital_ajout(champs: dict) -> str:
     return f"Wari {montant} bɛna fara i ka jagokun kan. I sɔnna wa?"
 
 
+def confirmation_sfd_declaration(champs: dict) -> str:
+    """Item 10 : déclaration d'un crédit SFD (institution de microfinance -
+
+    "Fiche 5, Suivi des remboursements SFD", documentation Fadima,
+    2026-11-17). "SFD" gardé tel quel (sigle propre à l'institution, pas un
+    mot bambara à traduire) ; le reste réutilise des mots déjà présents dans
+    ce fichier (wari=argent, kalo=mois, kelen=un) plutôt que d'en inventer -
+    pas validé par une personne bambaraphone, comme le reste de ce module.
+    """
+    nom_sfd = champs.get("nom_sfd", "")
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
+    duree = nombre_en_bambara(champs.get("duree_mois", 0))
+    echeance = _montant_bambara(champs.get("echeance_mensuelle_fcfa", 0))
+    return (f"SFD {nom_sfd} : wari {montant} juru la, kalo {duree} kɔnɔ, "
+            f"kalo kelen-kelen wari {echeance} sara. I sɔnna wa?")
+
+
+def confirmation_sfd_paiement(champs: dict) -> str:
+    """Item 11 : paiement d'une échéance SFD - un seul prêt actif supposé
+
+    (voir base_donnees.enregistrer_paiement_sfd), donc pas besoin de
+    redemander le nom du SFD ici.
+    """
+    montant = _montant_bambara(champs.get("montant_fcfa", 0))
+    return f"SFD wari {montant} sara. I sɔnna wa?"
+
+
+def reponse_sfd_consultation(montant_restant_fcfa: int, prochaine_echeance_fcfa: int | None = None) -> str:
+    """Item 12 : reste à payer sur le crédit SFD, et montant de la prochaine
+
+    échéance si elle existe (pas de date parlée - voir EcheanceSfd,
+    base_donnees.py - aucune reconnaissance de date n'existe dans ce projet).
+    """
+    montant_mot = _montant_bambara(montant_restant_fcfa)
+    if prochaine_echeance_fcfa:
+        prochaine_mot = _montant_bambara(prochaine_echeance_fcfa)
+        return f"I bɛ wari {montant_mot} de sara SFD ye fɔlɔ. Kalo nata wari {prochaine_mot}."
+    return f"I bɛ wari {montant_mot} de sara SFD ye fɔlɔ."
+
+
 def reponse_stock(article: str, quantite: int, seuil_bas: bool) -> str:
     base = f"{article} {nombre_en_bambara(quantite)} de bɛ i bolo."
     if seuil_bas:
@@ -173,6 +213,10 @@ def menu_principal() -> str:
     (retiré du menu annoncé le 2026-11-16, resté reconnu en parole libre
     seulement) : un chiffre annoncé sans mot-clé fiable derrière, plutôt
     qu'un mot-clé inventé et potentiellement faux.
+
+    Items 10-12 (SFD, même jour) : même principe, chiffre seul, pas de mot
+    annoncé ici - le texte de cette fonction ne change donc pas en passant
+    de 9 à 12 choix.
     """
     return ("I ni ce, aw bisimila N'GONI NANA na. "
             "Kelen : feere. Fila : sara. Saba : jagokun. "
@@ -232,6 +276,14 @@ NOMS_CHAMPS_BAMBARA = {
     "montant_fcfa": "wari",
     "client": "mɔgɔ tɔgɔ",
     "fournisseur": "fɛn feerelikɛla tɔgɔ",
+    # Items 10-12 (SFD, 2026-11-17) : "nom_sfd" distinct de "fournisseur" -
+    # NOMS_CHAMPS_BAMBARA["fournisseur"] signifie explicitement "nom du
+    # fournisseur de marchandises", un mauvais libellé pour une institution
+    # de microfinance (confusion sémantique réelle à éviter, pas juste un
+    # style différent).
+    "nom_sfd": "SFD tɔgɔ",
+    "duree_mois": "kalo hakɛ",
+    "echeance_mensuelle_fcfa": "kalo wari",
 }
 
 
@@ -257,15 +309,16 @@ def demander_quel_champ_corriger(champs: list[str]) -> str:
 def confirmer_champ(champ: str, valeur) -> str:
     """Relit UNE valeur tout juste saisie (quantité ou montant) avant de
 
-    poursuivre - sécurité supplémentaire sur les deux champs numériques les
-    plus sensibles à la saisie clavier (voir
-    agent_vocal.CHAMPS_A_CONFIRMER_UNITAIREMENT). Pas pour l'article ou le
-    client : un nom mal compris se corrige sans risque, un chiffre mal
-    compris peut fausser toute l'écriture comptable.
+    poursuivre - sécurité supplémentaire sur les champs numériques les plus
+    sensibles à la saisie clavier (voir agent_vocal.CHAMPS_A_CONFIRMER_
+    UNITAIREMENT : montant, quantité, et depuis les items 10-12 SFD, durée
+    en mois et échéance mensuelle). Pas pour l'article ou le client : un
+    nom mal compris se corrige sans risque, un chiffre mal compris peut
+    fausser toute l'écriture comptable.
     """
-    if champ == "montant_fcfa":
+    if champ in ("montant_fcfa", "echeance_mensuelle_fcfa"):
         return f"I ko wari {_montant_bambara(valeur)}. I sɔnna wa?"
-    if champ == "quantite":
+    if champ in ("quantite", "duree_mois"):
         return f"I ko {nombre_en_bambara(valeur)}. I sɔnna wa?"
     return "I sɔnna wa?"
 
@@ -300,6 +353,20 @@ def demander_fournisseur() -> str:
     return "Fɛn feerelikɛla tɔgɔ fɔ."
 
 
+# Items 10-12 (SFD) : trois nouveaux champs, même principe que les cinq
+# ci-dessus (première demande sans "tuguni", voir les variantes "_encore").
+def demander_nom_sfd() -> str:
+    return "SFD tɔgɔ fɔ."
+
+
+def demander_duree_mois() -> str:
+    return "Kalo hakɛ fɔ."
+
+
+def demander_echeance_mensuelle() -> str:
+    return "Kalo kelen-kelen wari hakɛ fɔ."
+
+
 # Variantes "encore" (avec "tuguni", = "encore/à nouveau") des cinq messages
 # ci-dessus : à utiliser UNIQUEMENT pour redemander un champ après un refus
 # explicite (un "non" à la relecture, ou une valeur mal comprise) - jamais
@@ -324,6 +391,18 @@ def demander_client_encore() -> str:
 
 def demander_fournisseur_encore() -> str:
     return "Fɛn feerelikɛla tɔgɔ fɔ tuguni."
+
+
+def demander_nom_sfd_encore() -> str:
+    return "SFD tɔgɔ fɔ tuguni."
+
+
+def demander_duree_mois_encore() -> str:
+    return "Kalo hakɛ fɔ tuguni."
+
+
+def demander_echeance_mensuelle_encore() -> str:
+    return "Kalo kelen-kelen wari hakɛ fɔ tuguni."
 
 
 def consultation_non_disponible() -> str:

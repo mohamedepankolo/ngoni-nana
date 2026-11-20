@@ -16,6 +16,7 @@ administratrice) suppose des comptes réels et reste à construire, pas un
 prérequis pour tester le pipeline ASR -> moteur -> TTS de bout en bout.
 """
 import base64
+import io
 import json
 import logging
 import os
@@ -26,11 +27,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from moteur import base_donnees as db
+from moteur import fiches
 from moteur import messages_bambara as msg
 from moteur.admin.routes import router as admin_router
 from moteur.agent_vocal import AgentVocal
@@ -461,6 +463,57 @@ def bilan(utilisatrice_id: int):
     """
     with _SessionLocal() as bd:
         return db.bilan_utilisatrice(bd, utilisatrice_id)
+
+
+def _pdf(contenu: bytes, nom_fichier: str) -> StreamingResponse:
+    """Même pattern que /admin/rapports.csv (StreamingResponse +
+
+    Content-Disposition), juste media_type="application/pdf" et des octets
+    PDF à la place d'un CSV.
+    """
+    return StreamingResponse(io.BytesIO(contenu), media_type="application/pdf",
+                              headers={"Content-Disposition": f"attachment; filename={nom_fichier}"})
+
+
+@app.get("/fiches/disponibles/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiches_disponibles(utilisatrice_id: int):
+    """Noms de clients/fournisseurs/articles connus, pour les listes
+
+    déroulantes du panneau "Fiches" (voir moteur/web/index.html) - évite de
+    retaper un nom à la main au moment de choisir quelle fiche générer.
+    """
+    with _SessionLocal() as bd:
+        return db.lister_tiers(bd, utilisatrice_id)
+
+
+@app.get("/fiches/journal/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_journal(utilisatrice_id: int):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_journal(bd, utilisatrice_id), "journal.pdf")
+
+
+@app.get("/fiches/vente_credit/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_vente_credit(utilisatrice_id: int, nom_client: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_vente_credit(bd, utilisatrice_id, nom_client), "ventes_a_credit.pdf")
+
+
+@app.get("/fiches/achat_credit/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_achat_credit(utilisatrice_id: int, nom_fournisseur: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_achat_credit(bd, utilisatrice_id, nom_fournisseur), "achats_a_credit.pdf")
+
+
+@app.get("/fiches/carte_stock/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_carte_stock(utilisatrice_id: int, article: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_carte_stock(bd, utilisatrice_id, article), "carte_de_stock.pdf")
+
+
+@app.get("/fiches/sfd/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_sfd(utilisatrice_id: int):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_sfd(bd, utilisatrice_id), "suivi_sfd.pdf")
 
 
 class SmsRequete(BaseModel):

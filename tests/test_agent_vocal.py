@@ -527,6 +527,97 @@ def test_stock_ecriture_initial_puis_reapprovisionnement(agent):
     assert db.consulter_stock(bd, agent.utilisatrice_id, "sukaro").quantite_actuelle == 25
 
 
+def test_stock_consultation_via_menu_puis_article_repond_sans_demander_de_montant(agent):
+    """Item 9, choisi au menu puis l'article donné dans un tour séparé (le
+
+    chemin réel au téléphone) : doit répondre directement la quantité en
+    stock et clore la session, comme quand l'article est donné dans la même
+    phrase (voir test_fournisseur_consultation_ne_demande_pas_de_confirmation
+    pour l'équivalent côté fournisseur). Bug réel trouvé en testant en direct
+    sur le serveur (2026-11-18) : "stock" n'a pas d'entrée dans
+    CONSTRUCTEURS_CONFIRMATION, donc le chemin "un champ à la fois"
+    (_apres_champ_confirme) retombait par erreur sur
+    msg.demander_precision_montant() ("Wari hakɛ fɔ.") sans jamais clore la
+    session ni répondre la quantité - seul le chemin direct de
+    _traiter_nouvelle_action vérifiait INTENTIONS_LECTURE_SEULE.
+    """
+    bd = agent._session_factory()
+    db.enregistrer_mouvement_stock(bd, utilisatrice_id=agent.utilisatrice_id,
+                                    article="sukaro", quantite=25)
+
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "9")  # 9 = stock (consultation)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "sukaro")
+
+    assert "?" not in r["message"]
+    assert bd.get(db.SessionAppel, sid).statut == "complete"
+
+
+def test_sfd_declaration_cree_le_pret_et_son_echeancier(agent):
+    """Item 10 : chaque champ numérique (montant/durée/échéance mensuelle)
+
+    passe par sa propre relecture ("owo"), comme les autres champs de
+    CHAMPS_A_CONFIRMER_UNITAIREMENT, avant la confirmation globale finale.
+    """
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "10")  # 10 = sfd_declaration
+    agent.traiter_texte(sid, agent.utilisatrice_id, "Soro")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "25000")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant total relu
+    agent.traiter_texte(sid, agent.utilisatrice_id, "6")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme la durée relue
+    agent.traiter_texte(sid, agent.utilisatrice_id, "5000")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme l'échéance mensuelle relue
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    assert r["contrat"]["action"] == "enregistrer"
+    bd = agent._session_factory()
+    utilisatrice = bd.get(db.Utilisatrice, agent.utilisatrice_id)
+    assert utilisatrice.nom_sfd == "soro"
+    assert utilisatrice.montant_total_sfd_fcfa == 25_000
+    assert utilisatrice.duree_mois_sfd == 6
+    assert utilisatrice.echeance_mensuelle_sfd_fcfa == 5_000
+
+    lignes = bd.query(db.EcheanceSfd).filter_by(utilisatrice_id=agent.utilisatrice_id).all()
+    assert len(lignes) == 6
+    assert all(l.montant_prevu == 5_000 and l.date_reelle is None for l in lignes)
+
+
+def test_sfd_paiement_remplit_la_prochaine_echeance(agent):
+    """Item 11 : un seul prêt actif supposé, pas de nom à redemander."""
+    bd = agent._session_factory()
+    db.declarer_pret_sfd(bd, utilisatrice_id=agent.utilisatrice_id, nom_sfd="soro",
+                          montant_total_fcfa=25_000, duree_mois=6, echeance_mensuelle_fcfa=5_000)
+
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    agent.traiter_texte(sid, agent.utilisatrice_id, "11")  # 11 = sfd_paiement
+    agent.traiter_texte(sid, agent.utilisatrice_id, "5000")
+    agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirme le montant relu
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "owo")  # confirmation finale
+
+    assert r["contrat"]["action"] == "enregistrer"
+    bilan = db.bilan_pret_sfd(bd, agent.utilisatrice_id)
+    assert bilan["reste_a_payer_fcfa"] == 20_000
+    assert bilan["prochaine_echeance_fcfa"] == 5_000  # échéance n°2, toujours impayée
+
+
+def test_sfd_consultation_ne_demande_pas_de_confirmation(agent):
+    """Item 12, comme "fournisseur_consultation" (item 7) : lecture seule,
+
+    pas de "c'est bien ça ?".
+    """
+    bd = agent._session_factory()
+    db.declarer_pret_sfd(bd, utilisatrice_id=agent.utilisatrice_id, nom_sfd="soro",
+                          montant_total_fcfa=25_000, duree_mois=6, echeance_mensuelle_fcfa=5_000)
+
+    sid = agent.demarrer_session(agent.utilisatrice_id)
+    r = agent.traiter_texte(sid, agent.utilisatrice_id, "12")
+
+    assert r["contrat"]["intention"] == "sfd_consultation"
+    assert "?" not in r["message"]
+    assert bd.get(db.SessionAppel, sid).statut == "complete"
+
+
 def test_choix_menu_demarre_une_vente_comme_le_mot_cle(agent):
     """Taper/dire "1" (menu numérique, R2) démarre une vente, comme "feere"."""
     sid = agent.demarrer_session(agent.utilisatrice_id)

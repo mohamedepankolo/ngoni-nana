@@ -12,6 +12,7 @@ sqlalchemy>=2.0
 python-multipart>=0.0.9  # upload audio (/call_audio) et formulaires FastAPI
 python-dotenv>=1.0  # charge .env (API_TOKEN, HF_TOKEN, DATABASE_URL), jamais commité
 jinja2>=3.1  # templates HTML du dashboard admin (moteur/admin/)
+reportlab>=4.0  # génération des fiches PDF (moteur/fiches.py)
 gradio_client>=1.0  # TTS (moteur/tts_maliba.py), nécessite HF_TOKEN à l'exécution
 
 # Transcription, backend "transformers" (lourd ; déjà présents sur Colab)

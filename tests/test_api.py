@@ -217,6 +217,65 @@ def test_bilan_agrege_les_transactions_de_lutilisatrice():
     assert len(corps["transactions"]) == 1
 
 
+def test_fiche_journal_refuse_sans_jeton():
+    client = TestClient(app)
+    r = client.get("/fiches/journal/1")
+    assert r.status_code == 401
+
+
+def test_fiches_generent_des_pdf_valides():
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L02", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_transaction(bd, utilisatrice_id=u.id, type_="vente",
+                                champs={"article": "mil", "quantite": 2, "montant_fcfa": 10_000})
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=u.id, nom_client="mariam",
+                                     montant_fcfa=2500, est_un_paiement=False)
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=u.id, nom_fournisseur="fanta",
+                                          montant_fcfa=5000, est_un_paiement=False)
+    db.enregistrer_mouvement_stock(bd, utilisatrice_id=u.id, article="riz", quantite=50)
+    db.declarer_pret_sfd(bd, utilisatrice_id=u.id, nom_sfd="soro", montant_total_fcfa=25_000,
+                          duree_mois=6, echeance_mensuelle_fcfa=5_000)
+
+    routes = [
+        f"/fiches/journal/{u.id}",
+        f"/fiches/vente_credit/{u.id}?nom_client=mariam",
+        f"/fiches/achat_credit/{u.id}?nom_fournisseur=fanta",
+        f"/fiches/carte_stock/{u.id}?article=riz",
+        f"/fiches/sfd/{u.id}",
+    ]
+    for route in routes:
+        r = client.get(route, headers=ENTETES)
+        assert r.status_code == 200, route
+        assert r.headers["content-type"] == "application/pdf"
+        assert "attachment" in r.headers["content-disposition"]
+        assert r.content.startswith(b"%PDF")
+
+
+def test_fiches_disponibles_liste_les_tiers_connus():
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L03", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=u.id, nom_client="mariam",
+                                     montant_fcfa=2500, est_un_paiement=False)
+
+    r = client.get(f"/fiches/disponibles/{u.id}", headers=ENTETES)
+    assert r.status_code == 200
+    assert r.json()["clients"] == ["mariam"]
+
+
 def _wav_silence(duree_s: float = 0.3) -> bytes:
     tampon = io.BytesIO()
     with wave.open(tampon, "wb") as w:
