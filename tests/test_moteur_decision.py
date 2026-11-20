@@ -8,7 +8,12 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "asr_test" / "scripts"))
 
-from moteur.dictionnaire_mots_cles import reconnaitre_confirmation, reconnaitre_intention  # noqa: E402
+from moteur.dictionnaire_mots_cles import (  # noqa: E402
+    MENU_NUMERIQUE,
+    reconnaitre_choix_menu,
+    reconnaitre_confirmation,
+    reconnaitre_intention,
+)
 from moteur.moteur_decision import Session, analyser, extraire_entites  # noqa: E402
 
 # categorie (phrases_reelles.csv) -> intention du moteur. Le parcours
@@ -232,3 +237,187 @@ def test_combler_champ_quantite_prend_le_plus_petit_chiffre():
     session.recevoir("n ye misi naani feere")  # un seul chiffre : pris pour le montant
     resultat = session.combler_champ("quantite", "misi naani feere wa bi duuru")
     assert resultat["champs"]["quantite"] == 4
+
+
+# --- Menu numérique (R2, intégration téléphonie/USSD) ---------------------
+
+def test_reconnaitre_choix_menu_chiffre_tape():
+    """Un chiffre arabe tapé tel quel (canal USSD/clavier) -> l'action du menu."""
+    for chiffre, intention in MENU_NUMERIQUE.items():
+        assert reconnaitre_choix_menu(str(chiffre)) == intention
+
+
+def test_reconnaitre_choix_menu_mot_bambara():
+    """Le même choix, dit en toutes lettres bambara (canal vocal)."""
+    assert reconnaitre_choix_menu("kelen") == "vente"
+    assert reconnaitre_choix_menu("saba") == "capital"
+    assert reconnaitre_choix_menu("kononton") == "stock"
+
+
+def test_reconnaitre_choix_menu_rejette_un_nombre_dans_une_vraie_phrase():
+    """"saba" (3) apparaît dans cette phrase, mais ce n'est pas un choix de
+
+    menu : reconnaitre_choix_menu doit rester strict (un seul nombre, rien
+    d'autre) pour ne jamais confondre une vraie phrase avec un menu.
+    """
+    assert reconnaitre_choix_menu("n ye saga saba feere wa bi duuru") is None
+
+
+def test_analyser_reconnait_un_choix_de_menu():
+    """analyser() (fonction pure, sans session) accepte aussi un chiffre de menu."""
+    resultat = analyser("1")
+    assert resultat["intention"] == "vente"
+    assert resultat["action"] == "demander_confirmation"
+    assert resultat["confiance"] == "a_confirmer"  # article/quantité/montant encore manquants
+
+
+def test_session_choix_menu_demarre_la_bonne_intention():
+    """Une session qui démarre par un chiffre de menu se comporte comme si
+
+    le mot-clé correspondant avait été dit.
+    """
+    session = Session()
+    resultat = session.recevoir("3")  # 3 = capital (voir MENU_NUMERIQUE)
+    assert resultat["intention"] == "capital"
+
+
+def test_choix_menu_ignore_une_fois_une_intention_deja_active():
+    """Régression de conception : une fois une intention active, un chiffre
+
+    isolé est la réponse à un champ demandé (quantité, montant...), jamais un
+    nouveau choix de menu - sinon répondre "2" à une question posée après
+    avoir choisi "1" (vente) changerait silencieusement l'intention en
+    "depense" au lieu de remplir le champ attendu (voir
+    dictionnaire_mots_cles.reconnaitre_choix_menu et
+    Session.recevoir, moteur_decision.py).
+    """
+    session = Session()
+    premier = session.recevoir("1")  # 1 = vente
+    assert premier["intention"] == "vente"
+
+    deuxieme = session.recevoir("2")  # ne doit PAS redevenir "depense"
+    assert deuxieme["intention"] == "vente"
+
+
+# ---------- Items 4 à 8 (script à 9 choix, 2026-11-17) ----------
+# Pas de mot-clé bambara pour ces 4 intentions (voir MENU_NUMERIQUE) :
+# testées uniquement via le chiffre du menu, jamais via un mot parlé.
+
+def test_choix_menu_vente_credit():
+    """Item 4 : comme tout choix de menu, le chiffre se dit SEUL (voir
+
+    reconnaitre_choix_menu, strict), puis l'article/quantité/montant
+    arrivent sur un tour séparé, et enfin le nom du client - via
+    combler_champ, puisque c'est le chemin que prend réellement
+    AgentVocal._combler_champ_en_attente une fois le champ manquant ciblé.
+    """
+    session = Session()
+    resultat = session.recevoir("4")
+    assert resultat["intention"] == "vente_credit"
+    resultat = session.recevoir("misi fila wa bi duuru")  # misi=vache
+    assert resultat["champs"]["quantite"] == 2
+    assert resultat["champs"]["montant_fcfa"] == 250000
+    assert session.premier_champ_manquant() == "client"
+    resultat = session.combler_champ("client", "Amadou")
+    assert resultat["champs"]["client"] == "amadou"
+    assert resultat["champs"]["article"] == "misi"  # pas écrasé par le nom du client
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_achat_credit():
+    session = Session()
+    resultat = session.recevoir("5")
+    assert resultat["intention"] == "achat_credit"
+    resultat = session.recevoir("saga bi duuru")
+    assert resultat["champs"]["montant_fcfa"] == 250
+    assert session.premier_champ_manquant() == "fournisseur"
+    resultat = session.combler_champ("fournisseur", "Fanta")
+    assert resultat["champs"]["fournisseur"] == "fanta"
+    assert resultat["champs"]["article"] == "saga"  # pas écrasé par le nom du fournisseur
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_fournisseur_paiement():
+    session = Session()
+    resultat = session.recevoir("6")
+    assert resultat["intention"] == "fournisseur_paiement"
+    resultat = session.recevoir("Fanta bi duuru")
+    assert resultat["champs"]["fournisseur"] == "fanta"
+    assert resultat["champs"]["montant_fcfa"] == 250
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_fournisseur_consultation_sans_nom():
+    """Item 7 sans nom de fournisseur précisé : aucun champ n'est requis,
+
+    l'intention est tout de suite en confiance haute (lecture seule, voir
+    AgentVocal.INTENTIONS_LECTURE_SEULE)."""
+    session = Session()
+    resultat = session.recevoir("7")
+    assert resultat["intention"] == "fournisseur_consultation"
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_stock_ecriture():
+    session = Session()
+    resultat = session.recevoir("8")
+    assert resultat["intention"] == "stock_ecriture"
+    resultat = session.recevoir("sukaro bi duuru")  # sukaro=sucre
+    assert resultat["champs"]["article"] == "sukaro"
+    assert resultat["champs"]["quantite"] == 50
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_sfd_declaration():
+    """Item 10 : seuls nom_sfd et montant_fcfa (le total du crédit) sont
+
+    extraits de la phrase initiale ; duree_mois et echeance_mensuelle_fcfa
+    sont toujours redemandés séparément (jamais 3 nombres ambigus extraits
+    d'un seul coup, voir extraire_entites).
+    """
+    session = Session()
+    resultat = session.recevoir("10")
+    assert resultat["intention"] == "sfd_declaration"
+    resultat = session.recevoir("Nyesigiso waa duuru")
+    assert resultat["champs"]["nom_sfd"] == "nyesigiso"
+    assert resultat["champs"]["montant_fcfa"] == 25_000  # waa duuru = 5000 dorome * 5
+    assert "duree_mois" not in resultat["champs"]
+    assert "echeance_mensuelle_fcfa" not in resultat["champs"]
+    assert session.premier_champ_manquant() == "duree_mois"
+
+    resultat = session.combler_champ("duree_mois", "wooro")  # 6 mois
+    assert resultat["champs"]["duree_mois"] == 6
+    assert session.premier_champ_manquant() == "echeance_mensuelle_fcfa"
+
+    resultat = session.combler_champ("echeance_mensuelle_fcfa", "waa duuru")
+    assert resultat["champs"]["echeance_mensuelle_fcfa"] == 25_000
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_sfd_paiement():
+    session = Session()
+    resultat = session.recevoir("11")
+    assert resultat["intention"] == "sfd_paiement"
+    resultat = session.recevoir("waa duuru")
+    assert resultat["champs"]["montant_fcfa"] == 25_000
+    assert resultat["confiance"] == "haute"
+
+
+def test_choix_menu_sfd_consultation():
+    """Item 12 : aucun champ requis, lecture seule (voir
+
+    AgentVocal.INTENTIONS_LECTURE_SEULE), même principe que item 7.
+    """
+    session = Session()
+    resultat = session.recevoir("12")
+    assert resultat["intention"] == "sfd_consultation"
+    assert resultat["confiance"] == "haute"
+
+
+def test_affiner_intention_stock_distingue_lecture_et_ecriture():
+    """"bolo" seul (sans chiffre) = consultation ; avec un chiffre = écriture
+
+    (même principe que _affiner_intention_capital, voir moteur_decision.py).
+    """
+    assert analyser("n ka sukaro bolo")["intention"] == "stock"
+    assert analyser("sukaro bi duuru bolo")["intention"] == "stock_ecriture"

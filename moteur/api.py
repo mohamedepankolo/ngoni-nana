@@ -16,6 +16,7 @@ administratrice) suppose des comptes réels et reste à construire, pas un
 prérequis pour tester le pipeline ASR -> moteur -> TTS de bout en bout.
 """
 import base64
+import io
 import json
 import logging
 import os
@@ -25,11 +26,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from moteur import base_donnees as db
+from moteur import fiches
 from moteur import messages_bambara as msg
 from moteur.admin.routes import router as admin_router
 from moteur.agent_vocal import AgentVocal
@@ -42,6 +45,21 @@ logger = logging.getLogger("ngoni_nana")
 # secondes) : au-delà, probablement un flux bloqué plutôt qu'un vrai
 # enregistrement, à rejeter avant de le charger entièrement en mémoire.
 TAILLE_MAX_AUDIO_OCTETS = 15 * 1024 * 1024  # 15 Mo
+
+# Message d'accueil : voix humaine réelle plutôt que le TTS synthétique, si
+# ce fichier local existe (2026-11-17, demande explicite - un des 5
+# enregistrements de l'équipe terrain couvrant les 9 choix du menu, bien
+# plus naturel qu'une synthèse, et sans le problème de vocabulaire bambara
+# non validé pour les items 4 à 8, voir messages_bambara.menu_principal).
+# Fichier dans ressource/ : jamais commité sur GitHub (voix de vraies
+# personnes, pas d'accord explicite pour une publication publique) - d'où
+# le repli silencieux sur le TTS si absent (ex. sur un autre poste), pas une
+# erreur. Choix du fichier à changer ici une fois l'équipe a écouté les 5 et
+# tranché (voir ressource/enregistrements_menu_bambara_2026-11-17/).
+CHEMIN_AUDIO_ACCUEIL_HUMAIN = (
+    Path(__file__).resolve().parent.parent
+    / "ressource" / "enregistrements_menu_bambara_2026-11-17" / "personne_1.ogg"
+)
 
 
 @asynccontextmanager
@@ -73,6 +91,20 @@ async def _cycle_de_vie(_app: FastAPI):
 
 
 app = FastAPI(title="N'GONI NANA : API", lifespan=_cycle_de_vie)
+
+# Necessaire pour l'appli mobile (Capacitor) : sa page est chargee depuis une
+# origine locale (https://localhost), differente de celle du serveur - sans
+# CORS, le navigateur embarque bloque silencieusement la requete ("Failed to
+# fetch") avant meme qu'elle n'atteigne l'API, independamment du reseau ou du
+# jeton. Sans impact sur la securite : le jeton (verifier_jeton, plus bas)
+# reste exige sur chaque endpoint, CORS ne fait qu'autoriser le navigateur a
+# LIRE la reponse d'une origine differente.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/web/config.js")
@@ -158,6 +190,15 @@ def _obtenir_syntheser():
     return _syntheser
 
 
+def _syntheser_message(texte: str) -> str:
+    """Synthétise un message complet (voir syntheser_par_phrases,
+    tts_maliba.py) : une vraie pause entre chaque phrase pour les messages
+    qui en contiennent plusieurs (le menu principal notamment), sans coût
+    ajouté pour les messages à une seule phrase (la grande majorité)."""
+    from moteur.tts_maliba import syntheser_par_phrases
+    return syntheser_par_phrases(_obtenir_syntheser(), texte)
+
+
 # Message audio de secours, pré-synthétisé une seule fois (voir
 # scripts/generer_audio_secours.py) et bundlé avec l'app plutôt que généré à
 # la volée : si le TTS en ligne (Space Gradio, section tts_maliba.py) est en
@@ -175,7 +216,12 @@ def _obtenir_audio_secours() -> str | None:
     return _audio_secours_base64
 
 
-def _reponse_secours(texte_reconnu: str | None, message: str) -> dict:
+def _reponse_secours(texte_reconnu: str | None, message: str, session_id: int | None = None) -> dict:
+    # L'état de la session n'a pas bougé (l'échec arrive AVANT le moteur :
+    # ASR/conversion en panne) : "attente" doit refléter ce qui était déjà
+    # attendu, pas "menu" par défaut, sinon l'interface afficherait le mauvais
+    # widget de saisie après une simple erreur réseau/micro.
+    attente = _agent.etat_attente(session_id) if session_id is not None else "menu"
     return {
         "texte_reconnu": texte_reconnu,
         "message": message,
@@ -184,6 +230,7 @@ def _reponse_secours(texte_reconnu: str | None, message: str) -> dict:
         "champs": {},
         "audio_base64": _obtenir_audio_secours(),
         "type_audio": "wav",
+        "attente": attente,
     }
 
 
@@ -230,8 +277,31 @@ def modules():
 
 @app.post("/session", dependencies=[Depends(verifier_jeton)])
 def creer_session(requete: CreerSessionRequete, agent: AgentVocal = Depends(obtenir_agent)):
+    """Démarre une session ET renvoie le message d'accueil + menu numérique
+
+    (menu_principal, messages_bambara.py), pour qu'une utilisatrice entende
+    tout de suite ce qu'elle peut faire plutôt que d'appuyer sur le bouton
+    sans savoir quoi dire (R2, menu numérique 1-6). L'audio est au mieux : si
+    le TTS échoue, le texte reste disponible (journal de test), pas d'erreur
+    - contrairement à /call_audio, pas de son de secours ici, un bip d'erreur
+    au tout premier contact donnerait l'impression à tort que quelque chose a
+    déjà mal tourné.
+    """
     session_id = agent.demarrer_session(requete.utilisatrice_id, canal=requete.canal)
-    return {"session_id": session_id}
+    message = msg.menu_principal()
+    audio_base64, type_audio = None, "wav"
+    try:
+        if CHEMIN_AUDIO_ACCUEIL_HUMAIN.exists():
+            chemin_audio = str(CHEMIN_AUDIO_ACCUEIL_HUMAIN)
+        else:
+            chemin_audio = _syntheser_message(message)
+        with open(chemin_audio, "rb") as f:
+            audio_base64 = base64.b64encode(f.read()).decode()
+        type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
+    except Exception:
+        logger.exception("Échec TTS pour le message d'accueil (session %s)", session_id)
+    return {"session_id": session_id, "message": message, "audio_base64": audio_base64,
+            "type_audio": type_audio, "attente": "menu"}
 
 
 @app.get("/session/{session_id}", dependencies=[Depends(verifier_jeton)])
@@ -264,14 +334,32 @@ def bootstrap_demo():
 
 @app.post("/call", dependencies=[Depends(verifier_jeton)])
 def appeler(requete: AppelRequete, agent: AgentVocal = Depends(obtenir_agent)):
+    """Comme /call_audio, mais à partir de texte déjà disponible (ex. un choix
+
+    de menu tapé "1".."6" sur la page de test, voir web/index.html) : évite
+    de repasser par le micro pour tester rapidement le menu numérique (R2).
+    Synthétise aussi la réponse en audio (avant : texte seul, jamais parlé),
+    avec le même repli que /call_audio si le TTS échoue.
+    """
     resultat = agent.traiter_texte(requete.session_id, requete.utilisatrice_id, requete.texte)
+    audio_base64, type_audio = None, "wav"
+    try:
+        chemin_audio = _syntheser_message(resultat["message"])
+        with open(chemin_audio, "rb") as f:
+            audio_base64 = base64.b64encode(f.read()).decode()
+        type_audio = Path(chemin_audio).suffix.lstrip(".") or "wav"
+    except Exception:
+        logger.exception("Échec TTS pour /call (session %s)", requete.session_id)
+        audio_base64 = _obtenir_audio_secours()
     return {
         "message": resultat["message"],
         "intention": resultat["contrat"]["intention"],
         "confiance": resultat["contrat"]["confiance"],
         "action": resultat["contrat"]["action"],
         "champs": resultat["contrat"]["champs"],
-        "audio": resultat["audio"],
+        "audio_base64": audio_base64,
+        "type_audio": type_audio,
+        "attente": resultat["attente"],
     }
 
 
@@ -289,10 +377,10 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
 
     contenu = await fichier.read()
     if not contenu:
-        return _reponse_secours(None, msg.reformulation(0))
+        return _reponse_secours(None, msg.reformulation(0), session_id)
     if len(contenu) > TAILLE_MAX_AUDIO_OCTETS:
         logger.warning("Enregistrement rejeté (%d octets > limite) pour la session %s", len(contenu), session_id)
-        return _reponse_secours(None, msg.reformulation(0))
+        return _reponse_secours(None, msg.reformulation(0), session_id)
 
     suffixe_entree = Path(fichier.filename or "audio.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffixe_entree, delete=False) as brut:
@@ -322,22 +410,22 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
             # téléphone, elle doit entendre qu'il faut réessayer (voir
             # _reponse_secours, section audit robustesse).
             logger.exception("Échec conversion/ASR pour la session %s", session_id)
-            return _reponse_secours(None, msg.reformulation(0))
+            return _reponse_secours(None, msg.reformulation(0), session_id)
     finally:
         os.unlink(chemin_brut)
         Path(chemin_wav).unlink(missing_ok=True)
 
     if not texte_reconnu or not texte_reconnu.strip():
-        return _reponse_secours(texte_reconnu, msg.reformulation(0))
+        return _reponse_secours(texte_reconnu, msg.reformulation(0), session_id)
 
     try:
         resultat = _agent.traiter_texte(session_id, utilisatrice_id, texte_reconnu)
     except Exception:
         logger.exception("Échec du moteur de décision pour la session %s", session_id)
-        return _reponse_secours(texte_reconnu, msg.reformulation(0))
+        return _reponse_secours(texte_reconnu, msg.reformulation(0), session_id)
 
     try:
-        chemin_audio_reponse = _obtenir_syntheser()(resultat["message"])
+        chemin_audio_reponse = _syntheser_message(resultat["message"])
         with open(chemin_audio_reponse, "rb") as f:
             audio_base64 = base64.b64encode(f.read()).decode()
         type_audio = Path(chemin_audio_reponse).suffix.lstrip(".") or "wav"
@@ -360,7 +448,72 @@ async def appeler_en_audio(session_id: int = Form(...), utilisatrice_id: int = F
         "champs": resultat["contrat"]["champs"],
         "audio_base64": audio_base64,
         "type_audio": type_audio,
+        "attente": resultat["attente"],
     }
+
+
+@app.get("/bilan/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def bilan(utilisatrice_id: int):
+    """Écran "bilan" de l'application mobile (lecture seule, section 3
+
+    du vocal, "une partie bilan/résumé" demandée en plus du flux vocal) :
+    capital, totaux ventes/dépenses, dernières transactions, dettes clients,
+    stock. Voir moteur/base_donnees.bilan_utilisatrice - différent du
+    dashboard admin ABIC (moteur/admin/), qui agrège par coopérative.
+    """
+    with _SessionLocal() as bd:
+        return db.bilan_utilisatrice(bd, utilisatrice_id)
+
+
+def _pdf(contenu: bytes, nom_fichier: str) -> StreamingResponse:
+    """Même pattern que /admin/rapports.csv (StreamingResponse +
+
+    Content-Disposition), juste media_type="application/pdf" et des octets
+    PDF à la place d'un CSV.
+    """
+    return StreamingResponse(io.BytesIO(contenu), media_type="application/pdf",
+                              headers={"Content-Disposition": f"attachment; filename={nom_fichier}"})
+
+
+@app.get("/fiches/disponibles/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiches_disponibles(utilisatrice_id: int):
+    """Noms de clients/fournisseurs/articles connus, pour les listes
+
+    déroulantes du panneau "Fiches" (voir moteur/web/index.html) - évite de
+    retaper un nom à la main au moment de choisir quelle fiche générer.
+    """
+    with _SessionLocal() as bd:
+        return db.lister_tiers(bd, utilisatrice_id)
+
+
+@app.get("/fiches/journal/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_journal(utilisatrice_id: int):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_journal(bd, utilisatrice_id), "journal.pdf")
+
+
+@app.get("/fiches/vente_credit/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_vente_credit(utilisatrice_id: int, nom_client: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_vente_credit(bd, utilisatrice_id, nom_client), "ventes_a_credit.pdf")
+
+
+@app.get("/fiches/achat_credit/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_achat_credit(utilisatrice_id: int, nom_fournisseur: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_achat_credit(bd, utilisatrice_id, nom_fournisseur), "achats_a_credit.pdf")
+
+
+@app.get("/fiches/carte_stock/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_carte_stock(utilisatrice_id: int, article: str):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_carte_stock(bd, utilisatrice_id, article), "carte_de_stock.pdf")
+
+
+@app.get("/fiches/sfd/{utilisatrice_id}", dependencies=[Depends(verifier_jeton)])
+def fiche_sfd(utilisatrice_id: int):
+    with _SessionLocal() as bd:
+        return _pdf(fiches.generer_pdf_sfd(bd, utilisatrice_id), "suivi_sfd.pdf")
 
 
 class SmsRequete(BaseModel):

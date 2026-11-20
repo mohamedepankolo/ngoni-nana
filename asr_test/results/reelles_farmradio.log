@@ -1,0 +1,69 @@
+W0926 01:30:32.647000 13740 site-packages\torch\utils\_pytree.py:630] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+Device set to use cpu
+Using `chunk_length_s` is very experimental with seq2seq models. The results will not necessarily be entirely accurate and will have caveats. More information: https://github.com/huggingface/transformers/pull/20104. Ignore this warning with pipeline(..., ignore_warning=True). To use Whisper for long-form transcription, use rather the model's `generate` method directly as the model relies on it's own chunking mechanism (cf. Whisper original paper, section 3.8. Long-form Transcription).
+`generation_config` default values have been modified to match model-specific defaults: {'suppress_tokens': [1, 2, 7, 8, 9, 10, 14, 25, 26, 27, 28, 29, 31, 58, 59, 60, 61, 62, 63, 90, 91, 92, 93, 359, 503, 522, 542, 873, 893, 902, 918, 922, 931, 1350, 1853, 1982, 2460, 2627, 3246, 3253, 3268, 3536, 3846, 3961, 4183, 4667, 6585, 6647, 7273, 9061, 9383, 10428, 10929, 11938, 12033, 12331, 12562, 13793, 14157, 14635, 15265, 15618, 16553, 16604, 18362, 18956, 20075, 21675, 22520, 26130, 26161, 26435, 28279, 29464, 31650, 32302, 32470, 36865, 42863, 47425, 49870, 50254, 50258, 50358, 50359, 50360, 50361, 50362], 'begin_suppress_tokens': [220, 50257]}. If this is not desired, please set these values explicitly.
+A custom logits processor of type <class 'transformers.generation.logits_process.SuppressTokensLogitsProcessor'> has been passed to `.generate()`, but it was also created in `.generate()`, given its parameterization. The custom <class 'transformers.generation.logits_process.SuppressTokensLogitsProcessor'> will take precedence. Please check the docstring of <class 'transformers.generation.logits_process.SuppressTokensLogitsProcessor'> to see related `.generate()` flags.
+A custom logits processor of type <class 'transformers.generation.logits_process.SuppressTokensAtBeginLogitsProcessor'> has been passed to `.generate()`, but it was also created in `.generate()`, given its parameterization. The custom <class 'transformers.generation.logits_process.SuppressTokensAtBeginLogitsProcessor'> will take precedence. Please check the docstring of <class 'transformers.generation.logits_process.SuppressTokensAtBeginLogitsProcessor'> to see related `.generate()` flags.
+Backend : transformers  |  Modèle : FarmRadioInternational/bambara-whisper-asr
+[P01] 37.4s  ne ka kɛmɛ duuru bɛ mariyamu na
+[P02] 36.6s  n ye saka saba fere ye wabiduru
+[P03] 33.7s  n i ye siga bɔrɛ fila fere ye wasaba
+[P04] 28.5s  ne ye safunɛ fere kɛmɛ ye
+[P05] 25.8s  n ye gan sara tan fɛ de kɛmɛ duuru
+[P06] 30.0s  ne ye fini tafɛ kelen fɛɛrɛ ye wa kelen ni kɛmɛ duuru
+[P07] 30.4s  n ye saɲɔbɔrɛ kelen sa u ka duuru
+[P08] 28.9s  ne ye situlu san kɛmɛ fila ni biduuru
+[P09] 25.0s  ne ye cɛ den duuru san wafila ani kɛmɛ duuru
+[P10] 23.1s  n ye n ka pase sara kɛmɛ ni biduuru
+[P11] 26.2s  ne ye n ka sugu sigiyɔrɔ sara dɔrɔmɛ mugan
+[P12] 24.9s  ne ye wa kelen kɛ ka mana foroko san
+[P13] 21.7s  ne ka wafila juru bɛ awa la
+[P14] 32.5s  n i ka kɛmɛ wolonwula juru minnu bɛ fɛn ta la a ye o sara
+[P15] 28.1s  e tɔgɔ ni jamu ne tɔgɔ ye adama kamara
+[P16] 23.7s  n ye wa nani fara n ka jago kun kan
+[P17] 23.9s  ne ye joli de fɛ de ni kalo in na
+[P18] 27.0s  n i ka juru bɛ mɔgɔ jɔnw na
+[P19] 31.4s  saɲɔ bɔrɔ nani de bɛ ne bolo a tɔ la
+[P20] 26.3s  n ye saka saba fere ye u ka mugan ni duuru
+[P01b] 26.4s  ne ka kɛmɛ duru be mariyamu na
+[P02b] 24.6s  ne ye saka saba fere wa bi duuru
+[P03b] 33.5s  ne ye tiga bɔrɛ fila ne y o fɛ wasaba
+[P04b] 27.1s  ne ye sɛtɛnɛ fɛ ye
+[P05b] 24.4s  ne ye gan safere kɛmɛ duuru
+[P06b] 27.7s  ne ye fini feere a kelen ni kɛmɛ duuru
+[P07b] 29.5s  ne ye saɲɔ bɔrɛ ke fere wa duuru
+[P08b] 28.8s  n i ye situlu fere kɛmɛ fila nin b i duuru
+[P09b] 27.9s  n ye cɛ duuru fere wafila ni kɛmɛ duuru
+[P10b] 25.4s  n ye pase sara kɛmɛ ni bi duuru
+[P11b] 25.0s  ɲɛ ka sugu sigiyɔrɔ sara mugan
+[P12b] 21.4s  n i mana furoko ni bɔrɛw sa
+[P13b] 22.3s  ne ka wafila juru be awa la
+[P14b] 25.0s  faanta ye kɛmɛ wolonwula sɔrɔ ne ka juru la
+[P15b] 25.9s  e tɔgɔ ni jamu ne tɔgɔ ye adama kamara
+[P16b] 19.5s  n ye wananni fara n ka jagokun kan
+[P17b] 24.1s  ne yɛrɛ ka minɛn tɔ tora joli ni kalo in na
+[P18b] 24.5s  mɔgɔ jɔn ni jɔn de ka ne ka juru bɛ olu la
+[P19b] 25.1s  ɛɛ ɲɔ bɔra nani de tora an bolo
+[P20b] 24.6s  n ye saga saba fere wa mugan ni duuru
+[P01c] 27.3s  ne ka kɛmɛ duru bɛ mariyamu fɛ
+[P02c] 30.9s  sakasaba ferele bɛnna wa bi jɛrɛ i ma i sɔnna
+[P03c] 23.7s  ne ye tika bɔrɛ fila ferewasaba
+[P04c] 18.5s  ne ye safunɛ sa
+[P05c] 20.0s  ne ye gan sarata fɛ kɛmɛ duuru
+[P06c] 19.6s  ne ye finisan wakelen kɛmɛ duuru
+[P07c] 20.8s  ne ye ɲɔbɔrɛ kelen sa wajuru
+[P08c] 23.6s  ne ye situlu ye san ne ye situlu kɛmɛ fila ni biduobila san
+[P09c] 26.7s  ne ye cɛsisan cɛwisan o b a fila ni kɛmɛjuru
+[P10c] 20.1s  ne ye pase sara kɛmɛ ni biduuru
+[P11c] 23.9s  ne ye n sigiyɔrɔ sara dɔrɔmɛ mɔgɔ ye
+[P12c] 19.3s  ne ye u ka hakilina do bɔrɛw la
+[P13c] 20.4s  ne ka bɔ a fila de bɛ aw la
+[P14c] 23.8s  faanta in ye ne ka kɛ makɔlɔn fila in sara
+[P15c] 17.8s  ne ka jagokun tun ye waata ye
+[P16c] 17.2s  ne ye wanan fariw kan
+[P17c] 19.7s  ne ye joli fɛrɛ ye nin kalo in na
+[P18c] 18.6s  ne ka wari bɛ jɔn na
+[P19c] 21.7s  ne ka ɲɔgɔn ye bɔrɛlali ye
+[P20c] 19.8s  ne ye saka saba fere ye wa mugan ni duuru
+
+60 transcriptions écrites dans asr_test\results\reelles_farmradio.csv

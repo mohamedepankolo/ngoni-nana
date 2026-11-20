@@ -108,7 +108,11 @@ def test_modules_liste_les_5_actions_du_menu():
     assert actions == {"vente", "depense", "capital", "client", "stock"}
 
 
-def test_parcours_complet_session_puis_call():
+def test_parcours_complet_session_puis_call(monkeypatch):
+    # /session et /call synthetisent maintenant une reponse audio (menu
+    # d'accueil, puis chaque reponse) : jamais le vrai TTS en test (reseau,
+    # Space HF distant), voir test_prechauffage_desactive_par_defaut.
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: (lambda texte: _ecrire_wav_temporaire()))
     client = TestClient(app)
 
     bd = _SessionLocal()
@@ -140,6 +144,136 @@ def test_parcours_complet_session_puis_call():
 
     r = client.get(f"/session/{session_id}", headers=ENTETES)
     assert r.json()["statut"] == "complete"
+
+
+def test_session_renvoie_le_message_d_accueil_avec_menu(monkeypatch):
+    """R2 (menu numérique) : /session doit renvoyer le menu, pas juste un id
+
+    de session - sinon une utilisatrice qui vient d'appuyer sur le bouton
+    n'a aucune idée de quoi dire/taper.
+    """
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: (lambda texte: _ecrire_wav_temporaire()))
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+
+    r = client.post("/session", json={"utilisatrice_id": u.id}, headers=ENTETES)
+    assert r.status_code == 200
+    corps = r.json()
+    assert "feere" in corps["message"]  # un des mots-clés du menu (vente)
+    assert corps["audio_base64"]
+
+
+def test_call_avec_un_chiffre_de_menu_demarre_la_bonne_action(monkeypatch):
+    """Taper "1" via /call (page de test, sans passer par le micro) démarre
+
+    une vente, comme reconnaitre_choix_menu (moteur_decision.py).
+    """
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: (lambda texte: _ecrire_wav_temporaire()))
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    session_id = client.post("/session", json={"utilisatrice_id": u.id}, headers=ENTETES).json()["session_id"]
+
+    r = client.post("/call", headers=ENTETES,
+                     json={"session_id": session_id, "utilisatrice_id": u.id, "texte": "1"})
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["intention"] == "vente"
+    assert corps["audio_base64"]
+
+
+def test_bilan_agrege_les_transactions_de_lutilisatrice():
+    """Écran "bilan" de l'application mobile (lecture seule)."""
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L01", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_transaction(bd, utilisatrice_id=u.id, type_="vente",
+                                champs={"article": "mil", "quantite": 2, "montant_fcfa": 10_000})
+
+    r = client.get(f"/bilan/{u.id}", headers=ENTETES)
+    assert r.status_code == 200
+    corps = r.json()
+    assert corps["capital"] == 10_000
+    assert corps["total_ventes"] == 10_000
+    assert len(corps["transactions"]) == 1
+
+
+def test_fiche_journal_refuse_sans_jeton():
+    client = TestClient(app)
+    r = client.get("/fiches/journal/1")
+    assert r.status_code == 401
+
+
+def test_fiches_generent_des_pdf_valides():
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L02", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_transaction(bd, utilisatrice_id=u.id, type_="vente",
+                                champs={"article": "mil", "quantite": 2, "montant_fcfa": 10_000})
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=u.id, nom_client="mariam",
+                                     montant_fcfa=2500, est_un_paiement=False)
+    db.enregistrer_mouvement_fournisseur(bd, utilisatrice_id=u.id, nom_fournisseur="fanta",
+                                          montant_fcfa=5000, est_un_paiement=False)
+    db.enregistrer_mouvement_stock(bd, utilisatrice_id=u.id, article="riz", quantite=50)
+    db.declarer_pret_sfd(bd, utilisatrice_id=u.id, nom_sfd="soro", montant_total_fcfa=25_000,
+                          duree_mois=6, echeance_mensuelle_fcfa=5_000)
+
+    routes = [
+        f"/fiches/journal/{u.id}",
+        f"/fiches/vente_credit/{u.id}?nom_client=mariam",
+        f"/fiches/achat_credit/{u.id}?nom_fournisseur=fanta",
+        f"/fiches/carte_stock/{u.id}?article=riz",
+        f"/fiches/sfd/{u.id}",
+    ]
+    for route in routes:
+        r = client.get(route, headers=ENTETES)
+        assert r.status_code == 200, route
+        assert r.headers["content-type"] == "application/pdf"
+        assert "attachment" in r.headers["content-disposition"]
+        assert r.content.startswith(b"%PDF")
+
+
+def test_fiches_disponibles_liste_les_tiers_connus():
+    client = TestClient(app)
+    bd = _SessionLocal()
+    coop = db.Cooperative(nom="ABIC Dioïla")
+    bd.add(coop)
+    bd.commit()
+    u = db.Utilisatrice(code_anonyme="L03", telephone_hash="x", cooperative_id=coop.id)
+    bd.add(u)
+    bd.commit()
+    bd.refresh(u)
+    db.enregistrer_mouvement_client(bd, utilisatrice_id=u.id, nom_client="mariam",
+                                     montant_fcfa=2500, est_un_paiement=False)
+
+    r = client.get(f"/fiches/disponibles/{u.id}", headers=ENTETES)
+    assert r.status_code == 200
+    assert r.json()["clients"] == ["mariam"]
 
 
 def _wav_silence(duree_s: float = 0.3) -> bytes:
@@ -193,6 +327,11 @@ def _ecrire_wav_temporaire() -> str:
 
 
 def _demarrer_session(client):
+    # Ne mocke PAS _obtenir_syntheser ici (appelé par /session, qui synthétise
+    # maintenant le message d'accueil) : un appelant qui veut tester un échec
+    # TTS précis (ex. test_call_audio_echec_tts_...) doit pouvoir poser son
+    # propre mock AVANT cet appel sans se le faire écraser. Les appelants qui
+    # n'en ont rien à faire doivent donc poser un mock "qui marche" eux-mêmes.
     bd = _SessionLocal()
     coop = db.Cooperative(nom="ABIC Dioïla")
     bd.add(coop)
@@ -205,10 +344,11 @@ def _demarrer_session(client):
     return u.id, session_id
 
 
-def test_call_audio_fichier_vide_renvoie_un_message_de_secours_sans_planter():
+def test_call_audio_fichier_vide_renvoie_un_message_de_secours_sans_planter(monkeypatch):
     # Un enregistrement vide (micro coupe trop tot, upload interrompu) ne doit
     # jamais faire planter l'appel : l'utilisatrice doit entendre qu'il faut
     # reessayer, pas un silence suivi d'une erreur serveur brute.
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: (lambda texte: _ecrire_wav_temporaire()))
     client = TestClient(app)
     utilisatrice_id, session_id = _demarrer_session(client)
 
@@ -226,6 +366,7 @@ def test_call_audio_fichier_vide_renvoie_un_message_de_secours_sans_planter():
 def test_call_audio_echec_asr_renvoie_un_message_de_secours_sans_planter(monkeypatch):
     # Fichier qui n'est pas un vrai audio : ffmpeg/convertir_en_wav doit
     # echouer (CalledProcessError), ce qui ne doit jamais remonter en 500.
+    monkeypatch.setattr(moteur_api, "_obtenir_syntheser", lambda: (lambda texte: _ecrire_wav_temporaire()))
     client = TestClient(app)
     utilisatrice_id, session_id = _demarrer_session(client)
 

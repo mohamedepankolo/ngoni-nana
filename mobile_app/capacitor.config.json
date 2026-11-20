@@ -1,0 +1,8 @@
+{
+  "appId": "ml.abic.ngoninana",
+  "appName": "N'GONI NANA",
+  "webDir": "../moteur/web",
+  "android": {
+    "allowMixedContent": false
+  }
+}

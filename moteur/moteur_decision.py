@@ -21,7 +21,13 @@ from dataclasses import dataclass, field
 
 from montants import ET, NUMERAUX, extraire_nombres, normaliser
 
-from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, _mot_present, reconnaitre_intention
+from moteur.dictionnaire_mots_cles import (
+    EXCEPTIONS_NOMS_PROPRES,
+    MOTS_CLES,
+    _mot_present,
+    reconnaitre_choix_menu,
+    reconnaitre_intention,
+)
 
 # Conversion dɔrɔmɛ -> FCFA (1 dɔrɔmɛ = 5 FCFA). La plupart des montants sont
 # énoncés en dɔrɔmɛ sans que le mot soit prononcé (voir montants.py) ; ce
@@ -32,6 +38,30 @@ from moteur.dictionnaire_mots_cles import EXCEPTIONS_NOMS_PROPRES, MOTS_CLES, _m
 # qu'en dɔrɔmɛ. D'où l'obligation de toujours faire confirmer le montant
 # converti à l'utilisatrice (Cas 8 du parcours) avant de l'enregistrer.
 FACTEUR_DOROME = 5
+
+# Mots qui, dits explicitement à côté d'un nombre, signalent que ce nombre EST
+# déjà le montant FCFA (pas un montant en dɔrɔmɛ à multiplier par
+# FACTEUR_DOROME) : "franc(s)"/"FCFA" sont des emprunts au français déjà
+# présents comme forme ASR réaliste dans ce projet (tests/test_montants.py,
+# "Mariam ka jɛnɛ ye 2500 francs", "2 500 FCFA") - pas un mot bambara inventé.
+# Bug réel signalé en test (2026-11-17, Mohamed) : un montant dit avec ce
+# marqueur explicite ("1000 francs") subissait quand même le x5 dɔrɔmɛ,
+# contrairement à la convention du cahier des charges (dɔrɔmɛ SANS dire le
+# mot, voir montants.py) - un marqueur franc/FCFA explicite dit le contraire :
+# le nombre EST le montant FCFA, pas un nombre de dɔrɔmɛ.
+MOTS_MONTANT_LITTERAL = {"franc", "francs", "fcfa"}
+
+
+def _montant_est_litteral(texte: str) -> bool:
+    """Vrai si le nombre de `texte` doit être pris comme montant FCFA direct
+
+    (pas de x5 dɔrɔmɛ) : soit un chiffre tapé tel quel (canal clavier, voir
+    Session.combler_champ), soit un nombre dit avec franc(s)/FCFA explicite
+    à côté (voir MOTS_MONTANT_LITTERAL).
+    """
+    if texte.strip().isdigit():
+        return True
+    return bool(set(normaliser(texte).split()) & MOTS_MONTANT_LITTERAL)
 
 # Champs attendus par intention (couche 2, slot filling), tel que décrit dans
 # le document d'architecture et le parcours utilisateur.
@@ -49,6 +79,35 @@ CHAMPS_ATTENDUS: dict[str, list[str]] = {
     "capital_ajout": ["montant_fcfa"],
     "stock": ["article"],
     "consultation": [],
+    # Les 4 intentions suivantes (2026-11-17, script à 9 choix) ne sont
+    # atteignables que par le chiffre du menu (voir MENU_NUMERIQUE,
+    # dictionnaire_mots_cles.py) : pas de mot-clé bambara validé pour
+    # "crédit"/"fournisseur"/"échéance" pour l'instant.
+    "vente_credit": ["article", "quantite", "montant_fcfa", "client"],
+    "achat_credit": ["article", "montant_fcfa", "fournisseur"],
+    "fournisseur_paiement": ["fournisseur", "montant_fcfa"],
+    # Consultation du reste à payer aux fournisseurs : le nom du fournisseur
+    # est optionnel (si absent, réponse = total tous fournisseurs confondus,
+    # voir AgentVocal._repondre_lecture), donc aucun champ n'est STRICTEMENT
+    # requis - même logique que "capital"/"stock" en lecture.
+    "fournisseur_consultation": [],
+    # Déclaration ou réapprovisionnement de stock (distinct de "stock", qui
+    # reste la consultation - voir _affiner_intention_stock) : l'un ou
+    # l'autre est décidé à l'écriture (base_donnees.enregistrer_mouvement_stock),
+    # selon qu'une ligne de stock existe déjà pour cet article, pas ici.
+    "stock_ecriture": ["article", "quantite"],
+    # Items 10-12 (SFD, 2026-11-17, documentation Fadima - "Fiche 5, Suivi
+    # des remboursements SFD") : même principe que 4-9, chiffre de menu
+    # uniquement (MENU_NUMERIQUE, dictionnaire_mots_cles.py). "nom_sfd" est
+    # un champ à part de "fournisseur" (voir messages_bambara.NOMS_CHAMPS_
+    # BAMBARA) : "fournisseur" désigne un fournisseur de marchandises, pas
+    # une institution de microfinance - réutiliser ce champ créerait une
+    # confusion sémantique réelle, pas seulement un style différent.
+    # Un seul prêt SFD actif supposé (comme capital_initial) : pas de nom à
+    # redemander pour "sfd_paiement"/"sfd_consultation".
+    "sfd_declaration": ["nom_sfd", "montant_fcfa", "duree_mois", "echeance_mensuelle_fcfa"],
+    "sfd_paiement": ["montant_fcfa"],
+    "sfd_consultation": [],
 }
 
 # Mots grammaticaux bambara à ignorer lors de l'extraction de l'article ou du
@@ -140,29 +199,83 @@ def _affiner_intention_capital(texte: str, intention: str | None) -> str | None:
     tokens = normaliser(texte).split()
     if "fara" in tokens:
         return "capital_ajout"
+    # Un énoncé qui N'EST QUE le chiffre du menu numérique (R2) ne doit pas
+    # être pris pour un montant déclaré : "3" tout seul sélectionne la
+    # consultation du capital (voir MENU_NUMERIQUE), ce n'est pas "mon
+    # capital est de 3 dɔrɔmɛ". Vérifié avant extraire_nombres, qui verrait
+    # sinon ce même chiffre comme un montant (bug réel, trouvé en testant le
+    # menu numérique : "3" tapé seul devenait à tort "capital_declaration").
+    if reconnaitre_choix_menu(texte) == "capital":
+        return "capital"
     if extraire_nombres(texte):
         return "capital_declaration"
     return "capital"
 
 
+def _affiner_intention_stock(texte: str, intention: str | None) -> str | None:
+    """"bolo" (stock) peut vouloir dire consulter le stock d'un article, ou en
+
+    déclarer/ajouter une quantité (item 8 du menu, 2026-11-17) - même
+    ambiguïté et même principe de résolution que _affiner_intention_capital
+    ci-dessus : un chiffre prononcé à côté du mot signale une écriture, pas
+    une simple question. Le chiffre du menu (8 ou 9, voir MENU_NUMERIQUE)
+    résout déjà l'ambiguïté sans passer par ici (reconnaitre_choix_menu
+    renvoie directement "stock_ecriture" ou "stock"), donc ce repli ne joue
+    que pour le mot-clé parlé libre ("bolo").
+    """
+    if intention != "stock":
+        return intention
+    if reconnaitre_choix_menu(texte) == "stock":
+        return "stock"
+    if extraire_nombres(texte):
+        return "stock_ecriture"
+    return "stock"
+
+
 def extraire_entites(texte: str, intention: str | None) -> dict:
-    """Couche 2 + 3 : isole article/quantité/montant/client selon l'intention reconnue."""
+    """Couche 2 + 3 : isole article/quantité/montant/client/fournisseur selon l'intention reconnue."""
     champs: dict = {}
-    nombres = extraire_nombres(texte)
+    # Si l'énoncé N'EST QUE le chiffre qui vient de sélectionner CETTE
+    # intention au menu (ex. "4" pour choisir vente_credit), ce chiffre ne
+    # doit jamais être pris pour une valeur métier (montant, quantité...) -
+    # bug réel trouvé en ajoutant les items 4 à 8 (2026-11-17) : "1" seul
+    # faisait déjà silencieusement enregistrer montant_fcfa=5 (1 dɔrɔmɛ*5)
+    # pour "vente", sans jamais redemander le vrai montant tant qu'aucun
+    # autre chiffre n'était redit ensuite (champs_confirmes le considérait
+    # comme déjà rempli). Seul _affiner_intention_capital avait un garde-fou
+    # pour ce cas, limité au choix "capital" ; généralisé ici à toutes les
+    # intentions plutôt que dupliqué pour chacune des 6 nouvelles.
+    nombres = [] if reconnaitre_choix_menu(texte) == intention else extraire_nombres(texte)
     mots = _mots_restants(texte)
 
-    if intention in ("vente", "depense", "capital", "capital_declaration", "capital_ajout", "client"):
+    intentions_avec_montant = (
+        "vente", "depense", "capital", "capital_declaration", "capital_ajout",
+        "client", "vente_credit", "achat_credit", "fournisseur_paiement",
+        # "sfd_declaration" : seul montant_fcfa (le total du crédit) est
+        # extrait ici ; "duree_mois" et "echeance_mensuelle_fcfa" ne le sont
+        # JAMAIS depuis cette phrase initiale (voir combler_champ plus bas) -
+        # trois nombres dont deux de forme "montant" (total et mensualité) et
+        # un petit ("durée en mois") ne peuvent pas se désambiguïser de façon
+        # fiable par magnitude seule, contrairement au couple montant/quantité
+        # déjà géré ailleurs dans cette fonction.
+        "sfd_declaration", "sfd_paiement",
+    )
+    if intention in intentions_avec_montant:
         if nombres:
             montant_brut = max(nombres)
-            champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
-            champs["unite_dite"] = "dorome"
-        if intention == "vente" and len(nombres) >= 2:
+            if _montant_est_litteral(texte):
+                champs["montant_fcfa"] = montant_brut
+                champs["unite_dite"] = "fcfa"
+            else:
+                champs["montant_fcfa"] = montant_brut * FACTEUR_DOROME
+                champs["unite_dite"] = "dorome"
+        if intention in ("vente", "vente_credit") and len(nombres) >= 2:
             champs["quantite"] = min(nombres)
 
-    if intention == "stock" and nombres:
+    if intention in ("stock", "stock_ecriture") and nombres:
         champs["quantite"] = min(nombres)
 
-    if intention in ("vente", "depense", "stock") and mots:
+    if intention in ("vente", "depense", "stock", "stock_ecriture", "vente_credit", "achat_credit") and mots:
         champs["article"] = " ".join(mots)
     if intention == "client" and mots:
         champs["client"] = mots[0]
@@ -173,6 +286,22 @@ def extraire_entites(texte: str, intention: str | None) -> dict:
         tokens_bruts = normaliser(texte).split()
         champs["est_un_paiement"] = any(t.startswith("sara") and t not in EXCEPTIONS_NOMS_PROPRES
                                          for t in tokens_bruts)
+    # fournisseur_paiement/fournisseur_consultation n'ont pas de mot-clé
+    # bambara (voir CHAMPS_ATTENDUS) : atteints uniquement par chiffre de
+    # menu, "mots" ne contient alors que le nom propre dit à côté du chiffre
+    # (ex. "6 Amadou") - même logique que "client" plus haut (premier mot
+    # restant = le nom). "client" du côté vente_credit n'est volontairement
+    # pas extrait ici : "mots" a déjà été pris par "article" juste au-dessus,
+    # le nom du client sera redemandé séparément (voir
+    # CHAMPS_ATTENDUS["vente_credit"], AgentVocal._combler_champ_en_attente).
+    if intention in ("fournisseur_paiement", "fournisseur_consultation") and mots:
+        champs["fournisseur"] = mots[0]
+    # "sfd_declaration" : seul le nom du SFD est extrait d'une éventuelle
+    # phrase initiale (ex. "10 Soro microfinance") - duree_mois et
+    # echeance_mensuelle_fcfa sont toujours redemandés séparément (voir
+    # intentions_avec_montant plus haut et combler_champ, même fichier).
+    if intention == "sfd_declaration" and mots:
+        champs["nom_sfd"] = " ".join(mots)
 
     return champs
 
@@ -185,10 +314,11 @@ def analyser(texte: str) -> dict:
     session, pour rester testable isolément (voir Architecture_Technique
     section 9, stratégie de test).
     """
-    intention = reconnaitre_intention(texte)
+    intention = reconnaitre_intention(texte) or reconnaitre_choix_menu(texte)
     if intention is None:
         return {"intention": None, "champs": {}, "confiance": "echec", "action": "reformuler"}
     intention = _affiner_intention_capital(texte, intention)
+    intention = _affiner_intention_stock(texte, intention)
 
     champs = extraire_entites(texte, intention)
     attendus = CHAMPS_ATTENDUS[intention]
@@ -243,8 +373,18 @@ class Session:
             return {"intention": self.intention, "champs": dict(self.champs_confirmes),
                      "confiance": "echec", "action": "escalade_humaine"}
 
-        intention = reconnaitre_intention(texte) or self.intention
+        # Le choix de menu (chiffre 1-6) n'est consulté que si AUCUNE intention
+        # n'est encore active cette session : sinon un chiffre isolé donné en
+        # réponse à un champ demandé ("quelle quantité ?" -> "1") serait repris
+        # à tort pour un nouveau choix de menu plutôt que la valeur du champ
+        # (collision chiffre de menu / chiffre de champ, voir
+        # dictionnaire_mots_cles.reconnaitre_choix_menu).
+        intention = reconnaitre_intention(texte)
+        if intention is None and self.intention is None:
+            intention = reconnaitre_choix_menu(texte)
+        intention = intention or self.intention
         intention = _affiner_intention_capital(texte, intention)
+        intention = _affiner_intention_stock(texte, intention)
         nouveaux_champs = extraire_entites(texte, intention) if intention else {}
 
         # "Rien d'extrait" ne veut dire "pas compris" que si l'intention
@@ -253,9 +393,18 @@ class Session:
         # elle-même), ne rien extraire est normal, pas un échec - bug réel
         # trouvé en test (2026-10-09) : "n ka jagokun" seul (consulter le
         # capital, sans aucun chiffre) était rejeté comme incompris alors que
-        # l'intention était correctement reconnue.
+        # l'intention était correctement reconnue. Même chose pour un chiffre
+        # de menu qui vient tout juste de sélectionner CETTE intention (ex.
+        # "4" pour vente_credit) : rien n'est encore extrait (le chiffre
+        # lui-même ne compte plus pour un montant, voir extraire_entites),
+        # c'est une sélection réussie, pas un échec de compréhension - bug
+        # réel trouvé en ajoutant les items 4 à 8 (2026-11-17) : sans ce
+        # garde-fou, choisir une action au chiffre seul (ex. "1") déclenchait
+        # tout de suite "je n'ai pas compris" avant même de pouvoir demander
+        # le premier champ manquant.
+        vient_du_choix_menu = reconnaitre_choix_menu(texte) == intention
         champ_requis = bool(CHAMPS_ATTENDUS.get(intention)) if intention else False
-        if intention is None or (not nouveaux_champs and champ_requis):
+        if intention is None or (not nouveaux_champs and champ_requis and not vient_du_choix_menu):
             self.tentatives_reformulation += 1
             if self.tentatives_reformulation > self.MAX_REFORMULATIONS:
                 self.escaladee = True
@@ -316,8 +465,23 @@ class Session:
         mots = _mots_restants(texte)
 
         if champ == "montant_fcfa" and nombres:
-            self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
-            self.champs_confirmes["unite_dite"] = "dorome"
+            # Voir _montant_est_litteral : un chiffre arabe tapé tel quel
+            # (clavier numérique de l'appli, #champSaisie) OU un nombre dit
+            # avec franc(s)/FCFA explicite est un montant FCFA direct, jamais
+            # un montant en dɔrɔmɛ - contrairement à la voix sans ce marqueur
+            # (où le dɔrɔmɛ est la convention orale réelle, validée sur
+            # phrases_reelles.csv). Bug réel signalé en test (2026-11-17,
+            # clavier) : le clavier appliquait quand même le x5, donc taper
+            # 1000 enregistrait 5000 FCFA sans que la relecture vocale (qui
+            # redit le même chiffre) ne le révèle - puis (même jour, re-signalé)
+            # le même x5 pour un montant dit à voix haute avec "francs"
+            # explicite ("1000 francs" -> 5000 prononcé).
+            if _montant_est_litteral(texte):
+                self.champs_confirmes["montant_fcfa"] = max(nombres)
+                self.champs_confirmes["unite_dite"] = "fcfa"
+            else:
+                self.champs_confirmes["montant_fcfa"] = max(nombres) * FACTEUR_DOROME
+                self.champs_confirmes["unite_dite"] = "dorome"
         elif champ == "quantite" and nombres:
             # min(), pas max() : coherent avec extraire_entites (le montant
             # est toujours le plus grand des deux chiffres, la quantite le
@@ -327,8 +491,25 @@ class Session:
             # la phrase entiere a ete repetee), max() assignait a tort le
             # plus gros chiffre a la quantite (bug reel, 2026-10-09).
             self.champs_confirmes["quantite"] = min(nombres)
-        elif champ in ("article", "client") and mots:
+        elif champ in ("article", "client", "fournisseur") and mots:
             self.champs_confirmes[champ] = " ".join(mots) if champ == "article" else mots[0]
+        elif champ == "nom_sfd" and mots:
+            # Jointure complète (comme "article"), pas mots[0] (comme
+            # "client"/"fournisseur") : le nom d'une institution de
+            # microfinance est souvent composé de plusieurs mots.
+            self.champs_confirmes["nom_sfd"] = " ".join(mots)
+        elif champ == "duree_mois" and nombres:
+            # Un nombre de mois, pas un montant : jamais de conversion dorome
+            # ici, contrairement à montant_fcfa/echeance_mensuelle_fcfa.
+            self.champs_confirmes["duree_mois"] = min(nombres)
+        elif champ == "echeance_mensuelle_fcfa" and nombres:
+            # Montant FCFA comme montant_fcfa : même convention dorome/
+            # littéral (_montant_est_litteral), une échéance mensuelle se
+            # dit aussi naturellement en dɔrɔmɛ à voix haute.
+            if _montant_est_litteral(texte):
+                self.champs_confirmes["echeance_mensuelle_fcfa"] = max(nombres)
+            else:
+                self.champs_confirmes["echeance_mensuelle_fcfa"] = max(nombres) * FACTEUR_DOROME
         else:
             return {"intention": self.intention, "champs": dict(self.champs_confirmes),
                      "confiance": "echec", "action": "reformuler"}

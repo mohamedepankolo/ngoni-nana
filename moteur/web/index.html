@@ -17,14 +17,113 @@
   }
 
   /* ---------- Vue principale (utilisatrice) ---------- */
-  /* Un seul element visible et interactif sur cet ecran : le gros bouton.
-     Pas de logo, pas de point d'etat separe (la couleur du bouton suffit) :
-     un deuxieme element qui ressemble a un micro ou a un bouton a cote du
-     vrai bouton a cause une vraie confusion en test reel (2026-10-08). */
+  /* Ecran d'accueil = tableau de bord (capital + actions), inspire de
+     l'appli "Max it" d'Orange Money (demande explicite, 2026-11-16) : carte
+     de solde sombre en haut, grille d'actions en dessous, le micro reste
+     l'entree principale mais n'est plus seul sur l'ecran. Palette Max it :
+     blanc / noir / orange (PAS rouge - verifie sur captures reelles de
+     l'appli, le rouge ne fait pas partie de sa charte). */
   #vuePrincipale {
-    height: 100%; display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px;
+    height: 100%; overflow-y: auto; display: flex; flex-direction: column;
+    align-items: center; padding: 20px 20px 32px; gap: 14px; background: #fff;
   }
-  #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding-top: 28px; }
+  #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
+
+  /* Carte de solde (equivalent de la carte sombre "Main USD / Main LRD" de
+     Max it) : capital en gros, ventes/depenses en resume juste en dessous. */
+  #carteCapital {
+    width: 100%; max-width: 360px; background: #161616; color: #fff;
+    border-radius: 18px; padding: 18px 20px; margin-top: 4px;
+  }
+  #carteCapital .capital-entete {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: #bbb; margin-bottom: 6px;
+  }
+  #carteCapital .lien-voir-tout {
+    background: none; border: none; color: #e8863a; font-weight: 600; font-size: 13px; padding: 0;
+  }
+  #carteCapital .capital-chiffre { font-size: 30px; font-weight: 700; }
+  #carteCapital .capital-chiffre.negatif { color: #e8695a; }
+  #carteCapital .capital-resume {
+    display: flex; gap: 18px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid #333; font-size: 14px; font-weight: 600;
+  }
+  #carteCapital .vente { color: #6fcf7d; }
+  #carteCapital .depense { color: #e8695a; }
+
+  /* Grille d'actions (equivalent des tuiles "Favorites" de Max it) : memes
+     5 choix que le menu vocal/telephonie (voir MENU_NUMERIQUE,
+     dictionnaire_mots_cles.py), juste presentes en tuiles plutot qu'en
+     boutons ronds numerotes. */
+  #menuNumerique {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    width: 100%; max-width: 360px;
+  }
+  /* flex (pas grid) expres : avec 5 tuiles, la 2e ligne n'en a que 2 - en
+     grid a 3 colonnes fixes, la 3e case restait vide (du "blanc derriere",
+     signale en test reel 2026-11-16). En flex, flex-grow repartit la place
+     en trop entre les tuiles de CHAQUE ligne : les 2 de la 2e ligne
+     s'agrandissent pour occuper toute la largeur, comme les 3 de la 1ere -
+     plus de case vide, sans avoir a coder un cas particulier pour "5". */
+  #menuNumerique button {
+    flex: 1 1 100px;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    background: #fff; border: none; border-radius: 14px; padding: 18px 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  #menuNumerique .badge {
+    width: 40px; height: 40px; border-radius: 50%; background: #e8863a;
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #menuNumerique .etiquette { font-size: 12px; color: #333; text-align: center; line-height: 1.3; }
+  #menuNumerique .etiquette small { display: block; color: #888; font-weight: 400; }
+  #menuNumerique button:disabled { opacity: 0.4; }
+
+  /* MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
+     client), affichee quand attente = "champ:<nom>" (voir agent_vocal.py,
+     AgentVocal._attente). Clavier numerique pour quantite/montant, texte
+     libre pour article/client (voir LABELS_CHAMP plus bas). */
+  #champSaisie { display: none; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 280px; }
+  #champSaisie input {
+    width: 100%; padding: 14px; font-size: 20px; text-align: center;
+    border: 2px solid #b85424; border-radius: 10px;
+  }
+  #champSaisie button {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    background: #b85424; color: #fff; font-weight: 600; font-size: 16px;
+  }
+  #champSaisie button:disabled, #choixOuiNon button:disabled { opacity: 0.4; }
+
+  /* MODE TEST : choix oui/non (confirmation d'un champ tout juste saisi,
+     confirmation globale de fin de transaction, ou "veux-tu faire autre
+     chose ?" - memes 3 cas que attente dans agent_vocal.py). */
+  #choixOuiNon { display: none; gap: 14px; }
+  #choixOuiNon button {
+    width: 72px; height: 72px; border-radius: 50%; border: none; font-size: 28px; color: #fff;
+  }
+  #choixOuiNon .oui { background: #4f8f5a; }
+  #choixOuiNon .non { background: #c23b2e; }
+
+  /* MODE TEST : choix du champ a corriger apres un "non" au resume final
+     (attente = "choix_champ:<nom1>,<nom2>,..." - voir agent_vocal.py,
+     _demarrer_correction/_traiter_choix_champ_a_corriger). Boutons generes
+     dynamiquement (voir appliquerAttente) : la liste de champs varie selon
+     la transaction (CHAMPS_CORRIGIBLES), pas fixe comme #menuNumerique. */
+  #choixChamp { display: none; flex-wrap: wrap; gap: 10px; width: 100%; max-width: 360px; }
+  #choixChamp button {
+    flex: 1 1 100px;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    background: #fff; border: none; border-radius: 14px; padding: 18px 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  #choixChamp .badge {
+    width: 40px; height: 40px; border-radius: 50%; background: #c23b2e;
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #choixChamp .etiquette { font-size: 13px; color: #333; text-align: center; }
+  #choixChamp button:disabled { opacity: 0.4; }
 
   /* MODE TEST (2026-10-09) : fil des echanges affiche a l'ecran pour suivre
      ce qui est reconnu/repondu pendant les tests internes, sans avoir a
@@ -44,12 +143,12 @@
   #zoneReglageSecrete { position: absolute; top: 0; left: 0; width: 72px; height: 72px; }
 
   #bouton {
-    width: 220px; height: 220px; border-radius: 50%; border: none;
+    width: 120px; height: 120px; border-radius: 50%; border: none;
     background: #b85424; display: flex; align-items: center; justify-content: center;
     box-shadow: 0 8px 24px rgba(184,84,36,0.35);
     transition: background-color 0.25s ease, transform 0.15s ease;
   }
-  #bouton svg { width: 88px; height: 88px; }
+  #bouton svg { width: 48px; height: 48px; }
   #bouton.enregistre {
     background: #c23b2e;
     animation: pouls 1.1s ease-in-out infinite;
@@ -84,7 +183,7 @@
 
   /* ---------- Vue réglage (staff uniquement, cachée) ---------- */
   #vueReglage {
-    display: none; height: 100%; overflow-y: auto; padding: 24px; background: #faf7f2;
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px; background: #faf7f2;
     font-size: 14px; color: #2a2a2a;
   }
   #vueReglage.visible { display: block; }
@@ -94,12 +193,118 @@
   #vueReglage button { margin-top: 16px; padding: 10px 16px; border-radius: 8px; border: none; background: #b85424; color: #fff; font-weight: 600; }
   #vueReglage .journal { margin-top: 20px; font-size: 12px; color: #555; white-space: pre-wrap; max-height: 40vh; overflow-y: auto; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
   #fermerReglage { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; }
+
+  /* ---------- Vue bilan (résumé/dashboard - demande explicite, "une partie
+     bilan/résumé" en plus du flux vocal) ---------- */
+  #vueBilan {
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
+  }
+  #vueBilan.visible { display: block; }
+  #vueBilan h2 { font-size: 15px; color: #666; font-weight: 500; margin: 0 0 4px; }
+  #vueBilan .gros-chiffre { font-size: 38px; font-weight: 700; color: #2a2a2a; margin: 0 0 20px; }
+  #vueBilan .gros-chiffre.negatif { color: #c23b2e; }
+  #vueBilan .carte {
+    background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #vueBilan .ligne { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  #vueBilan .ligne + .ligne { border-top: 1px solid #f0ebe3; }
+  #vueBilan .vente { color: #4f8f5a; }
+  #vueBilan .depense { color: #c23b2e; }
+  #fermerBilan { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 22px; }
+
+  /* ---------- Vue fiches (génération de PDF à partir des données déjà
+     enregistrées - demande explicite, 2026-11-17, suite aux fiches papier
+     transmises par Fadima) : même structure que #vueBilan. ---------- */
+  #vueFiches {
+    display: none; position: fixed; inset: 0; z-index: 20; overflow-y: auto; padding: 24px 20px; background: #faf7f2;
+  }
+  #vueFiches.visible { display: block; }
+  #vueFiches h2 { font-size: 15px; color: #666; font-weight: 500; margin: 0 0 4px; }
+  #vueFiches .carte {
+    background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #vueFiches .carte select {
+    width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;
+  }
+  #vueFiches .carte button {
+    width: 100%; padding: 10px; border-radius: 8px; border: none;
+    background: #b85424; color: #fff; font-weight: 600; font-size: 14px;
+  }
+  #vueFiches .carte button:disabled { opacity: 0.4; }
+  #vueFiches .carte p { font-size: 12px; color: #888; margin: 0 0 10px; }
+  #fermerFiches { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 22px; }
 </style>
 </head>
 <body>
 
 <div id="vuePrincipale">
   <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
+
+  <!-- Carte de solde (equivalent "Main USD/LRD" de Max it) : capital + resume
+       ventes/depenses, toujours visible en ouvrant l'appli. Detail complet
+       (dettes, stock, transactions) via "Bɛɛ" -> ouvrirBilan() (#vueBilan). -->
+  <div id="carteCapital">
+    <div class="capital-entete">
+      <span>Jagokun (capital)</span>
+      <button class="lien-voir-tout" onclick="ouvrirBilan()">Bɛɛ &#8594;</button>
+    </div>
+    <div class="capital-entete" style="margin-top: -4px;">
+      <span></span>
+      <button class="lien-voir-tout" onclick="ouvrirFiches()">Fiches &#8594;</button>
+    </div>
+    <div class="capital-chiffre" id="carteCapitalChiffre">—</div>
+    <div class="capital-resume">
+      <span class="vente" id="carteVentes">+0</span>
+      <span class="depense" id="carteDepenses">-0</span>
+    </div>
+  </div>
+
+  <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
+       Memes 9 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py).
+       4 a 8 n'ont pas de mot-cle bambara valide (voir messages_bambara.menu_principal) :
+       etiquette en francais seul, pas de mot bambara invente. -->
+  <div id="menuNumerique">
+    <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
+      <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
+    </button>
+    <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">
+      <span class="badge">2</span><span class="etiquette">Sara<small>dépense</small></span>
+    </button>
+    <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">
+      <span class="badge">3</span><span class="etiquette">Jagokun<small>capital</small></span>
+    </button>
+    <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
+      <span class="badge">4</span><span class="etiquette">Vente<small>à crédit</small></span>
+    </button>
+    <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
+      <span class="badge">5</span><span class="etiquette">Achat<small>à crédit</small></span>
+    </button>
+    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
+      <span class="badge">6</span><span class="etiquette">Échéance<small>dette fournisseur</small></span>
+    </button>
+    <button disabled data-chiffre="7" onclick="envoyerChoixMenu(7)">
+      <span class="badge">7</span><span class="etiquette">Reste<small>à payer</small></span>
+    </button>
+    <button disabled data-chiffre="8" onclick="envoyerChoixMenu(8)">
+      <span class="badge">8</span><span class="etiquette">Stock<small>ajouter</small></span>
+    </button>
+    <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
+      <span class="badge">9</span><span class="etiquette">Bolo<small>stock</small></span>
+    </button>
+    <!-- Items 10-12 (SFD, 2026-11-17, documentation Fadima) : meme principe
+         que 4-8, aucun mot bambara valide pour "SFD"/"echeance". -->
+    <button disabled data-chiffre="10" onclick="envoyerChoixMenu(10)">
+      <span class="badge">10</span><span class="etiquette">Crédit SFD<small>déclarer</small></span>
+    </button>
+    <button disabled data-chiffre="11" onclick="envoyerChoixMenu(11)">
+      <span class="badge">11</span><span class="etiquette">Échéance SFD<small>payer</small></span>
+    </button>
+    <button disabled data-chiffre="12" onclick="envoyerChoixMenu(12)">
+      <span class="badge">12</span><span class="etiquette">Crédit SFD<small>reste à payer</small></span>
+    </button>
+  </div>
 
   <div id="zoneBouton">
     <button id="bouton" disabled>
@@ -111,13 +316,94 @@
     </button>
   </div>
 
+  <!-- MODE TEST : saisie clavier d'un champ precis (voir #champSaisie dans <style>). -->
+  <div id="champSaisie">
+    <input id="champSaisieEntree" type="text">
+    <button disabled onclick="envoyerChampSaisi()">Valider</button>
+  </div>
+
+  <!-- MODE TEST : choix oui/non (voir #choixOuiNon dans <style>). -->
+  <div id="choixOuiNon">
+    <button class="oui" disabled onclick="envoyerOuiNon(true)">&#10003;</button>
+    <button class="non" disabled onclick="envoyerOuiNon(false)">&#10007;</button>
+  </div>
+
+  <!-- MODE TEST : choix du champ a corriger (voir #choixChamp dans <style>,
+       rempli dynamiquement par appliquerAttente). -->
+  <div id="choixChamp"></div>
+
   <!-- MODE TEST : voir le commentaire sur #filEchanges dans <style>. -->
   <div id="filEchanges"></div>
+</div>
+
+<div id="vueBilan">
+  <button id="fermerBilan" onclick="fermerBilanVue()">×</button>
+  <h2>Jagokun (capital)</h2>
+  <div class="gros-chiffre" id="bilanCapital">—</div>
+  <div class="carte">
+    <div class="ligne"><span>Feereli (ventes)</span><span class="vente" id="bilanVentes">—</span></div>
+    <div class="ligne"><span>Wariboli (dépenses)</span><span class="depense" id="bilanDepenses">—</span></div>
+  </div>
+  <div class="carte" id="bilanDettesCarte">
+    <h2>Juru (dettes clients)</h2>
+    <div id="bilanDettes"></div>
+  </div>
+  <div class="carte" id="bilanStockCarte">
+    <h2>Bolo (stock)</h2>
+    <div id="bilanStock"></div>
+  </div>
+  <div class="carte">
+    <h2>Kɛwale laban (dernières transactions)</h2>
+    <div id="bilanTransactions"></div>
+  </div>
+</div>
+
+<!-- Génération de PDF à partir des données déjà enregistrées (demande
+     explicite, 2026-11-17, suite aux fiches papier transmises par Fadima) :
+     voir moteur/fiches.py et les routes /fiches/* (moteur/api.py). -->
+<div id="vueFiches">
+  <button id="fermerFiches" onclick="fermerFichesVue()">×</button>
+  <h2>Fiches</h2>
+
+  <div class="carte">
+    <h3>Journal</h3>
+    <p>Tout l'historique vente/dépense.</p>
+    <button onclick="genererFiche('/fiches/journal/' + utilisatriceId, 'journal.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Ventes à Crédit</h3>
+    <p>Par client.</p>
+    <select id="ficheSelectClient"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectClient', '/fiches/vente_credit/' + utilisatriceId + '?nom_client=', 'ventes_a_credit.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Achats à Crédit</h3>
+    <p>Par fournisseur.</p>
+    <select id="ficheSelectFournisseur"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectFournisseur', '/fiches/achat_credit/' + utilisatriceId + '?nom_fournisseur=', 'achats_a_credit.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Carte de stock</h3>
+    <p>Par article.</p>
+    <select id="ficheSelectArticle"></select>
+    <button onclick="genererFicheAvecSelection('ficheSelectArticle', '/fiches/carte_stock/' + utilisatriceId + '?article=', 'carte_de_stock.pdf')">Générer</button>
+  </div>
+
+  <div class="carte">
+    <h3>Suivi SFD</h3>
+    <p>Crédit microfinance en cours (item 10-12 du menu).</p>
+    <button onclick="genererFiche('/fiches/sfd/' + utilisatriceId, 'suivi_sfd.pdf')">Générer</button>
+  </div>
 </div>
 
 <div id="vueReglage">
   <button id="fermerReglage" onclick="fermerReglage()">×</button>
   <h2>Reglage (equipe)</h2>
+  <label>Adresse du serveur (vide = meme serveur que cette page ; ex: https://192.168.1.50:8099 pour l'appli mobile)</label>
+  <input type="text" id="champServeur">
   <label>Jeton API (API_TOKEN du serveur)</label>
   <input type="text" id="champJeton">
   <button onclick="enregistrerJeton()">Enregistrer et demarrer</button>
@@ -136,6 +422,11 @@ const $ = (id) => document.getElementById(id);
 // autre serveur par ex.) > celui fourni automatiquement par ce serveur
 // (config.js) > vide (jamais atteint en usage normal).
 let jeton = localStorage.getItem("ngoni_jeton") || window.NGONI_JETON || "";
+// Vide quand la page est servie PAR le serveur (PWA navigateur, chemins
+// relatifs valides). Non vide dans l'appli mobile (Capacitor) : la page y est
+// embarquee localement, donc "/session" seul ne pointerait nulle part - il
+// faut l'origine complete du serveur distant.
+let serveur = localStorage.getItem("ngoni_serveur") || window.NGONI_SERVEUR || "";
 let utilisatriceId = null;
 let sessionId = null;
 let media = null, enregistreur = null, morceaux = [];
@@ -155,7 +446,13 @@ function ajouterAuFil(etiquette, texte) {
   const gras = document.createElement("strong");
   gras.textContent = etiquette + " : ";
   ligne.appendChild(gras);
-  ligne.appendChild(document.createTextNode(texte));
+  // Une phrase par ligne plutot que tout colle en continu - utile surtout
+  // pour le menu principal (accueil, bienvenue puis 6 choix) : voir
+  // _decouper_phrases, tts_maliba.py, meme logique de decoupage cote audio.
+  String(texte).split(/(?<=\.)\s+/).forEach((phrase, i) => {
+    if (i > 0) ligne.appendChild(document.createElement("br"));
+    ligne.appendChild(document.createTextNode(phrase));
+  });
   fil.appendChild(ligne);
   fil.scrollTop = fil.scrollHeight;
 }
@@ -192,13 +489,16 @@ function gererTapLogo() {
   if (compteurTapLogo >= 5) {
     compteurTapLogo = 0;
     $("champJeton").value = jeton;
+    $("champServeur").value = serveur;
     $("vueReglage").classList.add("visible");
   }
 }
 function fermerReglage() { $("vueReglage").classList.remove("visible"); }
 function enregistrerJeton() {
   jeton = $("champJeton").value.trim();
+  serveur = $("champServeur").value.trim().replace(/\/$/, "");
   localStorage.setItem("ngoni_jeton", jeton);
+  localStorage.setItem("ngoni_serveur", serveur);
   fermerReglage();
   demarrer();
 }
@@ -218,7 +518,7 @@ async function appelApi(chemin, options = {}) {
   const minuteur = setTimeout(() => controleur.abort(), DELAI_MAX_MS);
   let reponse;
   try {
-    reponse = await fetch(chemin, {
+    reponse = await fetch(serveur + chemin, {
       method: options.methode || "GET", headers: entetes,
       body: options.corps instanceof FormData ? options.corps : options.corps ? JSON.stringify(options.corps) : undefined,
       signal: controleur.signal,
@@ -233,23 +533,119 @@ async function appelApi(chemin, options = {}) {
   return reponse.json();
 }
 
+function activerControles(actif) {
+  $("bouton").disabled = !actif;
+  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button, #choixChamp button")
+    .forEach((b) => { b.disabled = !actif; });
+}
+
+// MODE TEST : quel widget de saisie proposer selon "attente" (voir
+// agent_vocal.AgentVocal._attente) - clavier numerique pour quantite/montant,
+// texte libre pour article/client, sinon un simple choix oui/non.
+const LABELS_CHAMP = {
+  quantite: { type: "number", inputmode: "numeric", placeholder: "Hakɛ (quantité)" },
+  montant_fcfa: { type: "number", inputmode: "numeric", placeholder: "Wari hakɛ (montant)" },
+  article: { type: "text", inputmode: "text", placeholder: "Fɛn tɔgɔ (article)" },
+  client: { type: "text", inputmode: "text", placeholder: "Mɔgɔ tɔgɔ (client)" },
+  fournisseur: { type: "text", inputmode: "text", placeholder: "Fournisseur" },
+};
+
+// Libelle francais court pour chaque champ, pour les boutons de
+// #choixChamp (voir messages_bambara.NOMS_CHAMPS_BAMBARA pour l'equivalent
+// bambara parle par le TTS - memes champs, juste traduits pour l'ecran).
+const LABELS_CHAMP_FR = {
+  article: "Article",
+  quantite: "Quantité",
+  montant_fcfa: "Montant",
+  client: "Client",
+  fournisseur: "Fournisseur",
+};
+
+function appliquerAttente(attente) {
+  $("menuNumerique").style.display = "none";
+  $("champSaisie").style.display = "none";
+  $("choixOuiNon").style.display = "none";
+  $("choixChamp").style.display = "none";
+
+  if (!attente || attente === "menu") {
+    $("menuNumerique").style.display = "flex";
+    return;
+  }
+  if (attente.startsWith("champ:")) {
+    const champ = attente.split(":")[1];
+    const config = LABELS_CHAMP[champ] || { type: "text", inputmode: "text", placeholder: champ };
+    const entree = $("champSaisieEntree");
+    entree.type = config.type;
+    entree.inputMode = config.inputmode;
+    entree.placeholder = config.placeholder;
+    entree.value = "";
+    $("champSaisie").style.display = "flex";
+    return;
+  }
+  if (attente.startsWith("choix_champ:")) {
+    const champs = attente.slice("choix_champ:".length).split(",");
+    const conteneur = $("choixChamp");
+    conteneur.innerHTML = "";
+    champs.forEach((champ, i) => {
+      const bouton = document.createElement("button");
+      bouton.innerHTML = `<span class="badge">${i + 1}</span>` +
+        `<span class="etiquette">${LABELS_CHAMP_FR[champ] || champ}</span>`;
+      bouton.onclick = () => envoyerChoixChamp(i + 1);
+      conteneur.appendChild(bouton);
+    });
+    conteneur.style.display = "flex";
+    return;
+  }
+  // "confirmation_champ:...", "confirmation", "continuer" : oui/non.
+  $("choixOuiNon").style.display = "flex";
+}
+
+// Carte de solde (haut de l'ecran d'accueil) : rafraichie au demarrage et
+// apres chaque transaction (voir traiterReponseAgent), comme le solde
+// toujours a jour de Max it. Best-effort : un echec ne bloque pas le flux
+// vocal/menu, la carte garde juste son dernier etat connu.
+async function rafraichirCarteCapital() {
+  if (!utilisatriceId) return;
+  try {
+    const bilan = await appelApi(`/bilan/${utilisatriceId}`, { methode: "GET" });
+    $("carteCapitalChiffre").textContent = bilan.capital.toLocaleString("fr-FR") + " FCFA";
+    $("carteCapitalChiffre").classList.toggle("negatif", bilan.capital < 0);
+    $("carteVentes").textContent = "+" + bilan.total_ventes.toLocaleString("fr-FR");
+    $("carteDepenses").textContent = "-" + bilan.total_depenses.toLocaleString("fr-FR");
+  } catch (e) { /* best-effort, voir commentaire ci-dessus */ }
+}
+
 async function demarrer() {
   if (!jeton) { journal("Aucun jeton enregistre."); return; }
   try {
     const bootstrap = await appelApi("/demo/bootstrap", { methode: "POST", corps: {} });
     utilisatriceId = bootstrap.utilisatrice_id;
     await nouvelleSession();
+    await rafraichirCarteCapital();
     journal("Pret.");
-    $("bouton").disabled = false;
+    activerControles(true);
   } catch (e) {
     await signalerErreur("Erreur de connexion : " + e.message);
   }
 }
 
+// Message d'accueil + menu numérique (menu_principal, messages_bambara.py) :
+// joué automatiquement à chaque nouvelle session (démarrage de l'app, ou
+// reprise après "fin_session"/"escalade_humaine" dans traiterReponseAgent),
+// pour que l'utilisatrice sache quoi dire/taper sans avoir à deviner.
 async function nouvelleSession() {
   const s = await appelApi("/session", { methode: "POST", corps: { utilisatrice_id: utilisatriceId } });
   sessionId = s.session_id;
   journal("Session " + sessionId + " demarree.");
+  ajouterAuFil("N'GONI NANA", s.message);
+  appliquerAttente(s.attente);
+  if (s.audio_base64) {
+    const lecteur = $("lecteur");
+    lecteur.src = `data:audio/${s.type_audio};base64,${s.audio_base64}`;
+    etatBouton("parle");
+    await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
+    etatBouton("");
+  }
 }
 
 async function commencerEnregistrement() {
@@ -270,75 +666,274 @@ function arreterEnregistrement() {
   });
 }
 
+// Partagé entre le tour vocal (/call_audio) et un choix de menu tapé (/call,
+// voir envoyerChoixMenu) : même traitement de la réponse quel que soit le
+// canal d'entrée, pour ne pas dupliquer la logique de lecture audio / fin de
+// session entre les deux chemins.
+async function traiterReponseAgent(resultat, texteEnvoye) {
+  journal(`reconnu: « ${resultat.texte_reconnu ?? texteEnvoye ?? "(rien)"} » -> ${resultat.message}`);
+  ajouterAuFil("Toi", resultat.texte_reconnu ?? texteEnvoye ?? "(rien compris)");  // MODE TEST, voir #filEchanges
+  ajouterAuFil("N'GONI NANA", resultat.message);                                  // MODE TEST, voir #filEchanges
+  appliquerAttente(resultat.attente);
+  await rafraichirCarteCapital();
+
+  if (resultat.audio_base64) {
+    const lecteur = $("lecteur");
+    lecteur.src = `data:audio/${resultat.type_audio};base64,${resultat.audio_base64}`;
+    etatBouton("parle");
+    await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
+  }
+
+  if (resultat.action === "fin_session" || resultat.action === "escalade_humaine") {
+    // "enregistrer" ne declenche plus une nouvelle session tout de suite :
+    // le systeme demande d'abord "veux-tu faire autre chose ?" et attend
+    // une vraie reponse (voir agent_vocal.py, _traiter_reponse_continuer).
+    // Une nouvelle session ne demarre qu'une fois cet echange termine
+    // (oui -> "continuer_session" reste sur la meme session ; non ->
+    // "fin_session" ici). Avant ce correctif, la session changeait tout de
+    // suite apres l'enregistrement et la reponse a la question etait
+    // traitee comme une tentative d'action ratee (bug reel, 2026-10-09).
+    await nouvelleSession();
+  }
+}
+
 async function envoyerTour(blobAudio) {
   etatBouton("traitement");
-  $("bouton").disabled = true;
+  activerControles(false);
   try {
     const donnees = new FormData();
     donnees.append("session_id", sessionId);
     donnees.append("utilisatrice_id", utilisatriceId);
     donnees.append("fichier", blobAudio, "tour.webm");
     const resultat = await appelApi("/call_audio", { methode: "POST", corps: donnees });
-
-    journal(`reconnu: « ${resultat.texte_reconnu || "(rien)"} » -> ${resultat.message}`);
-    ajouterAuFil("Toi", resultat.texte_reconnu || "(rien compris)");  // MODE TEST, voir #filEchanges
-    ajouterAuFil("N'GONI NANA", resultat.message);                   // MODE TEST, voir #filEchanges
-
-    if (resultat.audio_base64) {
-      const lecteur = $("lecteur");
-      lecteur.src = `data:audio/${resultat.type_audio};base64,${resultat.audio_base64}`;
-      etatBouton("parle");
-      await new Promise((r) => { lecteur.onended = r; lecteur.play().catch(r); });
-    }
-
-    if (resultat.action === "fin_session" || resultat.action === "escalade_humaine") {
-      // "enregistrer" ne declenche plus une nouvelle session tout de suite :
-      // le systeme demande d'abord "veux-tu faire autre chose ?" et attend
-      // une vraie reponse (voir agent_vocal.py, _traiter_reponse_continuer).
-      // Une nouvelle session ne demarre qu'une fois cet echange termine
-      // (oui -> "continuer_session" reste sur la meme session ; non ->
-      // "fin_session" ici). Avant ce correctif, la session changeait tout de
-      // suite apres l'enregistrement et la reponse a la question etait
-      // traitee comme une tentative d'action ratee (bug reel, 2026-10-09).
-      await nouvelleSession();
-    }
+    await traiterReponseAgent(resultat);
   } catch (e) {
     await signalerErreur("Erreur : " + e.message);
   } finally {
     etatBouton("");
-    $("bouton").disabled = false;
+    activerControles(true);
   }
+}
+
+// MODE TEST : chemin texte partagé par le menu numérique, la saisie clavier
+// d'un champ, et le choix oui/non - tous passent par /call, seul le texte
+// envoyé change (voir reconnaitre_choix_menu, dictionnaire_mots_cles.py,
+// pour le menu ; reconnaitre_confirmation pour le oui/non).
+async function envoyerTexteLibre(texte) {
+  etatBouton("traitement");
+  activerControles(false);
+  try {
+    const resultat = await appelApi("/call", {
+      methode: "POST",
+      corps: { session_id: sessionId, utilisatrice_id: utilisatriceId, texte: String(texte) },
+    });
+    await traiterReponseAgent(resultat, String(texte));
+  } catch (e) {
+    await signalerErreur("Erreur : " + e.message);
+  } finally {
+    etatBouton("");
+    activerControles(true);
+  }
+}
+
+async function envoyerChoixMenu(chiffre) { await envoyerTexteLibre(chiffre); }
+
+// MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
+// client) - voir #champSaisie et appliquerAttente.
+async function envoyerChampSaisi() {
+  const valeur = $("champSaisieEntree").value.trim();
+  if (!valeur) return;
+  await envoyerTexteLibre(valeur);
+}
+
+// MODE TEST : confirmation unitaire d'un champ, confirmation globale, ou
+// "veux-tu faire autre chose ?" - voir #choixOuiNon et appliquerAttente.
+async function envoyerOuiNon(reponse) {
+  await envoyerTexteLibre(reponse ? "owo" : "ayi");
+}
+
+// MODE TEST : choix du champ a corriger apres un "non" au resume final -
+// voir #choixChamp et appliquerAttente. Le numero (1, 2...) correspond a sa
+// position dans la liste recue (_reconnaitre_choix_champ, agent_vocal.py).
+async function envoyerChoixChamp(numero) { await envoyerTexteLibre(numero); }
+
+// --- Bilan/résumé (demande explicite, en plus du flux vocal) ---
+
+function construireLigne(gauche, droite, classeDroite) {
+  const ligne = document.createElement("div");
+  ligne.className = "ligne";
+  const spanGauche = document.createElement("span");
+  spanGauche.textContent = gauche;
+  const spanDroite = document.createElement("span");
+  if (classeDroite) spanDroite.className = classeDroite;
+  spanDroite.textContent = droite;
+  ligne.appendChild(spanGauche);
+  ligne.appendChild(spanDroite);
+  return ligne;
+}
+
+function remplirListe(conteneurId, items, construireItem) {
+  const conteneur = $(conteneurId);
+  conteneur.innerHTML = "";
+  if (!items.length) {
+    conteneur.appendChild(construireLigne("—", ""));
+    return;
+  }
+  items.forEach((item) => conteneur.appendChild(construireItem(item)));
+}
+
+async function ouvrirBilan() {
+  if (!utilisatriceId) return;
+  try {
+    const bilan = await appelApi(`/bilan/${utilisatriceId}`, { methode: "GET" });
+    $("bilanCapital").textContent = bilan.capital.toLocaleString("fr-FR") + " FCFA";
+    $("bilanCapital").classList.toggle("negatif", bilan.capital < 0);
+    $("bilanVentes").textContent = "+" + bilan.total_ventes.toLocaleString("fr-FR");
+    $("bilanDepenses").textContent = "-" + bilan.total_depenses.toLocaleString("fr-FR");
+
+    remplirListe("bilanDettes", bilan.dettes_clients,
+      (d) => construireLigne(d.nom, d.montant_du.toLocaleString("fr-FR")));
+    $("bilanDettesCarte").style.display = bilan.dettes_clients.length ? "block" : "none";
+
+    remplirListe("bilanStock", bilan.stock,
+      (s) => construireLigne(s.article, String(s.quantite)));
+    $("bilanStockCarte").style.display = bilan.stock.length ? "block" : "none";
+
+    remplirListe("bilanTransactions", bilan.transactions, (t) => {
+      const texte = [t.article, t.quantite].filter(Boolean).join(" x") || t.type;
+      return construireLigne(texte, t.montant_fcfa.toLocaleString("fr-FR"), t.type === "vente" ? "vente" : "depense");
+    });
+
+    $("vueBilan").classList.add("visible");
+  } catch (e) {
+    await signalerErreur("Bilan indisponible : " + e.message);
+  }
+}
+function fermerBilanVue() { $("vueBilan").classList.remove("visible"); }
+
+// --- Fiches PDF (demande explicite, 2026-11-17, suite aux fiches papier
+// transmises par Fadima) : voir moteur/fiches.py et les routes /fiches/*
+// (moteur/api.py). ---
+
+function remplirSelect(id, options) {
+  const select = $(id);
+  select.innerHTML = "";
+  if (!options.length) {
+    const vide = document.createElement("option");
+    vide.textContent = "(aucun)";
+    select.appendChild(vide);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  options.forEach((nom) => {
+    const option = document.createElement("option");
+    option.value = nom;
+    option.textContent = nom;
+    select.appendChild(option);
+  });
+}
+
+async function ouvrirFiches() {
+  if (!utilisatriceId) return;
+  try {
+    const tiers = await appelApi(`/fiches/disponibles/${utilisatriceId}`, { methode: "GET" });
+    remplirSelect("ficheSelectClient", tiers.clients);
+    remplirSelect("ficheSelectFournisseur", tiers.fournisseurs);
+    remplirSelect("ficheSelectArticle", tiers.articles);
+    $("vueFiches").classList.add("visible");
+  } catch (e) {
+    await signalerErreur("Fiches indisponibles : " + e.message);
+  }
+}
+function fermerFichesVue() { $("vueFiches").classList.remove("visible"); }
+
+function _blobEnBase64(blob) {
+  return new Promise((resoudre, rejeter) => {
+    const lecteur = new FileReader();
+    lecteur.onloadend = () => resoudre(String(lecteur.result).split(",")[1]);
+    lecteur.onerror = rejeter;
+    lecteur.readAsDataURL(blob);
+  });
+}
+
+// Télécharge le PDF d'une fiche et le propose à l'utilisatrice : sur
+// l'application mobile (Capacitor), écrit le fichier puis ouvre le
+// sélecteur de partage natif Android (visualiser/imprimer/envoyer par
+// WhatsApp...) ; sur la page de test navigateur (window.Capacitor absent ou
+// non natif), simple téléchargement via un lien <a download> classique -
+// même fonction, un seul chemin de code à tester sur desktop avant l'APK.
+async function genererFiche(chemin, nomFichier) {
+  try {
+    const reponse = await fetch(serveur + chemin, { headers: { Authorization: "Bearer " + jeton } });
+    if (!reponse.ok) throw new Error(`${reponse.status} : ${await reponse.text()}`);
+    const blob = await reponse.blob();
+
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      const donnees = await _blobEnBase64(blob);
+      const ecrit = await window.Capacitor.Plugins.Filesystem.writeFile({
+        path: nomFichier, data: donnees, directory: "CACHE",
+      });
+      await window.Capacitor.Plugins.Share.share({ title: nomFichier, url: ecrit.uri });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const lien = document.createElement("a");
+      lien.href = url;
+      lien.download = nomFichier;
+      document.body.appendChild(lien);
+      lien.click();
+      lien.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+  } catch (e) {
+    await signalerErreur("Fiche indisponible : " + e.message);
+  }
+}
+
+// Comme genererFiche, mais pour les fiches qui ont besoin d'un nom choisi
+// dans une liste déroulante (client/fournisseur/article) - voir #vueFiches.
+async function genererFicheAvecSelection(idSelect, cheminPrefixe, nomFichier) {
+  const select = $(idSelect);
+  if (select.disabled || !select.value) return;
+  await genererFiche(cheminPrefixe + encodeURIComponent(select.value), nomFichier);
 }
 
 const bouton = $("bouton");
 let enTraitement = false;
-bouton.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  // L'attribut HTML "disabled" n'empeche pas toujours un pointerdown de se
-  // declencher (observe en test reel, 2026-10-08 : bouton grise car demarrer()
-  // n'avait pas encore reussi, mais le micro s'activait quand meme et l'envoi
-  // echouait en 401 plus loin, au lieu de simplement ne rien faire).
-  if (bouton.disabled || enTraitement) return;
-  commencerEnregistrement().catch((err) => signalerErreur("Micro indisponible : " + err.message));
-});
-["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
-  bouton.addEventListener(evt, async () => {
-    if (!enregistreur || enregistreur.state !== "recording") return;
-    // Desactive IMMEDIATEMENT, avant tout await : sinon un second
-    // pointerdown entre ce relachement et l'envoi reel peut demarrer un
-    // nouvel enregistrement qui ecrase `morceaux` en plein milieu.
+// Un clic pour parler, un second pour envoyer (PAS "maintenir appuye") :
+// essaye d'abord en "maintenir appuye, relacher pour envoyer" (voir
+// l'ancienne version de ce bloc), mais observe en test reel (2026-11-16)
+// qu'une utilisatrice clique et relache tout de suite AVANT de parler,
+// pensant que ca reste a l'ecoute - l'enregistrement s'arretait donc avant
+// qu'elle ait rien dit, d'ou "il n'a pas compris" a chaque fois. `bascule`
+// protege contre un double-clic trop rapide (avant que le premier clic
+// n'ait fini de demarrer le micro, ex. en attendant l'autorisation la toute
+// premiere fois) qui lancerait un second enregistrement en parallele.
+let bascule = false;
+bouton.addEventListener("click", async () => {
+  if (bouton.disabled || enTraitement || bascule) return;
+  bascule = true;
+  try {
+    if (!enregistreur || enregistreur.state !== "recording") {
+      await commencerEnregistrement();
+      return;
+    }
     enTraitement = true;
-    $("bouton").disabled = true;
+    bouton.disabled = true;
     const blob = await arreterEnregistrement();
     if (blob && blob.size > 0) {
       await envoyerTour(blob);
     } else {
       etatBouton("");
-      $("bouton").disabled = false;
+      bouton.disabled = false;
     }
     enTraitement = false;
-  })
-);
+  } catch (err) {
+    signalerErreur("Micro indisponible : " + err.message);
+  } finally {
+    bascule = false;
+  }
+});
 
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
   journal("Microphone indisponible (ouvrir cette page en https).");
