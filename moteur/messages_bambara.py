@@ -202,21 +202,22 @@ def menu_principal() -> str:
 
     Passage à 9 choix (2026-11-17, script corrigé par l'équipe terrain) :
     seuls 1 (vente), 2 (dépense), 3 (capital) et 9 (stock, ex-5 renuméroté)
-    ont un mot-clé bambara validé-ish. Les 4 nouveaux choix (vente/achat à
-    crédit, échéance fournisseur, reste à payer - items 4 à 7) et le
-    réapprovisionnement de stock (item 8) n'ont PAS de mot bambara pour
-    "crédit"/"fournisseur"/"échéance" dans le corpus de ce projet : plutôt
-    que d'en inventer un (interdit par ce module, voir l'en-tête), ils ne
-    sont annoncés QUE par leur chiffre, à choisir au clavier ou en disant le
-    nombre en bambara - l'écran affiche déjà leur libellé en français (voir
-    moteur/web/index.html). Même principe que pour "consultation" avant eux
-    (retiré du menu annoncé le 2026-11-16, resté reconnu en parole libre
-    seulement) : un chiffre annoncé sans mot-clé fiable derrière, plutôt
-    qu'un mot-clé inventé et potentiellement faux.
+    ont un mot-clé annoncé ici. Les 4 nouveaux choix (vente/achat à crédit,
+    échéance fournisseur, reste à payer - items 4 à 7), le réapprovisionnement
+    de stock (item 8) et les items 10-12 (SFD) ne sont annoncés QUE par leur
+    chiffre, à choisir au clavier ou en disant le nombre en bambara - l'écran
+    affiche leur libellé (voir moteur/web/index.html).
 
-    Items 10-12 (SFD, même jour) : même principe, chiffre seul, pas de mot
-    annoncé ici - le texte de cette fonction ne change donc pas en passant
-    de 9 à 12 choix.
+    Fadima (GERME) a transmis le 2026-11-21 un mot bambara pour chacun de ces
+    items (4-8, 10-12) - voir web/index.html, qui les affiche désormais comme
+    étiquette de bouton. Ce texte-ci (le message vocal d'accueil) ne les
+    annonce volontairement PAS en plus de ceux déjà présents : l'audio de ce
+    message est déjà anormalement long en test réel (~72s mesurés, voir
+    tts_maliba.py et le suivi du bug correspondant) pour un texte aussi court -
+    y ajouter 8 mots composés (certains à 3 segments, ex. "Warimarasow-
+    djourousarata-hake") l'allongerait encore, sans bénéfice clair puisque le
+    choix par chiffre fonctionne déjà. À reconsidérer seulement après
+    correction de ce bug de lenteur.
     """
     return ("I ni ce, aw bisimila N'GONI NANA na. "
             "Kelen : feere. Fila : sara. Saba : jagokun. "

@@ -37,13 +37,25 @@ MOTS_CLES: dict[str, list[str]] = {
     # 2026-10-06, sur 3 locutrices différentes), pas une erreur isolée.
     "vente": ["feere", "fere"],
     # "sara" = payer ; "san" = acheter (englobe "achat", voir note ci-dessus).
-    "depense": ["sara", "san"],
+    # "musaka" = dépense (nom) : mot transmis par Fadima le 2026-11-21 pour
+    # l'étiquette du bouton menu item 2 (voir web/index.html) - ajouté ici en
+    # synonyme de "sara" (verbe payer), pas en remplacement : décision
+    # explicite de Mohamed de garder les deux formes reconnues à l'oral.
+    "depense": ["sara", "san", "musaka"],
     # "jagokun" = capital, cité explicitement dans le document d'architecture.
     "capital": ["jagokun"],
     # "bolo" ("en ma possession"), "tora" (rester) : signaux les plus faibles
     # du dictionnaire, absents d'un des 3 témoins du corpus (P19c). À
     # renforcer en priorité lors de la validation linguistique (R9).
-    "stock": ["bolo", "tora"],
+    # "minaw koura" : mot composé transmis par Fadima le 2026-11-21 pour
+    # l'étiquette du bouton menu item 9 (consultation stock). Ajouté en
+    # synonyme de "bolo"/"tora", pas en remplacement (même décision que pour
+    # "musaka" ci-dessus). Volontairement le mot COMPOSÉ ("minaw koura"), pas
+    # le seul "minaw" : "Minaw" (sans "koura") est le mot distinct donné pour
+    # l'item 8 (stock_ecriture, écrire un mouvement) - un simple "minaw"
+    # confondrait les deux intentions (voir _mot_present ci-dessous, qui sait
+    # matcher une séquence de plusieurs tokens pour ce cas).
+    "stock": ["bolo", "tora", "minaw koura"],
 }
 
 
@@ -56,8 +68,8 @@ MOTS_CLES: dict[str, list[str]] = {
 EXCEPTIONS_NOMS_PROPRES = {"sarata", "saran"}
 
 
-def _mot_present(mot_cle: str, tokens: list[str]) -> bool:
-    """Un token du texte correspond-il à ce mot-clé ?
+def _un_mot_present(mot_cle: str, tokens: list[str]) -> bool:
+    """Un token du texte correspond-il à ce mot-clé simple (un seul mot) ?
 
     Préfixe pour absorber les suffixes bambara (ex. "feere" -> "feerelen"),
     mais exact pour les racines de moins de 4 lettres, trop courtes pour un
@@ -67,6 +79,24 @@ def _mot_present(mot_cle: str, tokens: list[str]) -> bool:
     if len(mot_cle) < 4:
         return mot_cle in tokens
     return any(tok.startswith(mot_cle) and tok not in EXCEPTIONS_NOMS_PROPRES for tok in tokens)
+
+
+def _mot_present(mot_cle: str, tokens: list[str]) -> bool:
+    """`mot_cle` (un mot, ou plusieurs séparés par un espace) apparaît-il dans `tokens` ?
+
+    Un mot composé (ex. "minaw koura", voir MOTS_CLES["stock"]) doit
+    correspondre à une séquence de tokens CONSÉCUTIFS, pas à ses mots pris
+    séparément n'importe où dans la phrase - sinon "minaw" seul (mot distinct
+    de l'item 8, voir commentaire sur MOTS_CLES) déclencherait à tort cette
+    entrée dès qu'il apparaît, même sans "koura" à proximité.
+    """
+    mots = mot_cle.split()
+    if len(mots) == 1:
+        return _un_mot_present(mot_cle, tokens)
+    return any(
+        all(_un_mot_present(mots[j], [tokens[i + j]]) for j in range(len(mots)))
+        for i in range(len(tokens) - len(mots) + 1)
+    )
 
 
 def intentions_correspondantes(texte: str) -> list[str]:
@@ -103,13 +133,19 @@ def reconnaitre_intention(texte: str) -> str | None:
 # voir les 9 phrases "Appuyez sur X pour...") : 4 nouvelles actions (vente à
 # crédit, achat à crédit, échéance/dépôt fournisseur, consultation du reste à
 # payer) et "client" (ancien 4) et "stock" (ancien 5) renumérotés. Ces
-# nouvelles intentions n'ont PAS de mot-clé bambara dans MOTS_CLES ci-dessus :
-# contrairement à vente/depense/capital/stock, aucun mot n'existe encore pour
-# "crédit", "fournisseur" ou "échéance" dans le corpus validé de ce projet -
-# en inventer un casserait la règle du module (jamais de vocabulaire non
-# vérifié). Ces 4 actions ne sont donc accessibles QUE par le chiffre du menu
-# (clavier ou nombre dit en bambara), jamais par reconnaissance libre, tant
-# qu'une personne bambaraphone n'aura pas validé les mots correspondants.
+# nouvelles intentions n'ont PAS de mot-clé dans MOTS_CLES ci-dessus pour la
+# RECONNAISSANCE LIBRE (reconnaitre_intention) : accessibles seulement par le
+# chiffre du menu (clavier ou nombre dit en bambara), jamais en disant leur
+# nom. Fadima (GERME) a transmis le 2026-11-21 un mot bambara pour CHACUN des
+# items 1-12 (y compris 4-8 et 10-12, voir web/index.html pour leur affichage
+# comme étiquette de bouton) - mais seuls deux d'entre eux ont été ajoutés
+# ci-dessus à MOTS_CLES (comme synonymes d'un mot déjà reconnu, items 2 et 9,
+# décision explicite de Mohamed) : les mots des items 4-8/10-12 ("Fereli-
+# djouroula", "Sani-djouroula", "Djourousarata-hake", etc.) contiennent tous
+# la racine "djourou" (dette), qui collisionnerait avec "juru" déjà utilisé
+# pour l'intention "client" - les ajouter à la reconnaissance libre demande
+# une analyse de collision dédiée, pas faite ici. Simple étiquette affichée
+# pour l'instant, pas une nouvelle voie de reconnaissance vocale.
 MENU_NUMERIQUE: dict[int, str] = {
     1: "vente", 2: "depense", 3: "capital",
     4: "vente_credit", 5: "achat_credit",
@@ -117,8 +153,9 @@ MENU_NUMERIQUE: dict[int, str] = {
     8: "stock_ecriture", 9: "stock",
     # Items 10-12 (2026-11-17, suite aux fiches terrain transmises par
     # Fadima) : suivi d'un crédit SFD (institution de microfinance), même
-    # principe que 4-8 - aucun mot bambara validé pour "SFD"/"échéance",
-    # chiffre de menu uniquement (voir reconnaitre_choix_menu).
+    # principe que 4-8 - chiffre de menu uniquement pour la reconnaissance
+    # libre (voir reconnaitre_choix_menu et la note juste au-dessus sur les
+    # mots transmis le 2026-11-21, affichés mais pas ajoutés à MOTS_CLES).
     10: "sfd_declaration", 11: "sfd_paiement", 12: "sfd_consultation",
 }
 
