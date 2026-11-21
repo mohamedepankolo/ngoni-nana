@@ -262,47 +262,51 @@
   </div>
 
   <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
-       Memes 9 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py).
-       4 a 8 n'ont pas de mot-cle bambara valide (voir messages_bambara.menu_principal) :
-       etiquette en francais seul, pas de mot bambara invente. -->
+       Memes 12 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py).
+       Mots bambara des items 4-12 transmis par Fadima le 2026-11-21 : utilises
+       ici comme etiquette affichee (pas forcement comme mot reconnu a l'oral,
+       voir le commentaire au-dessus de MOTS_CLES["stock"] dans
+       dictionnaire_mots_cles.py pour le detail items 2/9, et celui au-dessus
+       de MENU_NUMERIQUE pour les items 4-8/10-12, volontairement laisses hors
+       de la reconnaissance libre pour l'instant). -->
   <div id="menuNumerique">
     <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
       <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
     </button>
     <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">
-      <span class="badge">2</span><span class="etiquette">Sara<small>dépense</small></span>
+      <span class="badge">2</span><span class="etiquette">Musakaw<small>dépense</small></span>
     </button>
     <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">
       <span class="badge">3</span><span class="etiquette">Jagokun<small>capital</small></span>
     </button>
     <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
-      <span class="badge">4</span><span class="etiquette">Vente<small>à crédit</small></span>
+      <span class="badge">4</span><span class="etiquette">Fereli-djouroula<small>vente à crédit</small></span>
     </button>
     <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
-      <span class="badge">5</span><span class="etiquette">Achat<small>à crédit</small></span>
+      <span class="badge">5</span><span class="etiquette">Sani-djouroula<small>achat à crédit</small></span>
     </button>
     <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
-      <span class="badge">6</span><span class="etiquette">Échéance<small>dette fournisseur</small></span>
+      <span class="badge">6</span><span class="etiquette">Djourousarata-hake<small>dette fournisseur</small></span>
     </button>
     <button disabled data-chiffre="7" onclick="envoyerChoixMenu(7)">
-      <span class="badge">7</span><span class="etiquette">Reste<small>à payer</small></span>
+      <span class="badge">7</span><span class="etiquette">Djourourasata-toh<small>reste à payer</small></span>
     </button>
     <button disabled data-chiffre="8" onclick="envoyerChoixMenu(8)">
-      <span class="badge">8</span><span class="etiquette">Stock<small>ajouter</small></span>
+      <span class="badge">8</span><span class="etiquette">Minaw<small>stock, article</small></span>
     </button>
     <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
-      <span class="badge">9</span><span class="etiquette">Bolo<small>stock</small></span>
+      <span class="badge">9</span><span class="etiquette">Minaw-koura<small>stock</small></span>
     </button>
-    <!-- Items 10-12 (SFD, 2026-11-17, documentation Fadima) : meme principe
-         que 4-8, aucun mot bambara valide pour "SFD"/"echeance". -->
+    <!-- Items 10-12 (SFD, 2026-11-17, documentation Fadima ; mots bambara
+         transmis le 2026-11-21) : meme principe que 4-8. -->
     <button disabled data-chiffre="10" onclick="envoyerChoixMenu(10)">
-      <span class="badge">10</span><span class="etiquette">Crédit SFD<small>déclarer</small></span>
+      <span class="badge">10</span><span class="etiquette">Warimarasow-djourou<small>crédit SFD</small></span>
     </button>
     <button disabled data-chiffre="11" onclick="envoyerChoixMenu(11)">
-      <span class="badge">11</span><span class="etiquette">Échéance SFD<small>payer</small></span>
+      <span class="badge">11</span><span class="etiquette">Warimarasow-djourousarata-hake<small>échéance SFD</small></span>
     </button>
     <button disabled data-chiffre="12" onclick="envoyerChoixMenu(12)">
-      <span class="badge">12</span><span class="etiquette">Crédit SFD<small>reste à payer</small></span>
+      <span class="badge">12</span><span class="etiquette">Warimarasow-djourourasata-toh<small>SFD, reste à payer</small></span>
     </button>
   </div>
 
