@@ -27,7 +27,7 @@ public class MainActivity extends BridgeActivity {
     // Si le certificat est regenere (nouvelle empreinte), cette valeur doit
     // etre mise a jour et l'app reconstruite.
     private static final String EMPREINTE_SHA256_ATTENDUE =
-            "4F:7B:6F:0D:1C:69:26:BF:9F:8A:91:17:75:C0:0F:E5:FE:A5:67:CE:0D:18:59:72:C5:12:72:01:BE:24:6A:09";
+            "F0:2A:F9:0E:B5:70:8B:32:50:F7:35:40:91:FD:53:5C:F0:1D:06:0B:DE:8F:47:2A:11:81:0B:EA:37:B2:A5:88";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
