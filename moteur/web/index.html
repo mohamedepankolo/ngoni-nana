@@ -24,9 +24,10 @@
      blanc / noir / orange (PAS rouge - verifie sur captures reelles de
      l'appli, le rouge ne fait pas partie de sa charte). */
   #vuePrincipale {
-    height: 100%; overflow-y: auto; display: flex; flex-direction: column;
+    height: 100%; overflow-y: auto; display: none; flex-direction: column;
     align-items: center; padding: 20px 20px 32px; gap: 14px; background: #fff;
   }
+  #vuePrincipale.visible { display: flex; }
   #zoneBouton { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
 
   /* Carte de solde (equivalent de la carte sombre "Main USD / Main LRD" de
@@ -79,6 +80,39 @@
   #menuNumerique .etiquette { font-size: 12px; color: #333; text-align: center; line-height: 1.3; }
   #menuNumerique .etiquette small { display: block; color: #888; font-weight: 400; }
   #menuNumerique button:disabled { opacity: 0.4; }
+
+  /* Bouton "Retour au menu" : visible uniquement PENDANT une operation en
+     cours (attente != "menu", voir appliquerAttente), pour ne jamais rester
+     bloquee dans un parcours sans issue autre que la terminer ou enchainer
+     des "non" jusqu'a l'escalade humaine (demande explicite, 2026-11-25).
+     Discret expres (texte gris, pas de fond) : ce n'est pas une action
+     principale, juste une sortie de secours. */
+  #boutonAnnuler {
+    display: none; background: none; border: none; color: #888;
+    font-size: 13px; padding: 6px 4px; align-self: flex-start;
+  }
+  #boutonAnnuler:disabled { opacity: 0.4; }
+
+  /* ---------- Ecran d'accueil (avant le tableau de bord) ---------- */
+  /* Premier ecran vu en ouvrant l'appli, avant le menu numerique (demande
+     explicite, 2026-11-25) : donne un point d'entree clair plutot que de
+     tomber directement sur les boutons, ET fournit un vrai geste utilisateur
+     avant de jouer le tout premier son (demarrer() -> nouvelleSession()) -
+     certains navigateurs/WebView bloquent l'audio qui demarre sans qu'un
+     geste l'ait precede (politique "autoplay"), ce qui pouvait silencieusement
+     empecher le message d'accueil de se faire entendre avant ce changement. */
+  #vueAccueil {
+    height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 18px; padding: 24px; text-align: center;
+    background: linear-gradient(180deg, #161616 0%, #2a1a10 100%);
+  }
+  #vueAccueil img { width: 96px; height: 96px; border-radius: 22px; }
+  #vueAccueil h1 { color: #fff; font-size: 26px; margin: 0; }
+  #vueAccueil p { color: #cbb; font-size: 14px; margin: 0; max-width: 280px; }
+  #vueAccueil button {
+    margin-top: 10px; padding: 16px 36px; border-radius: 30px; border: none;
+    background: #b85424; color: #fff; font-weight: 600; font-size: 16px;
+  }
 
   /* MODE TEST : saisie clavier d'un champ precis (quantite/montant/article/
      client), affichee quand attente = "champ:<nom>" (voir agent_vocal.py,
@@ -239,9 +273,21 @@
 </head>
 <body>
 
-<div id="vuePrincipale">
-  <div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
+<!-- En dehors de #vuePrincipale (qui reste cachee tant que "Commencer" n'a
+     pas ete tape) pour rester accessible des le tout premier ecran -
+     c'est ici qu'on configure jeton/serveur avant de pouvoir demarrer. -->
+<div id="zoneReglageSecrete" onclick="gererTapLogo()"></div>
 
+<!-- Ecran d'accueil (voir le commentaire sur #vueAccueil dans <style>) :
+     premier ecran vu, avant le tableau de bord/menu numerique. -->
+<div id="vueAccueil">
+  <img src="icon-192.png" alt="">
+  <h1>N'GONI NANA</h1>
+  <p>Assistant comptable vocal en bambara</p>
+  <button onclick="commencer()">Commencer</button>
+</div>
+
+<div id="vuePrincipale">
   <!-- Carte de solde (equivalent "Main USD/LRD" de Max it) : capital + resume
        ventes/depenses, toujours visible en ouvrant l'appli. Detail complet
        (dettes, stock, transactions) via "Bɛɛ" -> ouvrirBilan() (#vueBilan). -->
@@ -260,6 +306,9 @@
       <span class="depense" id="carteDepenses">-0</span>
     </div>
   </div>
+
+  <!-- Voir le commentaire sur #boutonAnnuler dans <style>. -->
+  <button id="boutonAnnuler" disabled onclick="annulerOperation()">&#8592; Retour au menu</button>
 
   <!-- MODE TEST (menu numerique) : voir le commentaire sur #menuNumerique dans <style>.
        Memes 12 choix que le menu vocal (MENU_NUMERIQUE, dictionnaire_mots_cles.py).
@@ -539,8 +588,25 @@ async function appelApi(chemin, options = {}) {
 
 function activerControles(actif) {
   $("bouton").disabled = !actif;
-  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button, #choixChamp button")
+  document.querySelectorAll("#menuNumerique button, #champSaisie button, #choixOuiNon button, #choixChamp button, #boutonAnnuler")
     .forEach((b) => { b.disabled = !actif; });
+}
+
+// Voir le commentaire sur #boutonAnnuler dans <style>. Confirmation cote
+// client (confirm() natif) avant d'abandonner quoi que ce soit - demande
+// explicite ("on demande si la personne veut tout arreter"). Le reset cote
+// serveur (/session/.../reinitialiser) est best-effort : meme s'il echoue
+// (reseau), on revient quand meme a l'ecran menu cote app, qui est ce que
+// l'utilisatrice voit et attend de ce bouton.
+async function annulerOperation() {
+  if (!confirm("Veux-tu arrêter cette opération et revenir au menu ?")) return;
+  activerControles(false);
+  try {
+    await appelApi(`/session/${sessionId}/reinitialiser`, { methode: "POST", corps: {} });
+  } catch (e) { /* best-effort, voir commentaire ci-dessus */ }
+  appliquerAttente("menu");
+  await rafraichirCarteCapital();
+  activerControles(true);
 }
 
 // MODE TEST : quel widget de saisie proposer selon "attente" (voir
@@ -570,6 +636,9 @@ function appliquerAttente(attente) {
   $("champSaisie").style.display = "none";
   $("choixOuiNon").style.display = "none";
   $("choixChamp").style.display = "none";
+  // Voir le commentaire sur #boutonAnnuler dans <style> : visible pour
+  // toute attente autre que "menu" (operation en cours).
+  $("boutonAnnuler").style.display = (attente && attente !== "menu") ? "block" : "none";
 
   if (!attente || attente === "menu") {
     $("menuNumerique").style.display = "flex";
@@ -946,8 +1015,19 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
-if (jeton) demarrer();
-else journal("Aucun jeton : ouvrir le reglage (5 appuis coin haut-gauche de l'ecran).");
+// Voir le commentaire sur #vueAccueil dans <style> : demarrer() n'est plus
+// appele automatiquement au chargement de la page, seulement au clic sur
+// "Commencer" (geste utilisateur requis avant la toute premiere lecture
+// audio sur certains navigateurs/WebView, en plus de donner un vrai point
+// d'entree a l'appli plutot que les boutons directement).
+async function commencer() {
+  $("vueAccueil").style.display = "none";
+  $("vuePrincipale").classList.add("visible");
+  if (jeton) await demarrer();
+  else journal("Aucun jeton : ouvrir le reglage (5 appuis coin haut-gauche de l'ecran).");
+}
+
+if (!jeton) journal("Aucun jeton : ouvrir le reglage (5 appuis coin haut-gauche de l'ecran).");
 </script>
 </body>
 </html>

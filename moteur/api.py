@@ -314,6 +314,19 @@ def consulter_session(session_id: int):
                  "date_debut": s.date_debut, "date_fin": s.date_fin}
 
 
+@app.post("/session/{session_id}/reinitialiser", dependencies=[Depends(verifier_jeton)])
+def reinitialiser_session(session_id: int, agent: AgentVocal = Depends(obtenir_agent)):
+    """Abandonne l'opération en cours (bouton "Retour au menu", voir
+
+    web/index.html) : remet la session à l'état "menu" SANS rejouer le
+    message d'accueil ni clôturer la session SQL (voir AgentVocal.reinitialiser)
+    - juste de quoi laisser une utilisatrice sortir d'une opération en cours
+    sans être bloquée jusqu'à la fin ou l'escalade humaine.
+    """
+    agent.reinitialiser(session_id)
+    return {"attente": "menu"}
+
+
 @app.post("/demo/bootstrap", dependencies=[Depends(verifier_jeton)])
 def bootstrap_demo():
     """Crée (une seule fois) une coopérative et une utilisatrice de démonstration,
