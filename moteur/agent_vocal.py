@@ -195,6 +195,19 @@ class AgentVocal:
         finally:
             bd.close()
 
+    def reinitialiser(self, session_id: int) -> None:
+        """Abandonne l'opération en cours pour cette session (bouton "Retour
+
+        au menu" côté app, voir web/index.html) : repart d'un état frais,
+        SANS rejouer le message d'accueil (contrairement à
+        demarrer_session) - sinon chaque annulation redéclencherait le bug
+        de l'audio d'accueil de ~72s (voir messages_bambara.menu_principal).
+        Ne touche pas à la session SQL (SessionAppel) : annuler une
+        opération n'est pas terminer l'appel, juste repartir à "menu" pour
+        permettre une nouvelle action tout de suite.
+        """
+        self._etats[session_id] = _EtatSession()
+
     def traiter_audio(self, session_id: int, utilisatrice_id: int, chemin_audio: str) -> dict:
         if self._transcrire is None:
             raise RuntimeError("Aucune fonction de transcription fournie à cet AgentVocal.")
