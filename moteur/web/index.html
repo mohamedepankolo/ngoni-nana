@@ -56,25 +56,36 @@
      5 choix que le menu vocal/telephonie (voir MENU_NUMERIQUE,
      dictionnaire_mots_cles.py), juste presentes en tuiles plutot qu'en
      boutons ronds numerotes. */
-  #menuNumerique {
-    display: flex; flex-wrap: wrap; gap: 10px;
-    width: 100%; max-width: 360px;
+  #menuNumerique { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px; }
+  /* Un groupe (categorie) par section, chacun avec son propre flex-wrap -
+     meme logique "flex pas grid" que l'ancien #menuNumerique (voir
+     l'explication qu'il y avait ici) : une categorie de 2 ou 4 boutons (pas
+     multiple de 3) s'etire pour remplir sa derniere ligne au lieu de
+     laisser une case vide, independamment des autres categories. */
+  .groupe-menu { display: flex; flex-wrap: wrap; gap: 10px; }
+  .entete-groupe {
+    font-size: 11px; font-weight: 700; color: #999; letter-spacing: 0.04em;
+    text-transform: uppercase; margin: 6px 2px -2px;
   }
-  /* flex (pas grid) expres : avec 5 tuiles, la 2e ligne n'en a que 2 - en
-     grid a 3 colonnes fixes, la 3e case restait vide (du "blanc derriere",
-     signale en test reel 2026-11-16). En flex, flex-grow repartit la place
-     en trop entre les tuiles de CHAQUE ligne : les 2 de la 2e ligne
-     s'agrandissent pour occuper toute la largeur, comme les 3 de la 1ere -
-     plus de case vide, sans avoir a coder un cas particulier pour "5". */
   #menuNumerique button {
     flex: 1 1 100px;
     display: flex; flex-direction: column; align-items: center; gap: 7px;
     background: #fff; border: none; border-radius: 14px; padding: 18px 4px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
   }
-  #menuNumerique .badge {
-    width: 40px; height: 40px; border-radius: 50%; background: #e8863a;
-    color: #fff; font-weight: 700; font-size: 16px;
+  /* Icone coloree (par categorie, voir chaque bouton plus bas) + chiffre du
+     menu vocal/telephonie en petit badge dans le coin - demande explicite de
+     design avec icones (2026-11-25), approuvee par Fadima sur cette option
+     precisement ("Option A", voir l'artifact de design pour les variantes
+     ecartees) : le chiffre reste visible (c'est ce qu'on dit/tape vraiment),
+     l'icone aide a repérer l'operation du premier coup d'oeil. */
+  #menuNumerique .icone-badge {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0;
+  }
+  #menuNumerique .chip-chiffre {
+    position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; border: 1.5px solid; color: inherit; font-size: 10px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
   }
   #menuNumerique .etiquette { font-size: 12px; color: #333; text-align: center; line-height: 1.3; }
@@ -319,44 +330,107 @@
        de MENU_NUMERIQUE pour les items 4-8/10-12, volontairement laisses hors
        de la reconnaissance libre pour l'instant). -->
   <div id="menuNumerique">
-    <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
-      <span class="badge">1</span><span class="etiquette">Feere<small>vente</small></span>
-    </button>
-    <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">
-      <span class="badge">2</span><span class="etiquette">Musakaw<small>dépense</small></span>
-    </button>
-    <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">
-      <span class="badge">3</span><span class="etiquette">Jagokun<small>capital</small></span>
-    </button>
-    <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
-      <span class="badge">4</span><span class="etiquette">Fereli-djouroula<small>vente à crédit</small></span>
-    </button>
-    <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
-      <span class="badge">5</span><span class="etiquette">Sani-djouroula<small>achat à crédit</small></span>
-    </button>
-    <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
-      <span class="badge">6</span><span class="etiquette">Djourousarata-hake<small>dette fournisseur</small></span>
-    </button>
-    <button disabled data-chiffre="7" onclick="envoyerChoixMenu(7)">
-      <span class="badge">7</span><span class="etiquette">Djourourasata-toh<small>reste à payer</small></span>
-    </button>
-    <button disabled data-chiffre="8" onclick="envoyerChoixMenu(8)">
-      <span class="badge">8</span><span class="etiquette">Minaw<small>stock, article</small></span>
-    </button>
-    <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
-      <span class="badge">9</span><span class="etiquette">Minaw-koura<small>stock</small></span>
-    </button>
+    <div class="entete-groupe">Ventes &amp; dépenses</div>
+    <div class="groupe-menu">
+      <button disabled data-chiffre="1" onclick="envoyerChoixMenu(1)">
+        <span class="icone-badge" style="background:#e8863a; color:#e8863a;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          <span class="chip-chiffre">1</span>
+        </span>
+        <span class="etiquette">Feere<small>vente</small></span>
+      </button>
+      <button disabled data-chiffre="2" onclick="envoyerChoixMenu(2)">
+        <span class="icone-badge" style="background:#e8863a; color:#e8863a;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          <span class="chip-chiffre">2</span>
+        </span>
+        <span class="etiquette">Musakaw<small>dépense</small></span>
+      </button>
+      <button disabled data-chiffre="3" onclick="envoyerChoixMenu(3)">
+        <span class="icone-badge" style="background:#e8863a; color:#e8863a;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          <span class="chip-chiffre">3</span>
+        </span>
+        <span class="etiquette">Jagokun<small>capital</small></span>
+      </button>
+    </div>
+
+    <div class="entete-groupe">Crédit client &amp; fournisseur</div>
+    <div class="groupe-menu">
+      <button disabled data-chiffre="4" onclick="envoyerChoixMenu(4)">
+        <span class="icone-badge" style="background:#2f6fed; color:#2f6fed;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          <span class="chip-chiffre">4</span>
+        </span>
+        <span class="etiquette">Fereli-djouroula<small>vente à crédit</small></span>
+      </button>
+      <button disabled data-chiffre="5" onclick="envoyerChoixMenu(5)">
+        <span class="icone-badge" style="background:#2f6fed; color:#2f6fed;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+          <span class="chip-chiffre">5</span>
+        </span>
+        <span class="etiquette">Sani-djouroula<small>achat à crédit</small></span>
+      </button>
+      <button disabled data-chiffre="6" onclick="envoyerChoixMenu(6)">
+        <span class="icone-badge" style="background:#c23b2e; color:#c23b2e;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span class="chip-chiffre">6</span>
+        </span>
+        <span class="etiquette">Djourousarata-hake<small>dette fournisseur</small></span>
+      </button>
+      <button disabled data-chiffre="7" onclick="envoyerChoixMenu(7)">
+        <span class="icone-badge" style="background:#c23b2e; color:#c23b2e;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="chip-chiffre">7</span>
+        </span>
+        <span class="etiquette">Djourourasata-toh<small>reste à payer</small></span>
+      </button>
+    </div>
+
+    <div class="entete-groupe">Stock</div>
+    <div class="groupe-menu">
+      <button disabled data-chiffre="8" onclick="envoyerChoixMenu(8)">
+        <span class="icone-badge" style="background:#4f8f5a; color:#4f8f5a;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          <span class="chip-chiffre">8</span>
+        </span>
+        <span class="etiquette">Minaw<small>stock, article</small></span>
+      </button>
+      <button disabled data-chiffre="9" onclick="envoyerChoixMenu(9)">
+        <span class="icone-badge" style="background:#4f8f5a; color:#4f8f5a;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          <span class="chip-chiffre">9</span>
+        </span>
+        <span class="etiquette">Minaw-koura<small>stock</small></span>
+      </button>
+    </div>
+
     <!-- Items 10-12 (SFD, 2026-11-17, documentation Fadima ; mots bambara
          transmis le 2026-11-21) : meme principe que 4-8. -->
-    <button disabled data-chiffre="10" onclick="envoyerChoixMenu(10)">
-      <span class="badge">10</span><span class="etiquette">Warimarasow-djourou<small>crédit SFD</small></span>
-    </button>
-    <button disabled data-chiffre="11" onclick="envoyerChoixMenu(11)">
-      <span class="badge">11</span><span class="etiquette">Warimarasow-djourousarata-hake<small>échéance SFD</small></span>
-    </button>
-    <button disabled data-chiffre="12" onclick="envoyerChoixMenu(12)">
-      <span class="badge">12</span><span class="etiquette">Warimarasow-djourourasata-toh<small>SFD, reste à payer</small></span>
-    </button>
+    <div class="entete-groupe">SFD / microfinance</div>
+    <div class="groupe-menu">
+      <button disabled data-chiffre="10" onclick="envoyerChoixMenu(10)">
+        <span class="icone-badge" style="background:#7c5cbf; color:#7c5cbf;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V10"></path><path d="M19 21V10"></path><path d="M9 21V10"></path><path d="M15 21V10"></path><path d="M2 10l10-6 10 6"></path></svg>
+          <span class="chip-chiffre">10</span>
+        </span>
+        <span class="etiquette">Warimarasow-djourou<small>crédit SFD</small></span>
+      </button>
+      <button disabled data-chiffre="11" onclick="envoyerChoixMenu(11)">
+        <span class="icone-badge" style="background:#7c5cbf; color:#7c5cbf;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span class="chip-chiffre">11</span>
+        </span>
+        <span class="etiquette">Warimarasow-djourousarata-hake<small>échéance SFD</small></span>
+      </button>
+      <button disabled data-chiffre="12" onclick="envoyerChoixMenu(12)">
+        <span class="icone-badge" style="background:#7c5cbf; color:#7c5cbf;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          <span class="chip-chiffre">12</span>
+        </span>
+        <span class="etiquette">Warimarasow-djourourasata-toh<small>SFD, reste à payer</small></span>
+      </button>
+    </div>
   </div>
 
   <div id="zoneBouton">
